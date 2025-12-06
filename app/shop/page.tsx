@@ -1,0 +1,174 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ProductCard } from '@/components/product-card';
+import { supabase } from '@/lib/supabase/client';
+import { Product, ProductImage, Category } from '@/lib/types';
+import { useCart } from '@/lib/cart-context';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+
+export default function ShopPage() {
+  const searchParams = useSearchParams();
+  const { currency } = useCart();
+  const [products, setProducts] = useState<{ product: Product; image?: ProductImage }[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.get('category') || '');
+  const [sortBy, setSortBy] = useState('newest');
+  const [priceRange, setPriceRange] = useState([0, 50000]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [selectedCategory, sortBy]);
+
+  const fetchCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('is_active', true);
+
+    if (data) setCategories(data);
+  };
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    let query = supabase
+      .from('products')
+      .select('*')
+      .eq('is_active', true)
+      .gte('base_price_inr', priceRange[0])
+      .lte('base_price_inr', priceRange[1]);
+
+    if (selectedCategory) {
+      const category = categories.find(c => c.slug === selectedCategory);
+      if (category) {
+        query = query.eq('category_id', category.id);
+      }
+    }
+
+    if (sortBy === 'price-asc') {
+      query = query.order('base_price_inr', { ascending: true });
+    } else if (sortBy === 'price-desc') {
+      query = query.order('base_price_inr', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    const { data } = await query;
+
+    if (data) {
+      const productsWithImages = await Promise.all(
+        data.map(async (product) => {
+          const { data: image } = await supabase
+            .from('product_images')
+            .select('*')
+            .eq('product_id', product.id)
+            .eq('is_primary', true)
+            .maybeSingle();
+
+          return { product, image };
+        })
+      );
+      setProducts(productsWithImages);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-4xl font-bold mb-8">Shop All Products</h1>
+
+      <div className="flex flex-col md:flex-row gap-8">
+        <aside className="w-full md:w-64 space-y-6">
+          <div>
+            <Label className="text-sm font-semibold mb-2 block">Category</Label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.slug}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-sm font-semibold mb-2 block">
+              Price Range (INR)
+            </Label>
+            <Slider
+              min={0}
+              max={50000}
+              step={1000}
+              value={priceRange}
+              onValueChange={setPriceRange}
+              className="mb-2"
+            />
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>₹{priceRange[0]}</span>
+              <span>₹{priceRange[1]}</span>
+            </div>
+            <Button
+              onClick={fetchProducts}
+              size="sm"
+              className="w-full mt-2"
+            >
+              Apply Filter
+            </Button>
+          </div>
+        </aside>
+
+        <div className="flex-1">
+          <div className="flex justify-between items-center mb-6">
+            <p className="text-sm text-gray-600">
+              {products.length} products
+            </p>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest First</SelectItem>
+                <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                <SelectItem value="price-desc">Price: High to Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-12">Loading...</div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">No products found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {products.map(({ product, image }) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  image={image}
+                  currency={currency}
+                  rate={1}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
