@@ -11,6 +11,7 @@ import {
   Tag,
   Folder,
   Users,
+  DollarSign,
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -45,23 +46,25 @@ export default function AdminLayout({
     { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
     { name: 'Categories', href: '/admin/categories', icon: Folder },
     { name: 'Coupons', href: '/admin/coupons', icon: Tag },
+    { name: 'Currency', href: '/admin/currency', icon: DollarSign },
     { name: 'Users', href: '/admin/users', icon: Users },
   ];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r">
-        <div className="p-6">
-          <h1 className="text-xl font-bold">Samara Admin</h1>
+    <div className="flex min-h-screen bg-neutral-50">
+      <aside className="w-64 bg-neutral-900 border-r border-neutral-800">
+        <div className="p-6 border-b border-neutral-800">
+          <h1 className="text-xl font-bold text-amber-400">Samara Admin</h1>
+          <p className="text-xs text-neutral-400 mt-1">Admin Panel</p>
         </div>
-        <nav className="px-3">
+        <nav className="px-3 py-4">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 mb-1"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-neutral-400 hover:text-amber-400 hover:bg-neutral-800/50 mb-1 transition-colors"
               >
                 <Icon className="h-5 w-5" />
                 <span>{item.name}</span>
@@ -70,7 +73,7 @@ export default function AdminLayout({
           })}
         </nav>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 p-8 bg-white">{children}</main>
     </div>
   );
 }
