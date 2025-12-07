@@ -13,7 +13,6 @@ import { Toaster } from '@/components/ui/sonner';
 import { ProductTryOnModal } from '@/components/ProductTryOnModal';
 import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
-import { AITryOnButton } from '@/components/AITryOnButton';
 import { getSimilarProducts } from '@/lib/content';
 
 interface Product {
@@ -135,16 +134,13 @@ export default function ProductDetailPageLuxury() {
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
             <div>
               <div className="sticky top-24">
-                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10 relative">
+                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10">
                   {selectedImage ? (
-                    <>
-                      <img
-                        src={selectedImage}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <AITryOnButton onClick={() => setTryOnModalOpen(true)} />
-                    </>
+                    <img
+                      src={selectedImage}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-600 font-serif">
                       Product Image
@@ -153,7 +149,7 @@ export default function ProductDetailPageLuxury() {
                 </div>
 
                 {images.length > 1 && (
-                  <div className="flex gap-3 overflow-x-auto pb-2">
+                  <div className="flex gap-3 overflow-x-auto pb-2 mb-4">
                     {images.map((image) => (
                       <button
                         key={image.id}
@@ -173,6 +169,14 @@ export default function ProductDetailPageLuxury() {
                     ))}
                   </div>
                 )}
+
+                <Button
+                  onClick={() => setTryOnModalOpen(true)}
+                  className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-xl hover:shadow-[#D4AF37]/50 text-black font-bold py-6 text-lg border-2 border-black/10 hover:scale-[1.02] transition-all"
+                >
+                  <Camera className="h-5 w-5 mr-2" />
+                  Try With AI Camera
+                </Button>
               </div>
             </div>
 
