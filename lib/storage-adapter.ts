@@ -1,4 +1,3 @@
-import { generatePresignedUploadUrl, isS3Enabled, uploadToS3 } from './aws/s3';
 import { supabase } from './supabase/client';
 
 const USE_S3 = process.env.USE_S3 === 'true' || process.env.NEXT_PUBLIC_USE_S3 === 'true';
@@ -19,41 +18,11 @@ export async function uploadImage(
   file: File,
   folder: 'products' | 'categories' | 'brands'
 ): Promise<UploadResult> {
-  if (USE_S3 && isS3Enabled()) {
-    return uploadToS3Client(file, folder);
-  } else if (USE_CLOUDINARY) {
+  if (USE_CLOUDINARY) {
     return uploadToCloudinary(file, folder);
   } else {
     return uploadToSupabaseStorage(file, folder);
   }
-}
-
-async function uploadToS3Client(
-  file: File,
-  folder: 'products' | 'categories' | 'brands'
-): Promise<UploadResult> {
-  const presigned = await generatePresignedUploadUrl(
-    folder,
-    file.name,
-    file.type
-  );
-
-  const uploadResponse = await fetch(presigned.uploadUrl, {
-    method: 'PUT',
-    body: file,
-    headers: {
-      'Content-Type': file.type,
-    },
-  });
-
-  if (!uploadResponse.ok) {
-    throw new Error('Failed to upload to S3');
-  }
-
-  return {
-    url: presigned.publicUrl,
-    key: presigned.key,
-  };
 }
 
 async function uploadToCloudinary(
@@ -116,11 +85,7 @@ async function uploadToSupabaseStorage(
 }
 
 export async function deleteImage(url: string): Promise<void> {
-  if (USE_S3 && url.includes('cloudfront.net')) {
-    // S3 deletion would require extracting the key and using deleteS3Object
-    console.log('S3 image deletion not implemented in client');
-    return;
-  } else if (USE_CLOUDINARY && url.includes('cloudinary.com')) {
+  if (USE_CLOUDINARY && url.includes('cloudinary.com')) {
     console.log('Cloudinary deletion requires server-side API call');
     return;
   } else {
@@ -133,8 +98,7 @@ export async function deleteImage(url: string): Promise<void> {
   }
 }
 
-export function getStorageProvider(): 'S3' | 'Cloudinary' | 'Supabase' {
-  if (USE_S3) return 'S3';
+export function getStorageProvider(): 'Cloudinary' | 'Supabase' {
   if (USE_CLOUDINARY) return 'Cloudinary';
   return 'Supabase';
 }
