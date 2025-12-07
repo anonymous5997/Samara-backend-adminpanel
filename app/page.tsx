@@ -8,6 +8,9 @@ import { AITryOn } from '@/components/AITryOn';
 import { ProductSection } from '@/components/ProductSection';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function Home() {
   const mostLovedProducts = await getMostLovedProducts(4);
   const newArrivals = await getNewArrivals(4);
