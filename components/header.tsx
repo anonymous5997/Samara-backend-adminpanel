@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { CurrencySelector } from '@/components/currency-selector';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -56,7 +57,9 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-4">
-            <span className="hidden md:block text-sm font-medium text-[#D4AF37]">{currency}</span>
+            <div className="hidden md:block">
+              <CurrencySelector currency={currency} onChange={setCurrency} />
+            </div>
 
             <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
               <Link href="/search">
