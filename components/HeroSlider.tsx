@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 
 interface HeroSlide {
   title: string;
   subtitle: string;
   primaryCta: { label: string; url: string };
   secondaryCta: { label: string; url: string };
-  backgroundImage: string;
 }
 
 const slides: HeroSlide[] = [
@@ -19,28 +18,24 @@ const slides: HeroSlide[] = [
     subtitle: 'Discover our premium collection of handcrafted sarees that celebrate elegance and tradition with modern grace',
     primaryCta: { label: 'Shop The Edit', url: '/sarees' },
     secondaryCta: { label: 'View All', url: '/collections' },
-    backgroundImage: 'https://images.pexels.com/photos/8533402/pexels-photo-8533402.jpeg?auto=compress&cs=tinysrgb&w=1920',
   },
   {
     title: 'Festive Elegance',
     subtitle: 'Celebrate every moment with our exclusive festive collection designed for the modern woman',
     primaryCta: { label: 'Shop The Edit', url: '/festive-edit' },
     secondaryCta: { label: 'View All', url: '/sarees' },
-    backgroundImage: 'https://images.pexels.com/photos/10214695/pexels-photo-10214695.jpeg?auto=compress&cs=tinysrgb&w=1920',
   },
   {
     title: 'Contemporary Grace',
     subtitle: 'Modern designs that honor traditional craftsmanship, perfect for today\'s confident woman',
     primaryCta: { label: 'Shop The Edit', url: '/sarees' },
     secondaryCta: { label: 'View All', url: '/collections' },
-    backgroundImage: 'https://images.pexels.com/photos/3560137/pexels-photo-3560137.jpeg?auto=compress&cs=tinysrgb&w=1920',
   },
   {
     title: 'Premium Collections',
     subtitle: 'Exquisite handpicked sarees crafted with the finest fabrics and intricate detailing',
     primaryCta: { label: 'Shop The Edit', url: '/collections' },
     secondaryCta: { label: 'View All', url: '/sarees' },
-    backgroundImage: 'https://images.pexels.com/photos/3560130/pexels-photo-3560130.jpeg?auto=compress&cs=tinysrgb&w=1920',
   },
 ];
 
@@ -73,50 +68,47 @@ export function HeroSlider() {
   const slide = slides[currentSlide];
 
   return (
-    <section className="relative h-screen min-h-[600px] overflow-hidden">
-      <div
-        className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
-        style={{
-          backgroundImage: `url(${slide.backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
+    <section className="relative bg-black overflow-hidden py-16 md:py-24 lg:py-32">
+      <div className="container mx-auto px-4 md:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-7xl mx-auto">
+          <div className="space-y-8 transition-opacity duration-700 ease-in-out" key={currentSlide}>
+            <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] tracking-tight leading-tight">
+              {slide.title}
+            </h1>
+            <p className="text-lg md:text-xl lg:text-2xl text-gray-300 leading-relaxed max-w-xl">
+              {slide.subtitle}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                size="lg"
+                asChild
+                className="bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold px-10 py-6 text-lg transition-all duration-300 border-0 hover:scale-105 rounded-full"
+              >
+                <Link href={slide.primaryCta.url}>
+                  {slide.primaryCta.label}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                asChild
+                className="border-2 border-[#D4AF37] bg-transparent hover:bg-[#D4AF37]/10 hover:shadow-lg hover:shadow-[#D4AF37]/30 text-[#D4AF37] font-bold px-10 py-6 text-lg transition-all duration-300 hover:scale-105 rounded-full"
+              >
+                <Link href={slide.secondaryCta.url}>
+                  {slide.secondaryCta.label}
+                </Link>
+              </Button>
+            </div>
+          </div>
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/80" />
-
-      <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black/60 to-transparent pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-black/60 to-transparent pointer-events-none" />
-
-      <div className="relative z-20 container mx-auto px-4 md:px-8 h-full flex items-center">
-        <div className="max-w-4xl animate-fade-in">
-          <h1 className="font-serif text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] tracking-tighter leading-tight drop-shadow-2xl">
-            {slide.title}
-          </h1>
-          <p className="text-xl md:text-2xl lg:text-3xl mb-12 text-gray-100 leading-relaxed max-w-2xl drop-shadow-lg">
-            {slide.subtitle}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button
-              size="lg"
-              asChild
-              className="bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold px-10 py-7 text-lg transition-all duration-300 border-0 hover:scale-105"
-            >
-              <Link href={slide.primaryCta.url}>
-                {slide.primaryCta.label}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              asChild
-              className="border-2 border-[#D4AF37] bg-black/40 backdrop-blur-sm hover:bg-[#D4AF37]/30 hover:shadow-lg hover:shadow-[#D4AF37]/40 text-[#D4AF37] font-bold px-10 py-7 text-lg transition-all duration-300 hover:scale-105"
-            >
-              <Link href={slide.secondaryCta.url}>
-                {slide.secondaryCta.label}
-              </Link>
-            </Button>
+          <div className="relative">
+            <div className="aspect-[3/4] rounded-3xl bg-gradient-to-br from-[#1a1a1a] via-[#0d0d0d] to-black border-2 border-[#D4AF37]/30 shadow-2xl shadow-[#D4AF37]/20 hover:border-[#D4AF37]/60 hover:shadow-[#D4AF37]/40 transition-all duration-500 flex flex-col items-center justify-center p-8">
+              <div className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 flex items-center justify-center">
+                <ImageIcon className="h-10 w-10 text-[#D4AF37]/60" />
+              </div>
+              <p className="text-[#D4AF37]/60 font-serif text-xl font-semibold">Hero Image</p>
+            </div>
           </div>
         </div>
       </div>
@@ -126,16 +118,16 @@ export function HeroSlider() {
           <button
             onClick={prevSlide}
             disabled={isAnimating}
-            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 hover:border-[#D4AF37] hover:scale-110 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-black/80 backdrop-blur-sm border-2 border-[#D4AF37]/40 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37] hover:scale-110 transition-all duration-300 flex items-center justify-center disabled:opacity-50 shadow-lg shadow-[#D4AF37]/20"
           >
-            <ChevronLeft className="h-6 w-6 text-[#D4AF37]" />
+            <ChevronLeft className="h-7 w-7 text-[#D4AF37]" />
           </button>
           <button
             onClick={nextSlide}
             disabled={isAnimating}
-            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 hover:border-[#D4AF37] hover:scale-110 transition-all duration-300 flex items-center justify-center disabled:opacity-50"
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-30 w-14 h-14 rounded-full bg-black/80 backdrop-blur-sm border-2 border-[#D4AF37]/40 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37] hover:scale-110 transition-all duration-300 flex items-center justify-center disabled:opacity-50 shadow-lg shadow-[#D4AF37]/20"
           >
-            <ChevronRight className="h-6 w-6 text-[#D4AF37]" />
+            <ChevronRight className="h-7 w-7 text-[#D4AF37]" />
           </button>
 
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex gap-3">
@@ -149,10 +141,10 @@ export function HeroSlider() {
                     setTimeout(() => setIsAnimating(false), 600);
                   }
                 }}
-                className={`h-2 rounded-full transition-all duration-300 ${
+                className={`h-2.5 rounded-full transition-all duration-300 ${
                   index === currentSlide
-                    ? 'w-12 bg-[#D4AF37] shadow-lg shadow-[#D4AF37]/50'
-                    : 'w-2 bg-white/50 hover:bg-white/80'
+                    ? 'w-14 bg-[#D4AF37] shadow-lg shadow-[#D4AF37]/50'
+                    : 'w-2.5 bg-gray-600 hover:bg-gray-400'
                 }`}
               />
             ))}
