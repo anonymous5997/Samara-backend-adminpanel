@@ -70,8 +70,8 @@ export function HeroSlider() {
   return (
     <section className="relative bg-[#000000] overflow-hidden py-20 md:py-24 lg:py-32">
       <div className="container mx-auto px-4 md:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-12 lg:gap-16 items-center max-w-7xl mx-auto">
-          <div className="space-y-8 transition-opacity duration-700 ease-in-out" key={currentSlide}>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.9fr] gap-12 lg:gap-24 items-center max-w-7xl mx-auto">
+          <div className="space-y-8 transition-opacity duration-700 ease-in-out lg:pl-24 lg:pt-20 lg:max-w-[540px]" key={currentSlide}>
             <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-[#D4AF37] heading-line-height tracking-tight">
               {slide.title}
             </h1>
@@ -101,7 +101,7 @@ export function HeroSlider() {
             </div>
           </div>
 
-          <div className="relative flex justify-center lg:justify-end">
+          <div className="relative flex justify-center lg:justify-end lg:ml-20 lg:self-center">
             <div className="w-[420px] h-[560px] md:w-[480px] md:h-[600px] rounded-2xl bg-gradient-to-br from-[#2a2a2a] via-[#1a1a1a] to-[#0a0a0a] border border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/30 hover:shadow-[#D4AF37]/50 transition-all duration-500 flex flex-col items-center justify-center p-8">
               <div className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 flex items-center justify-center">
                 <ImageIcon className="h-10 w-10 text-[#D4AF37]/60" />
