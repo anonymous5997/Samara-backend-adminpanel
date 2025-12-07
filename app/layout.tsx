@@ -15,10 +15,17 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: 'Samara - Woven For Every Woman',
-  description: 'Discover exquisite handcrafted sarees blending Indian heritage with modern luxury',
+  title: 'Samara - Best Handcrafted Sambalpuri Sarees | Traditional Indian Sarees',
+  description: 'Discover the finest handcrafted Sambalpuri sarees at Samara. Authentic traditional Indian sarees woven with heritage craftsmanship, featuring exquisite designs and premium quality. Shop genuine Sambalpuri silk sarees, cotton sarees, and ethnic wear for every occasion.',
+  keywords: 'sambalpuri saree, handcrafted sarees, traditional sarees, sambalpuri silk saree, indian sarees online, ethnic wear, handloom sarees, authentic sambalpuri, samara sarees, traditional indian wear',
+  openGraph: {
+    title: 'Samara - Best Handcrafted Sambalpuri Sarees',
+    description: 'Authentic handcrafted Sambalpuri sarees woven with traditional Indian craftsmanship. Premium quality ethnic wear for the modern woman.',
+    type: 'website',
+    locale: 'en_IN',
+  },
   icons: {
-    icon: '/img_2601.jpeg',
+    icon: '/img_2599 copy.jpeg',
   },
 };
 

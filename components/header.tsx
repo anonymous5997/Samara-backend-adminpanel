@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { ShoppingCart, User, Heart, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useCart } from '@/lib/cart-context';
@@ -37,10 +38,15 @@ export function Header() {
         <div className="flex h-[72px] items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#F4D03F] flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 group-hover:shadow-[#D4AF37]/50 transition-all duration-300">
-                <span className="text-black font-serif text-2xl font-bold">S</span>
+              <div className="relative w-48 h-14 transition-all duration-300 group-hover:scale-105">
+                <Image
+                  src="/img_2599 copy.jpeg"
+                  alt="Samara - Best Handcrafted Sambalpuri Sarees"
+                  fill
+                  className="object-contain"
+                  priority
+                />
               </div>
-              <span className="font-serif text-2xl font-bold text-[#D4AF37] tracking-wide">SAMARA</span>
             </Link>
           </div>
 

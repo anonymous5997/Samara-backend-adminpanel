@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Facebook, Instagram, Twitter } from 'lucide-react';
 
 export function Footer() {
@@ -7,14 +8,18 @@ export function Footer() {
       <div className="container mx-auto px-4 md:px-8 py-16 md:py-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           <div>
-            <Link href="/" className="flex items-center gap-3 group mb-6">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#F4D03F] flex items-center justify-center shadow-lg shadow-[#D4AF37]/30">
-                <span className="text-black font-serif text-2xl font-bold">S</span>
+            <Link href="/" className="inline-block mb-6 group">
+              <div className="relative w-48 h-14 transition-all duration-300 group-hover:scale-105">
+                <Image
+                  src="/img_2599 copy.jpeg"
+                  alt="Samara - Best Handcrafted Sambalpuri Sarees"
+                  fill
+                  className="object-contain"
+                />
               </div>
-              <span className="font-serif text-2xl font-bold text-[#D4AF37] tracking-wide">SAMARA</span>
             </Link>
             <p className="text-sm text-[#CFCFCF] leading-relaxed">
-              Woven for every woman. Discover exquisite handcrafted sarees blending tradition with modern elegance.
+              Discover the finest handcrafted Sambalpuri sarees. Authentic traditional Indian sarees woven with heritage craftsmanship for the modern woman.
             </p>
           </div>
 
