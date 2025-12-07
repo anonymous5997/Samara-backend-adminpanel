@@ -15,8 +15,11 @@ const cormorant = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: 'Samara - Luxury Sarees & Handcrafted Elegance',
+  title: 'Samara - Woven For Every Woman',
   description: 'Discover exquisite handcrafted sarees blending Indian heritage with modern luxury',
+  icons: {
+    icon: '/img_2601.jpeg',
+  },
 };
 
 export default function RootLayout({

@@ -35,13 +35,12 @@ export function Header() {
       <div className="container mx-auto px-4">
         <div className="flex h-18 items-center justify-between">
           <div className="flex items-center gap-10">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold to-gold-light flex items-center justify-center shadow-lg shadow-gold/20 group-hover:shadow-gold/40 transition-all duration-300">
-                <Crown className="h-5 w-5 text-black" />
-              </div>
-              <span className="text-2xl font-display font-semibold text-gold tracking-luxury">
-                SAMARA
-              </span>
+            <Link href="/" className="flex items-center gap-3 group">
+              <img
+                src="/img_2599.jpeg"
+                alt="Samara"
+                className="h-16 w-auto object-contain transition-all duration-300 group-hover:scale-105"
+              />
             </Link>
 
             <nav className="hidden lg:flex items-center gap-8">
