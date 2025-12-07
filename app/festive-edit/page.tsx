@@ -2,98 +2,58 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { getCollectionBySlug, getCollectionProducts } from '@/lib/content';
-import type { Collection, ProductWithImages } from '@/lib/content';
+import { getCollectionProducts } from '@/lib/content';
+import type { ProductWithImages } from '@/lib/content';
 import { Star, Sparkles } from 'lucide-react';
 
-export default function CollectionDetailPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-
-  const [collection, setCollection] = useState<Collection | null>(null);
+export default function FestiveEditPage() {
   const [products, setProducts] = useState<ProductWithImages[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCollectionData();
-  }, [slug]);
+    loadProducts();
+  }, []);
 
-  const loadCollectionData = async () => {
+  const loadProducts = async () => {
     try {
-      const [collectionData, productsData] = await Promise.all([
-        getCollectionBySlug(slug),
-        getCollectionProducts(slug),
-      ]);
-
-      setCollection(collectionData);
-      setProducts(productsData);
+      const data = await getCollectionProducts('festive-edit');
+      setProducts(data);
     } catch (error) {
-      console.error('Error loading collection:', error);
+      console.error('Error loading festive products:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Loading collection...</p>
-      </div>
-    );
-  }
-
-  if (!collection) {
-    return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="font-serif text-3xl font-bold text-gold mb-4">Collection Not Found</h2>
-          <p className="text-gray-400 mb-6">The collection you're looking for doesn't exist.</p>
-          <Link href="/collections" className="text-gold hover:underline">
-            Browse All Collections
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-black text-white min-h-screen">
-      {collection.hero_image_url && (
-        <div className="relative h-96 bg-luxury-black overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black z-10" />
-          <img
-            src={collection.hero_image_url}
-            alt={collection.name}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white text-center px-4">
-            <h1 className="font-serif text-6xl md:text-7xl font-bold mb-4 text-gold tracking-tighter">
-              {collection.hero_title || collection.name}
-            </h1>
-            {collection.hero_subtitle && (
-              <p className="text-xl text-gray-300">{collection.hero_subtitle}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <section className="py-20 bg-gradient-to-b from-luxury-charcoal to-black">
+      <section className="relative py-24 bg-gradient-to-b from-black via-luxury-charcoal to-black">
         <div className="container mx-auto px-4 md:px-8">
-          {!collection.hero_image_url && (
-            <div className="mb-12 text-center">
-              <h1 className="font-serif text-6xl md:text-7xl font-bold mb-6 text-gold tracking-tighter">
-                {collection.name}
-              </h1>
-              {collection.description && (
-                <p className="text-xl text-gray-400 max-w-2xl mx-auto">{collection.description}</p>
-              )}
-            </div>
-          )}
+          <div className="text-center mb-16">
+            <h1 className="font-serif text-6xl md:text-7xl font-bold mb-6 text-gold tracking-tighter">
+              Festive Edit
+            </h1>
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
+              Celebrate in style with our curated collection of festive sarees, designed to make
+              every occasion unforgettable
+            </p>
+          </div>
 
-          {products.length === 0 ? (
+          {loading ? (
             <div className="text-center py-20">
-              <p className="text-gray-500">No products in this collection yet.</p>
+              <p className="text-gray-500">Loading festive collection...</p>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-gray-500 mb-8">
+                Our festive collection is being curated. Check back soon!
+              </p>
+              <Link
+                href="/sarees"
+                className="inline-block px-8 py-3 bg-gold-gradient text-black font-semibold rounded-lg hover:shadow-xl hover:shadow-gold/40 transition-all"
+              >
+                Browse All Sarees
+              </Link>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

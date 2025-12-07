@@ -9,17 +9,32 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)', 'sans-serif'],
+        serif: ['var(--font-playfair)', 'serif'],
+        display: ['var(--font-cormorant)', 'serif'],
+      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        'gold-gradient': 'linear-gradient(135deg, #D4AF37 0%, #F4D03F 50%, #D4AF37 100%)',
       },
-      borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+      letterSpacing: {
+        'tighter': '-0.05em',
+        'luxury': '-0.02em',
       },
       colors: {
+        gold: {
+          DEFAULT: '#D4AF37',
+          light: '#F4D03F',
+          dark: '#B8942F',
+        },
+        luxury: {
+          black: '#0A0A0A',
+          charcoal: '#111111',
+          grey: '#9CA3AF',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
