@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, User, Heart, Search, Menu, Crown } from 'lucide-react';
+import { ShoppingCart, User, Heart, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useCart } from '@/lib/cart-context';
 import { Button } from '@/components/ui/button';
@@ -31,70 +31,52 @@ export function Header() {
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gold/20 bg-black/95 backdrop-blur-sm">
-      <div className="container mx-auto px-4">
-        <div className="flex h-18 items-center justify-between">
-          <div className="flex items-center gap-10">
+    <header className="sticky top-0 z-50 w-full bg-[#050505] border-b border-[#D4AF37]/20">
+      <div className="container mx-auto px-4 md:px-8">
+        <div className="flex h-[72px] items-center justify-between">
+          <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-3 group">
-              <img
-                src="/img_2599.jpeg"
-                alt="Samara"
-                className="h-16 w-auto object-contain transition-all duration-300 group-hover:scale-105"
-              />
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#F4D03F] flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 group-hover:shadow-[#D4AF37]/50 transition-all duration-300">
+                <span className="text-black font-serif text-2xl font-bold">S</span>
+              </div>
+              <span className="font-serif text-2xl font-bold text-[#D4AF37] tracking-wide">SAMARA</span>
             </Link>
-
-            <nav className="hidden lg:flex items-center gap-8">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm font-medium text-gray-300 hover:text-gold transition-colors duration-300 tracking-wide"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
           </div>
 
-          <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-gray-300 hover:text-gold hover:bg-gold/10">
-                  {currency}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-luxury-charcoal border-gold/20">
-                <DropdownMenuItem onClick={() => setCurrency('INR')} className="text-gray-300 hover:text-gold focus:text-gold">
-                  INR (₹)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrency('USD')} className="text-gray-300 hover:text-gold focus:text-gold">
-                  USD ($)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCurrency('AED')} className="text-gray-300 hover:text-gold focus:text-gold">
-                  AED (د.إ)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <nav className="hidden lg:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-[#F5F5F5] hover:text-[#F4D03F] transition-colors duration-300 tracking-wide hover:underline underline-offset-4"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
-            <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex text-gray-300 hover:text-gold hover:bg-gold/10">
+          <div className="flex items-center gap-4">
+            <span className="hidden md:block text-sm font-medium text-[#D4AF37]">{currency}</span>
+
+            <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
               <Link href="/search">
                 <Search className="h-5 w-5" />
               </Link>
             </Button>
 
             {user && (
-              <Button variant="ghost" size="icon" asChild className="text-gray-300 hover:text-gold hover:bg-gold/10">
+              <Button variant="ghost" size="icon" asChild className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
                 <Link href="/wishlist">
                   <Heart className="h-5 w-5" />
                 </Link>
               </Button>
             )}
 
-            <Button variant="ghost" size="icon" asChild className="relative text-gray-300 hover:text-gold hover:bg-gold/10">
+            <Button variant="ghost" size="icon" asChild className="relative text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
               <Link href="/cart">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-gold text-xs text-black flex items-center justify-center font-semibold">
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#D4AF37] text-xs text-black flex items-center justify-center font-semibold">
                     {cartItemsCount}
                   </span>
                 )}
@@ -104,46 +86,46 @@ export function Header() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-gray-300 hover:text-gold hover:bg-gold/10">
+                  <Button variant="ghost" size="icon" className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
                     <User className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-luxury-charcoal border-gold/20">
-                  <DropdownMenuItem asChild className="text-gray-300 hover:text-gold focus:text-gold">
+                <DropdownMenuContent align="end" className="bg-[#111111] border-[#D4AF37]/20">
+                  <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
                     <Link href="/profile">Profile</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="text-gray-300 hover:text-gold focus:text-gold">
+                  <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
                     <Link href="/orders">Orders</Link>
                   </DropdownMenuItem>
                   {profile?.role === 'admin' && (
-                    <DropdownMenuItem asChild className="text-gray-300 hover:text-gold focus:text-gold">
+                    <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
                       <Link href="/admin">Admin Panel</Link>
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={signOut} className="text-gray-300 hover:text-gold focus:text-gold">
+                  <DropdownMenuItem onClick={signOut} className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild size="sm" className="bg-gold hover:bg-gold-light text-black font-semibold">
+              <Button asChild size="sm" className="bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold rounded-full px-6">
                 <Link href="/auth/login">Sign In</Link>
               </Button>
             )}
 
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-gray-300 hover:text-gold hover:bg-gold/10">
+                <Button variant="ghost" size="icon" className="lg:hidden text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="bg-luxury-black border-gold/20">
+              <SheetContent side="left" className="bg-[#000000] border-[#D4AF37]/20">
                 <nav className="flex flex-col gap-4 mt-8">
                   {navLinks.map((link) => (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="text-lg font-medium text-gray-300 hover:text-gold transition-colors"
+                      className="text-lg font-medium text-[#F5F5F5] hover:text-[#D4AF37] transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {link.label}
