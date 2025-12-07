@@ -45,7 +45,7 @@ export default async function Home() {
           <div className="container mx-auto px-4 md:px-8">
             <SectionHeading
               title="Most Loved by Samara Women"
-              subtitle="Bestsellers chosen by our customers"
+              subtitle="Discover our bestselling collection"
             />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {mostLovedProducts.map((product) => (
@@ -93,6 +93,14 @@ export default async function Home() {
                   </div>
                 </Link>
               ))}
+            </div>
+            <div className="flex items-center justify-center gap-4 mt-12">
+              <button className="w-12 h-12 rounded-full bg-transparent border-2 border-[#D4AF37]/40 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all duration-300 flex items-center justify-center group">
+                <ArrowRight className="h-5 w-5 text-[#D4AF37] rotate-180 group-hover:scale-110 transition-transform" />
+              </button>
+              <button className="w-12 h-12 rounded-full bg-transparent border-2 border-[#D4AF37]/40 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all duration-300 flex items-center justify-center group">
+                <ArrowRight className="h-5 w-5 text-[#D4AF37] group-hover:scale-110 transition-transform" />
+              </button>
             </div>
           </div>
         </section>
