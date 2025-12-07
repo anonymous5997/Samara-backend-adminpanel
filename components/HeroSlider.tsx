@@ -15,18 +15,32 @@ interface HeroSlide {
 
 const slides: HeroSlide[] = [
   {
-    title: 'Timeless Elegance',
-    subtitle: 'Discover handcrafted sarees that blend tradition with modern sophistication',
-    primaryCta: { label: 'Shop Now', url: '/sarees' },
-    secondaryCta: { label: 'View Collections', url: '/collections' },
+    title: 'Woven For Every Woman',
+    subtitle: 'Discover our premium collection of handcrafted sarees that celebrate elegance and tradition with modern grace',
+    primaryCta: { label: 'Shop The Edit', url: '/sarees' },
+    secondaryCta: { label: 'View All', url: '/collections' },
     backgroundImage: 'https://images.pexels.com/photos/8533402/pexels-photo-8533402.jpeg?auto=compress&cs=tinysrgb&w=1920',
   },
   {
-    title: 'Festive Collection',
-    subtitle: 'Celebrate special moments with our curated festive sarees',
-    primaryCta: { label: 'Explore', url: '/festive-edit' },
+    title: 'Festive Elegance',
+    subtitle: 'Celebrate every moment with our exclusive festive collection designed for the modern woman',
+    primaryCta: { label: 'Shop The Edit', url: '/festive-edit' },
     secondaryCta: { label: 'View All', url: '/sarees' },
     backgroundImage: 'https://images.pexels.com/photos/10214695/pexels-photo-10214695.jpeg?auto=compress&cs=tinysrgb&w=1920',
+  },
+  {
+    title: 'Contemporary Grace',
+    subtitle: 'Modern designs that honor traditional craftsmanship, perfect for today\'s confident woman',
+    primaryCta: { label: 'Shop The Edit', url: '/sarees' },
+    secondaryCta: { label: 'View All', url: '/collections' },
+    backgroundImage: 'https://images.pexels.com/photos/3560137/pexels-photo-3560137.jpeg?auto=compress&cs=tinysrgb&w=1920',
+  },
+  {
+    title: 'Premium Collections',
+    subtitle: 'Exquisite handpicked sarees crafted with the finest fabrics and intricate detailing',
+    primaryCta: { label: 'Shop The Edit', url: '/collections' },
+    secondaryCta: { label: 'View All', url: '/sarees' },
+    backgroundImage: 'https://images.pexels.com/photos/3560130/pexels-photo-3560130.jpeg?auto=compress&cs=tinysrgb&w=1920',
   },
 ];
 

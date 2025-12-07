@@ -4,6 +4,7 @@ import { ArrowRight, Star, Sparkles, Heart } from 'lucide-react';
 import { HeroSlider } from '@/components/HeroSlider';
 import { SectionHeading } from '@/components/SectionHeading';
 import { CollectionsGrid } from '@/components/CollectionsGrid';
+import { AITryOn } from '@/components/AITryOn';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 
 export default async function Home() {
@@ -102,7 +103,7 @@ export default async function Home() {
           <div className="container mx-auto px-4 md:px-8">
             <SectionHeading
               title="New Arrivals"
-              subtitle="Fresh designs just for you"
+              subtitle="Fresh designs for the season"
             />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {newArrivals.map((product) => (
@@ -153,9 +154,24 @@ export default async function Home() {
                 </Link>
               ))}
             </div>
+            <div className="text-center mt-12">
+              <Button
+                size="lg"
+                variant="outline"
+                asChild
+                className="border-2 border-[#D4AF37] bg-transparent hover:bg-[#D4AF37]/20 hover:shadow-lg hover:shadow-[#D4AF37]/40 text-[#D4AF37] font-bold px-10 py-6 text-lg transition-all duration-300 hover:scale-105"
+              >
+                <Link href="/sarees">
+                  View All New Arrivals
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </section>
       )}
+
+      <AITryOn />
     </div>
   );
 }
