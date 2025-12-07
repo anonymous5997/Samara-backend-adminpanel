@@ -5,11 +5,11 @@ import { HeroSlider } from '@/components/HeroSlider';
 import { SectionHeading } from '@/components/SectionHeading';
 import { CollectionsGrid } from '@/components/CollectionsGrid';
 import { AITryOn } from '@/components/AITryOn';
-import { getMostLovedProducts } from '@/lib/content';
+import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 
 export default async function Home() {
   const mostLovedProducts = await getMostLovedProducts(4);
-  const newArrivals = mostLovedProducts.slice(0, 4);
+  const newArrivals = await getNewArrivals(4);
 
   return (
     <div className="bg-[#000000]">
