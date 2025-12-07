@@ -1,4 +1,4 @@
-import { supabase } from './supabase/client';
+import { createClient } from '@supabase/supabase-js';
 
 export interface HeroSlide {
   id: number;
@@ -47,7 +47,20 @@ export interface ProductWithImages {
   }>;
 }
 
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 export async function getHomeHeroSlides(): Promise<HeroSlide[]> {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('home_hero_slides')
     .select('*')
@@ -64,6 +77,7 @@ export async function getHomeHeroSlides(): Promise<HeroSlide[]> {
 }
 
 export async function getMostLovedProducts(limit: number = 4): Promise<ProductWithImages[]> {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('products')
     .select(`
@@ -95,6 +109,7 @@ export async function getMostLovedProducts(limit: number = 4): Promise<ProductWi
 }
 
 export async function getNewArrivals(limit: number = 4): Promise<ProductWithImages[]> {
+  const supabase = getSupabaseClient();
   const { data: flaggedProducts, error: flaggedError } = await supabase
     .from('products')
     .select(`
@@ -161,6 +176,7 @@ export async function getSareeProducts(filters?: {
   minPrice?: number;
   maxPrice?: number;
 }): Promise<ProductWithImages[]> {
+  const supabase = getSupabaseClient();
   const { data: sareeCategory } = await supabase
     .from('categories')
     .select('id')
@@ -212,6 +228,7 @@ export async function getSareeProducts(filters?: {
 }
 
 export async function getAllCollections(): Promise<Collection[]> {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('collections')
     .select('*')
@@ -227,6 +244,7 @@ export async function getAllCollections(): Promise<Collection[]> {
 }
 
 export async function getCollectionBySlug(slug: string): Promise<Collection | null> {
+  const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('collections')
     .select('*')
@@ -250,6 +268,7 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
   }
 
   if (collection.collection_type === 'category' && collection.category_id) {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('products')
       .select(`
@@ -279,6 +298,7 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
     }));
   }
 
+  const supabase = getSupabaseClient();
   const { data: collectionProductsData, error } = await supabase
     .from('collection_products')
     .select(`

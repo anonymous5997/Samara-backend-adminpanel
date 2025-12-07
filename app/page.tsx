@@ -1,34 +1,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase/client';
 import { ArrowRight, Star, Sparkles, Heart } from 'lucide-react';
 import { HeroSlider } from '@/components/HeroSlider';
 import { SectionHeading } from '@/components/SectionHeading';
 import { CollectionsGrid } from '@/components/CollectionsGrid';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
-
-async function getFeaturedProducts() {
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('is_active', true)
-    .limit(8);
-
-  const productsWithImages = await Promise.all(
-    (products || []).map(async (product) => {
-      const { data: image } = await supabase
-        .from('product_images')
-        .select('*')
-        .eq('product_id', product.id)
-        .eq('is_primary', true)
-        .maybeSingle();
-
-      return { product, image };
-    })
-  );
-
-  return productsWithImages;
-}
 
 export default async function Home() {
   const [mostLovedProducts, newArrivals] = await Promise.all([
