@@ -334,3 +334,74 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
       };
     });
 }
+
+export async function getSimilarProducts(productId: string, limit: number = 4): Promise<ProductWithImages[]> {
+  const supabase = getSupabaseClient();
+
+  const { data: currentProduct } = await supabase
+    .from('products')
+    .select('category_id')
+    .eq('id', productId)
+    .maybeSingle();
+
+  if (!currentProduct?.category_id) {
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images (
+          id,
+          image_url,
+          is_primary,
+          display_order
+        )
+      `)
+      .neq('id', productId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching similar products:', error);
+      return [];
+    }
+
+    return (data || []).map(product => ({
+      ...product,
+      images: product.product_images || [],
+      primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
+                          (product.product_images || [])[0]?.image_url ||
+                          null,
+    }));
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(`
+      *,
+      product_images (
+        id,
+        image_url,
+        is_primary,
+        display_order
+      )
+    `)
+    .eq('category_id', currentProduct.category_id)
+    .neq('id', productId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching similar products:', error);
+    return [];
+  }
+
+  return (data || []).map(product => ({
+    ...product,
+    images: product.product_images || [],
+    primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
+                        (product.product_images || [])[0]?.image_url ||
+                        null,
+  }));
+}

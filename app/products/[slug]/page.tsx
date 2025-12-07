@@ -7,9 +7,13 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase/client';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
-import { Heart, ShoppingCart, Check, Share2, Truck, ShieldCheck, Sparkles } from 'lucide-react';
+import { Heart, ShoppingCart, Check, Share2, Truck, ShieldCheck, Sparkles, Camera, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
+import { ProductTryOnModal } from '@/components/ProductTryOnModal';
+import { BuyNowModal } from '@/components/BuyNowModal';
+import { SimilarProductsSection } from '@/components/SimilarProductsSection';
+import { getSimilarProducts } from '@/lib/content';
 
 interface Product {
   id: string;
@@ -39,6 +43,9 @@ export default function ProductDetailPageLuxury() {
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [tryOnModalOpen, setTryOnModalOpen] = useState(false);
+  const [buyNowModalOpen, setBuyNowModalOpen] = useState(false);
+  const [similarProducts, setSimilarProducts] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProduct();
@@ -68,6 +75,11 @@ export default function ProductDetailPageLuxury() {
 
       const primaryImage = imageData?.find(img => img.is_primary)?.image_url || imageData?.[0]?.image_url || '';
       setSelectedImage(primaryImage);
+
+      if (productData?.id) {
+        const similar = await getSimilarProducts(productData.id, 4);
+        setSimilarProducts(similar);
+      }
     } catch (error) {
       console.error('Error fetching product:', error);
     } finally {
@@ -122,13 +134,26 @@ export default function ProductDetailPageLuxury() {
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
             <div>
               <div className="sticky top-24">
-                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10">
+                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10 relative group">
                   {selectedImage ? (
-                    <img
-                      src={selectedImage}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={selectedImage}
+                        alt={product.name}
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setTryOnModalOpen(true)}
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Button
+                          onClick={() => setTryOnModalOpen(true)}
+                          className="bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black font-semibold"
+                          size="lg"
+                        >
+                          <Camera className="mr-2 h-5 w-5" />
+                          Try With Camera
+                        </Button>
+                      </div>
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-600 font-serif">
                       Product Image
@@ -214,33 +239,44 @@ export default function ProductDetailPageLuxury() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="space-y-3 pt-4">
                 <Button
-                  onClick={handleAddToCart}
-                  disabled={addingToCart}
-                  className="flex-1 bg-gold-gradient hover:shadow-xl hover:shadow-gold/40 text-black font-semibold py-6 text-lg"
+                  onClick={() => setBuyNowModalOpen(true)}
+                  className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold py-7 text-lg"
                 >
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  {addingToCart ? 'Adding...' : 'Add to Bag'}
+                  <Zap className="h-5 w-5 mr-2" />
+                  Buy Now
                 </Button>
 
-                {user && (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleAddToCart}
+                    disabled={addingToCart}
+                    variant="outline"
+                    className="flex-1 border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold py-6 text-lg"
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    {addingToCart ? 'Adding...' : 'Add to Bag'}
+                  </Button>
+
+                  {user && (
+                    <Button
+                      variant="outline"
+                      className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
+                      size="icon"
+                    >
+                      <Heart className="h-5 w-5" />
+                    </Button>
+                  )}
+
                   <Button
                     variant="outline"
-                    className="border-2 border-gold text-gold hover:bg-gold/10 py-6"
+                    className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
                     size="icon"
                   >
-                    <Heart className="h-5 w-5" />
+                    <Share2 className="h-5 w-5" />
                   </Button>
-                )}
-
-                <Button
-                  variant="outline"
-                  className="border-2 border-gold text-gold hover:bg-gold/10 py-6"
-                  size="icon"
-                >
-                  <Share2 className="h-5 w-5" />
-                </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gold/20">
@@ -260,9 +296,9 @@ export default function ProductDetailPageLuxury() {
             </div>
           </div>
 
-          <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-gold/20">
-            <div className="bg-luxury-charcoal rounded-lg p-8 border border-gold/20">
-              <h3 className="font-serif text-2xl font-bold text-gold mb-6 text-center">
+          <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-[#D4AF37]/20">
+            <div className="bg-luxury-charcoal rounded-lg p-8 border border-[#D4AF37]/20">
+              <h3 className="font-serif text-2xl font-bold text-[#D4AF37] mb-6 text-center">
                 Why Women Love This Saree
               </h3>
               <div className="grid md:grid-cols-3 gap-6">
@@ -272,8 +308,8 @@ export default function ProductDetailPageLuxury() {
                   'Perfect for special occasions',
                 ].map((reason, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-gold/20 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Check className="h-4 w-4 text-gold" />
+                    <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Check className="h-4 w-4 text-[#D4AF37]" />
                     </div>
                     <p className="text-gray-400">{reason}</p>
                   </div>
@@ -283,6 +319,24 @@ export default function ProductDetailPageLuxury() {
           </div>
         </div>
       </section>
+
+      <SimilarProductsSection products={similarProducts} />
+
+      <ProductTryOnModal
+        isOpen={tryOnModalOpen}
+        onClose={() => setTryOnModalOpen(false)}
+        productImage={selectedImage}
+        productName={product.name}
+      />
+
+      <BuyNowModal
+        isOpen={buyNowModalOpen}
+        onClose={() => setBuyNowModalOpen(false)}
+        productId={product.id}
+        productName={product.name}
+        productPrice={product.base_price_inr}
+        productImage={selectedImage}
+      />
     </div>
   );
 }
