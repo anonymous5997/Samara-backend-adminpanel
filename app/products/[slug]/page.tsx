@@ -13,6 +13,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { ProductTryOnModal } from '@/components/ProductTryOnModal';
 import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
+import { AITryOnButton } from '@/components/AITryOnButton';
 import { getSimilarProducts } from '@/lib/content';
 
 interface Product {
@@ -134,25 +135,15 @@ export default function ProductDetailPageLuxury() {
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
             <div>
               <div className="sticky top-24">
-                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10 relative group">
+                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10 relative">
                   {selectedImage ? (
                     <>
                       <img
                         src={selectedImage}
                         alt={product.name}
-                        className="w-full h-full object-cover cursor-pointer"
-                        onClick={() => setTryOnModalOpen(true)}
+                        className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Button
-                          onClick={() => setTryOnModalOpen(true)}
-                          className="bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black font-semibold"
-                          size="lg"
-                        >
-                          <Camera className="mr-2 h-5 w-5" />
-                          Try With Camera
-                        </Button>
-                      </div>
+                      <AITryOnButton onClick={() => setTryOnModalOpen(true)} />
                     </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-600 font-serif">
