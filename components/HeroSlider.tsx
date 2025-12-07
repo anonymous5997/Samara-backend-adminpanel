@@ -43,14 +43,6 @@ export function HeroSlider() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      nextSlide();
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, [currentSlide]);
-
   const nextSlide = () => {
     if (isAnimating) return;
     setIsAnimating(true);
@@ -64,6 +56,14 @@ export function HeroSlider() {
     setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
     setTimeout(() => setIsAnimating(false), 600);
   };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const slide = slides[currentSlide];
 
