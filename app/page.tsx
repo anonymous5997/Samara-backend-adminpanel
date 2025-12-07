@@ -15,33 +15,6 @@ export default async function Home() {
     <div className="bg-[#000000]">
       <HeroSlider />
 
-      <section className="py-20 md:py-24 bg-gradient-to-b from-[#000000] via-[#050505] to-[#000000]">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="text-center mb-12">
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] heading-line-height mb-4">
-              Explore Our Collections
-            </h2>
-            <p className="text-lg text-[#CFCFCF]">
-              Signature edits curated for the modern woman
-            </p>
-          </div>
-          <CollectionsGrid />
-
-          <div className="text-center mt-16">
-            <Button
-              size="lg"
-              asChild
-              className="bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold px-10 py-6 text-lg hover:scale-105 transition-all duration-300"
-            >
-              <Link href="/collections">
-                View All Collections
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
       {mostLovedProducts.length > 0 && (
         <section className="py-20 md:py-24 bg-[#050505]">
           <div className="container mx-auto px-4 md:px-8">
@@ -188,6 +161,33 @@ export default async function Home() {
           </div>
         </section>
       )}
+
+      <section className="py-20 md:py-24 bg-[#050505]">
+        <div className="container mx-auto px-4 md:px-8">
+          <div className="text-center mb-12">
+            <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] heading-line-height mb-4">
+              Explore Our Collections
+            </h2>
+            <p className="text-lg text-[#CFCFCF]">
+              Signature edits curated for the modern woman
+            </p>
+          </div>
+          <CollectionsGrid />
+
+          <div className="text-center mt-16">
+            <Button
+              size="lg"
+              asChild
+              className="bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold px-10 py-6 text-lg hover:scale-105 transition-all duration-300"
+            >
+              <Link href="/collections">
+                View All Collections
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
 
       <AITryOn />
     </div>
