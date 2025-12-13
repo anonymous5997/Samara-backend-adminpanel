@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Camera } from 'lucide-react';
+import { AITryOnModal } from '@/components/AITryOnModal';
 
 export function AITryOn() {
   return (
@@ -37,3 +38,4 @@ export function AITryOn() {
     </section>
   );
 }
+

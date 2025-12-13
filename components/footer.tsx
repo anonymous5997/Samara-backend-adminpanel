@@ -11,7 +11,7 @@ export function Footer() {
             <Link href="/" className="inline-block mb-6 group">
               <div className="relative w-48 h-14 transition-all duration-300 group-hover:scale-105">
                 <Image
-                  src="/img_2599 copy.jpeg"
+                  src="/samara-logo.png"
                   alt="Samara - Best Handcrafted Sambalpuri Sarees"
                   fill
                   className="object-contain"
@@ -63,8 +63,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Shipping Info
+                <Link href="/track-order" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                  Shipping Info  & Tracking
                 </Link>
               </li>
               <li>

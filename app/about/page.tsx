@@ -13,8 +13,8 @@ export default function AboutPage() {
 
             <div className="grid md:grid-cols-2 gap-12 items-center mb-20">
               <div>
-                <div className="aspect-[4/5] bg-gradient-to-br from-luxury-charcoal to-black rounded-lg border-2 border-gold/20 flex items-center justify-center">
-                  <p className="text-gray-600 font-serif text-lg">Brand Image</p>
+                <div className="aspect-[4/5] rounded-lg border-2 border-gold/20 overflow-hidden">
+                  <img src="/img_2599.jpeg" alt ="Samara Brand Image" className="w-full h-full object-cover"/>
                 </div>
               </div>
               <div className="space-y-6">

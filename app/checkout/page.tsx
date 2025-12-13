@@ -17,11 +17,21 @@ import { trackAnalyticsEvent } from '@/lib/analytics';
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const { user } = useAuth();
-  const { items, currency, getCartTotal, clearCart } = useCart();
+
+  const {
+    items,
+    currency,
+    rate,
+    getCartTotalInINR,
+    getCartTotalInSelectedCurrency,
+    clearCart,
+  } = useCart();
+
   const [loading, setLoading] = useState(false);
-  const [currencyRate, setCurrencyRate] = useState(1);
-  const [discount, setDiscount] = useState(0);
+  const [discountINR, setDiscountINR] = useState(0);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -35,6 +45,7 @@ export default function CheckoutPage() {
   const couponCode = searchParams.get('coupon');
   const [checkoutTracked, setCheckoutTracked] = useState(false);
 
+  // Load logic
   useEffect(() => {
     if (!user) {
       router.push('/auth/login');
@@ -46,7 +57,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    fetchCurrencyRate();
     if (couponCode) {
       fetchCouponDiscount();
     }
@@ -55,19 +65,7 @@ export default function CheckoutPage() {
       trackAnalyticsEvent('checkout_started', undefined, undefined, user.id);
       setCheckoutTracked(true);
     }
-  }, [user, items, currency, couponCode, checkoutTracked]);
-
-  const fetchCurrencyRate = async () => {
-    const { data } = await supabase
-      .from('currency_rates')
-      .select('rate')
-      .eq('target_currency', currency)
-      .maybeSingle();
-
-    if (data) {
-      setCurrencyRate(data.rate);
-    }
-  };
+  }, [user, items, couponCode, checkoutTracked]);
 
   const fetchCouponDiscount = async () => {
     if (!couponCode) return;
@@ -79,31 +77,33 @@ export default function CheckoutPage() {
       .eq('is_active', true)
       .maybeSingle();
 
-    if (coupon) {
-      const subtotal = getCartTotal();
-      let discountAmount = 0;
+    if (!coupon) return;
 
-      if (coupon.type === 'PERCENTAGE') {
-        discountAmount = (subtotal * coupon.value) / 100;
-      } else {
-        discountAmount = coupon.value;
-      }
+    const subtotalINR = getCartTotalInINR();
 
-      if (coupon.max_discount_inr && discountAmount > coupon.max_discount_inr) {
-        discountAmount = coupon.max_discount_inr;
-      }
+    let discount = 0;
 
-      setDiscount(discountAmount);
+    if (coupon.type === 'PERCENTAGE') {
+      discount = (subtotalINR * coupon.value) / 100;
+    } else {
+      discount = coupon.value;
     }
+
+    if (coupon.max_discount_inr && discount > coupon.max_discount_inr) {
+      discount = coupon.max_discount_inr;
+    }
+
+    setDiscountINR(discount);
   };
 
+  // Place Order
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const subtotal = getCartTotal();
-      const total = subtotal - discount;
+      const subtotalINR = getCartTotalInINR();
+      const totalINR = subtotalINR - discountINR;
 
       const orderNumber = `ORD${Date.now()}`;
 
@@ -112,14 +112,15 @@ export default function CheckoutPage() {
         .insert({
           user_id: user!.id,
           order_number: orderNumber,
-          subtotal_inr: subtotal,
-          discount_inr: discount,
+          subtotal_inr: subtotalINR,
+          discount_inr: discountINR,
           shipping_inr: 0,
-          total_amount_inr: total,
+          total_amount_inr: totalINR,
           currency,
-          exchange_rate: currencyRate,
+          exchange_rate: rate,
           status: 'pending',
           payment_status: 'pending',
+
           shipping_name: formData.name,
           shipping_email: formData.email,
           shipping_phone: formData.phone,
@@ -127,6 +128,7 @@ export default function CheckoutPage() {
           shipping_city: formData.city,
           shipping_state: formData.state,
           shipping_pincode: formData.pincode,
+
           coupon_code: couponCode,
         })
         .select()
@@ -173,102 +175,121 @@ export default function CheckoutPage() {
     }
   };
 
-  const subtotal = getCartTotal();
-  const total = subtotal - discount;
+  // Totals
+  const subtotalINR = getCartTotalInINR();
+  const totalINR = subtotalINR - discountINR;
+
+  const subtotalConverted = subtotalINR / rate;
+  const discountConverted = discountINR / rate;
+  const totalConverted = totalINR / rate;
 
   return (
     <>
       <Toaster />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 text-white">
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* LEFT SIDE — FORM */}
           <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-4">
-                  Shipping Information
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      required
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      required
-                      value={formData.address}
-                      onChange={(e) =>
-                        setFormData({ ...formData, address: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      required
-                      value={formData.city}
-                      onChange={(e) =>
-                        setFormData({ ...formData, city: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                      id="state"
-                      required
-                      value={formData.state}
-                      onChange={(e) =>
-                        setFormData({ ...formData, state: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="pincode">Pincode</Label>
-                    <Input
-                      id="pincode"
-                      required
-                      value={formData.pincode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pincode: e.target.value })
-                      }
-                    />
-                  </div>
+            <form onSubmit={handleSubmit} className="space-y-6 text-white">
+
+              <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                {/* NAME */}
+                <div className="md:col-span-2">
+                  <Label className="text-white">Full Name</Label>
+                  <Input
+                    required
+                    className="bg-white text-black"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* EMAIL */}
+                <div>
+                  <Label className="text-white">Email</Label>
+                  <Input
+                    type="email"
+                    required
+                    className="bg-white text-black"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* PHONE */}
+                <div>
+                  <Label className="text-white">Phone</Label>
+                  <Input
+                    type="tel"
+                    required
+                    className="bg-white text-black"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* ADDRESS */}
+                <div className="md:col-span-2">
+                  <Label className="text-white">Address</Label>
+                  <Input
+                    required
+                    className="bg-white text-black"
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* CITY */}
+                <div>
+                  <Label className="text-white">City</Label>
+                  <Input
+                    required
+                    className="bg-white text-black"
+                    value={formData.city}
+                    onChange={(e) =>
+                      setFormData({ ...formData, city: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* STATE */}
+                <div>
+                  <Label className="text-white">State</Label>
+                  <Input
+                    required
+                    className="bg-white text-black"
+                    value={formData.state}
+                    onChange={(e) =>
+                      setFormData({ ...formData, state: e.target.value })
+                    }
+                  />
+                </div>
+
+                {/* PINCODE */}
+                <div>
+                  <Label className="text-white">Pincode</Label>
+                  <Input
+                    required
+                    className="bg-white text-black"
+                    value={formData.pincode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, pincode: e.target.value })
+                    }
+                  />
                 </div>
               </div>
 
@@ -278,40 +299,38 @@ export default function CheckoutPage() {
             </form>
           </div>
 
+          {/* RIGHT SIDE — ORDER SUMMARY */}
           <div>
-            <div className="border rounded-lg p-6 sticky top-24">
+            <div className="border border-gray-700 rounded-lg p-6 sticky top-24 text-white">
+
               <h2 className="text-xl font-bold mb-4">Order Summary</h2>
 
-              <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
+              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
                 {items.map((item) => {
-                  const price =
+                  const priceINR =
                     item.product.base_price_inr +
                     (item.variant?.additional_price_inr || 0);
 
+                  const priceConverted = priceINR / rate;
+
                   return (
                     <div key={item.id} className="flex gap-3">
-                      <div className="relative w-16 h-16 rounded bg-gray-100 flex-shrink-0">
+                      <div className="relative w-16 h-16 rounded bg-gray-800 overflow-hidden">
                         {item.image_url && (
                           <Image
                             src={item.image_url}
                             alt={item.product.name}
                             fill
-                            className="object-cover rounded"
+                            className="object-cover"
                           />
                         )}
                       </div>
+
                       <div className="flex-1 text-sm">
-                        <p className="font-medium line-clamp-1">
-                          {item.product.name}
-                        </p>
-                        {item.variant && (
-                          <p className="text-gray-600 text-xs">
-                            {item.variant.size || item.variant.color}
-                          </p>
-                        )}
-                        <p className="text-gray-600">Qty: {item.quantity}</p>
-                        <p className="font-semibold">
-                          {formatPrice(price * item.quantity, currency, currencyRate)}
+                        <p className="font-medium">{item.product.name}</p>
+                        <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
+                        <p className="font-semibold text-[#D4AF37]">
+                          {formatPrice(priceConverted * item.quantity, currency)}
                         </p>
                       </div>
                     </div>
@@ -319,27 +338,34 @@ export default function CheckoutPage() {
                 })}
               </div>
 
-              <div className="space-y-2 mb-6 pb-6 border-t pt-4">
+              <div className="space-y-2 mb-6 pb-6 border-b border-gray-700">
                 <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(subtotal, currency, currencyRate)}</span>
+                  <span className="text-gray-300">Subtotal</span>
+                  <span className="text-[#D4AF37]">
+                    {formatPrice(subtotalConverted, currency)}
+                  </span>
                 </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-green-600">
+
+                {discountINR > 0 && (
+                  <div className="flex justify-between text-[#4ADE80]">
                     <span>Discount</span>
-                    <span>-{formatPrice(discount, currency, currencyRate)}</span>
+                    <span>-{formatPrice(discountConverted, currency)}</span>
                   </div>
                 )}
+
                 <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span>Free</span>
+                  <span className="text-gray-300">Shipping</span>
+                  <span className="text-gray-300">Free</span>
                 </div>
               </div>
 
               <div className="flex justify-between text-xl font-bold">
                 <span>Total</span>
-                <span>{formatPrice(total, currency, currencyRate)}</span>
+                <span className="text-[#D4AF37]">
+                  {formatPrice(totalConverted, currency)}
+                </span>
               </div>
+
             </div>
           </div>
         </div>

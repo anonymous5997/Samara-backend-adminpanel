@@ -6,8 +6,10 @@ interface CurrencyRate {
   rate: number;
 }
 
+export type SupportedCurrency = 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD';
+
 let cachedRates: Map<string, number> | null = null;
-let lastFetch: number = 0;
+let lastFetch = 0;
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 export async function getCurrencyRates(): Promise<Map<string, number>> {
@@ -23,10 +25,7 @@ export async function getCurrencyRates(): Promise<Map<string, number>> {
       .select('base_currency, target_currency, rate')
       .eq('base_currency', 'INR');
 
-    if (error) {
-      console.error('Failed to fetch currency rates:', error);
-      return getDefaultRates();
-    }
+    if (error) throw error;
 
     const rates = new Map<string, number>();
     data?.forEach((rate: CurrencyRate) => {
@@ -44,95 +43,81 @@ export async function getCurrencyRates(): Promise<Map<string, number>> {
 }
 
 function getDefaultRates(): Map<string, number> {
-  // Fallback rates if database is unavailable
   const defaults = new Map<string, number>();
-  defaults.set('USD', 83.5); // 1 USD = 83.5 INR
-  defaults.set('AED', 22.75); // 1 AED = 22.75 INR
+
+  defaults.set('USD', 83.5);
+  defaults.set('AED', 22.75);
+  defaults.set('GBP', 105); // example fallback
+  defaults.set('CAD', 62); // example fallback
+
   return defaults;
 }
 
+// ---------------------- Convert (Async) ----------------------
+
 export async function convertPrice(
   amountInr: number,
-  targetCurrency: 'INR' | 'USD' | 'AED'
+  targetCurrency: SupportedCurrency
 ): Promise<number> {
-  if (targetCurrency === 'INR') {
-    return amountInr;
-  }
+  if (targetCurrency === 'INR') return amountInr;
 
   const rates = await getCurrencyRates();
   const rate = rates.get(targetCurrency);
 
-  if (!rate || rate <= 0) {
-    console.warn(`Currency rate not found for ${targetCurrency}, returning INR amount`);
-    return amountInr;
-  }
+  if (!rate) return amountInr;
 
   return amountInr / rate;
 }
 
 export async function formatPrice(
   amountInr: number,
-  targetCurrency: 'INR' | 'USD' | 'AED'
+  currency: SupportedCurrency
 ): Promise<string> {
-  const converted = await convertPrice(amountInr, targetCurrency);
+  const converted = await convertPrice(amountInr, currency);
+  return formatPriceSync(converted, currency);
+}
 
-  switch (targetCurrency) {
-    case 'INR':
-      return `₹${converted.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    case 'USD':
-      return `$${converted.toFixed(2)}`;
-    case 'AED':
-      return `${converted.toFixed(2)} AED`;
-    default:
-      return `₹${amountInr.toLocaleString('en-IN')}`;
-  }
+// ---------------------- Convert (Sync for UI) ----------------------
+
+export function convertPriceSync(
+  amountInr: number,
+  currency: SupportedCurrency,
+  rates?: Map<string, number> | null
+): number {
+  if (currency === 'INR') return amountInr;
+  if (!rates) return amountInr;
+
+  const rate = rates.get(currency);
+  if (!rate || rate <= 0) return amountInr;
+
+  return amountInr / rate;
 }
 
 export function formatPriceSync(
   amount: number,
-  currency: 'INR' | 'USD' | 'AED'
+  currency: SupportedCurrency
 ): string {
-  switch (currency) {
-    case 'INR':
-      return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    case 'USD':
-      return `$${amount.toFixed(2)}`;
-    case 'AED':
-      return `${amount.toFixed(2)} AED`;
-    default:
-      return `₹${amount.toLocaleString('en-IN')}`;
-  }
+  const symbol = getCurrencySymbol(currency);
+  const fraction = currency === 'INR' ? 0 : 2;
+
+  return (
+    symbol +
+    amount.toLocaleString(currency === 'INR' ? 'en-IN' : 'en-US', {
+      minimumFractionDigits: fraction,
+      maximumFractionDigits: fraction,
+    })
+  );
 }
 
-export function getCurrencySymbol(currency: 'INR' | 'USD' | 'AED'): string {
+export function getCurrencySymbol(currency: SupportedCurrency): string {
   switch (currency) {
-    case 'INR':
-      return '₹';
-    case 'USD':
-      return '$';
-    case 'AED':
-      return 'AED';
-    default:
-      return '₹';
+    case 'INR': return '₹';
+    case 'USD': return '$';
+    case 'AED': return 'AED';
+    case 'GBP': return '£';
+    case 'CAD': return 'C$';
+    default: return '₹';
   }
-}
-
-export function convertPriceSync(
-  amountInr: number,
-  targetCurrency: 'INR' | 'USD' | 'AED',
-  rates: Map<string, number>
-): number {
-  if (targetCurrency === 'INR') {
-    return amountInr;
-  }
-
-  const rate = rates.get(targetCurrency);
-
-  if (!rate || rate <= 0) {
-    return amountInr;
-  }
-
-  return amountInr / rate;
 }
 
 export function clearCurrencyCache(): void {

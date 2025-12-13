@@ -2,19 +2,32 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
+import { ShoppingBag, Package, Truck, CheckCircle2, Clock } from 'lucide-react';
+
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { Order } from '@/lib/types';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShoppingBag } from 'lucide-react';
-import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
+
+// Extend your Order type locally with optional tracking fields.
+// (These fields should exist in the Supabase "orders" table to be populated)
+type OrderWithTracking = Order & {
+  tracking_number?: string | null;
+  shipping_carrier?: string | null;
+  estimated_delivery?: string | null;
+};
+
+type OrderStatus = Order['status'];
 
 export default function OrdersPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+
+  const [orders, setOrders] = useState<OrderWithTracking[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,20 +37,28 @@ export default function OrdersPage() {
     }
 
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchOrders = async () => {
     if (!user) return;
 
     try {
+      setLoading(true);
+
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setOrders(data);
+      if (error) {
+        console.error('Error fetching orders:', error);
+        return;
+      }
+
+      if (data) {
+        setOrders(data as OrderWithTracking[]);
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -45,6 +66,120 @@ export default function OrdersPage() {
       setLoading(false);
     }
   };
+
+  // -------- helpers for tracking UI --------
+
+  const steps = ['Order Placed', 'Packed', 'Shipped', 'Delivered'] as const;
+
+  const getStepIndex = (status: OrderStatus): number => {
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'packed':
+        return 1;
+      case 'shipped':
+        return 2;
+      case 'delivered':
+        return 3;
+      case 'cancelled':
+        // cancelled orders show only first step as done
+        return 0;
+      default:
+        return 0;
+    }
+  };
+
+  const renderStatusBadge = (status: OrderStatus) => {
+    const base =
+      'px-2 py-1 rounded-full text-xs font-semibold capitalize';
+
+    if (status === 'delivered') {
+      return (
+        <span className={`${base} bg-green-100 text-green-800`}>
+          delivered
+        </span>
+      );
+    }
+    if (status === 'cancelled') {
+      return (
+        <span className={`${base} bg-red-100 text-red-800`}>
+          cancelled
+        </span>
+      );
+    }
+    return (
+      <span className={`${base} bg-blue-100 text-blue-800`}>
+        {status}
+      </span>
+    );
+  };
+
+  const renderPaymentBadge = (paymentStatus: Order['payment_status']) => {
+    const base =
+      'px-2 py-1 rounded-full text-xs font-semibold capitalize';
+
+    if (paymentStatus === 'paid') {
+      return (
+        <span className={`${base} bg-green-100 text-green-800`}>
+          paid
+        </span>
+      );
+    }
+    if (paymentStatus === 'failed') {
+      return (
+        <span className={`${base} bg-red-100 text-red-800`}>
+          failed
+        </span>
+      );
+    }
+    return (
+      <span className={`${base} bg-yellow-100 text-yellow-800`}>
+        {paymentStatus}
+      </span>
+    );
+  };
+
+  const renderStepIcon = (idx: number, current: number) => {
+    const done = idx <= current;
+    const active = idx === current;
+
+    const common =
+      'flex items-center justify-center w-7 h-7 rounded-full border text-xs';
+
+    let icon: JSX.Element;
+    if (idx === 0) icon = <Package className="w-4 h-4" />;
+    else if (idx === steps.length - 1)
+      icon = <CheckCircle2 className="w-4 h-4" />;
+    else icon = <Truck className="w-4 h-4" />;
+
+    if (done) {
+      return (
+        <div
+          className={`${common} bg-[#D4AF37] border-[#D4AF37] text-black`}
+        >
+          {icon}
+        </div>
+      );
+    }
+
+    if (active) {
+      return (
+        <div
+          className={`${common} border-[#D4AF37] text-[#D4AF37]`}
+        >
+          {icon}
+        </div>
+      );
+    }
+
+    return (
+      <div className={`${common} border-gray-400 text-gray-400`}>
+        {icon}
+      </div>
+    );
+  };
+
+  // -------- loading / empty states --------
 
   if (loading) {
     return (
@@ -71,69 +206,110 @@ export default function OrdersPage() {
     );
   }
 
+  // -------- main list --------
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">My Orders</h1>
 
       <div className="space-y-4">
-        {orders.map((order) => (
-          <Card key={order.id}>
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">
-                    Order #{order.order_number}
-                  </CardTitle>
-                  <p className="text-sm text-gray-600">
-                    {format(new Date(order.created_at), 'MMMM dd, yyyy')}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">
-                    ₹{Number(order.total_amount_inr).toFixed(2)}
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        order.status === 'delivered'
-                          ? 'bg-green-100 text-green-800'
-                          : order.status === 'cancelled'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {order.status}
-                    </span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        order.payment_status === 'paid'
-                          ? 'bg-green-100 text-green-800'
-                          : order.payment_status === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}
-                    >
-                      {order.payment_status}
-                    </span>
+        {orders.map((order) => {
+          const currentStep = getStepIndex(order.status);
+
+          return (
+            <Card key={order.id} className="border border-[#D4AF37]/30">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">
+                      Order #{order.order_number}
+                    </CardTitle>
+                    <p className="text-sm text-gray-600">
+                      {format(new Date(order.created_at), 'MMMM dd, yyyy')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">
+                      ₹{Number(order.total_amount_inr).toFixed(2)}
+                    </p>
+                    <div className="flex gap-2 mt-2 justify-end">
+                      {renderStatusBadge(order.status)}
+                      {renderPaymentBadge(order.payment_status)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-gray-600 mb-4">
-                <p>Shipping to: {order.shipping_name}</p>
-                <p>{order.shipping_address}</p>
-                <p>
-                  {order.shipping_city}, {order.shipping_state} -{' '}
-                  {order.shipping_pincode}
-                </p>
-              </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/orders/${order.id}`}>View Details</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                {/* Delivery Progress / Tracking */}
+                <div>
+                  <div className="flex items-center justify-between mb-2 text-sm font-semibold text-gray-700">
+                    <span>Delivery Progress</span>
+                    {order.estimated_delivery && (
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        <Clock className="w-3 h-3" />
+                        ETA:{' '}
+                        {format(
+                          new Date(order.estimated_delivery),
+                          'dd MMM'
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    {steps.map((step, idx) => (
+                      <div
+                        key={step}
+                        className="flex-1 flex flex-col items-center"
+                      >
+                        {renderStepIcon(idx, currentStep)}
+                        <span
+                          className={`mt-2 text-center ${
+                            idx <= currentStep
+                              ? 'text-gray-900'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tracking info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
+                  <div>
+                    <p className="text-gray-500">Tracking Number</p>
+                    <p className="font-mono">
+                      {order.tracking_number || 'Not assigned yet'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Carrier</p>
+                    <p>{order.shipping_carrier || 'Will be updated soon'}</p>
+                  </div>
+                </div>
+
+                {/* Shipping address (your existing block) */}
+                <div className="text-sm text-gray-700">
+                  <p className="text-gray-500 mb-1">Shipping to</p>
+                  <p>{order.shipping_name}</p>
+                  <p>{order.shipping_address}</p>
+                  <p>
+                    {order.shipping_city}, {order.shipping_state} -{' '}
+                    {order.shipping_pincode}
+                  </p>
+                </div>
+
+                {/* Link to detailed order page (you already had this) */}
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/orders/${order.id}`}>View Details</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

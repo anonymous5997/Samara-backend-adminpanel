@@ -34,10 +34,19 @@ export interface ProductWithImages {
   description: string | null;
   brand: string | null;
   base_price_inr: number;
+
   is_bestseller: boolean;
   bestseller_badge_label: string;
   is_new_arrival: boolean;
   is_active: boolean;
+
+  // filter / placement fields
+  show_in_sarees: boolean;
+  show_in_festive_edit: boolean;
+  fabric: string | null;
+  color: string | null;
+  occasion: string | null;
+
   category_id: string | null;
   primary_image_url: string | null;
   images: Array<{
@@ -59,6 +68,21 @@ function getSupabaseClient() {
   });
 }
 
+function mapProductsWithImages(data: any[] | null): ProductWithImages[] {
+  return (data || []).map((product: any) => ({
+    ...product,
+    images: product.product_images || [],
+    primary_image_url:
+      product.product_images?.find((img: any) => img.is_primary)?.image_url ||
+      product.product_images?.[0]?.image_url ||
+      null,
+  }));
+}
+
+/* ------------------------------------------------------------------ */
+/*  HERO SLIDES                                                        */
+/* ------------------------------------------------------------------ */
+
 export async function getHomeHeroSlides(): Promise<HeroSlide[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -76,11 +100,19 @@ export async function getHomeHeroSlides(): Promise<HeroSlide[]> {
   return data || [];
 }
 
-export async function getMostLovedProducts(limit: number = 4): Promise<ProductWithImages[]> {
+/* ------------------------------------------------------------------ */
+/*  HOMEPAGE PRODUCTS                                                  */
+/* ------------------------------------------------------------------ */
+
+export async function getMostLovedProducts(
+  limit: number = 4,
+): Promise<ProductWithImages[]> {
   const supabase = getSupabaseClient();
+
   const { data, error } = await supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       product_images (
         id,
@@ -88,7 +120,8 @@ export async function getMostLovedProducts(limit: number = 4): Promise<ProductWi
         is_primary,
         display_order
       )
-    `)
+    `,
+    )
     .eq('is_bestseller', true)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
@@ -99,20 +132,18 @@ export async function getMostLovedProducts(limit: number = 4): Promise<ProductWi
     return [];
   }
 
-  return (data || []).map(product => ({
-    ...product,
-    images: product.product_images || [],
-    primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                        (product.product_images || [])[0]?.image_url ||
-                        null,
-  }));
+  return mapProductsWithImages(data);
 }
 
-export async function getNewArrivals(limit: number = 4): Promise<ProductWithImages[]> {
+export async function getNewArrivals(
+  limit: number = 4,
+): Promise<ProductWithImages[]> {
   const supabase = getSupabaseClient();
+
   const { data: flaggedProducts, error: flaggedError } = await supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       product_images (
         id,
@@ -120,7 +151,8 @@ export async function getNewArrivals(limit: number = 4): Promise<ProductWithImag
         is_primary,
         display_order
       )
-    `)
+    `,
+    )
     .eq('is_new_arrival', true)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
@@ -131,18 +163,13 @@ export async function getNewArrivals(limit: number = 4): Promise<ProductWithImag
   }
 
   if (flaggedProducts && flaggedProducts.length > 0) {
-    return flaggedProducts.map(product => ({
-      ...product,
-      images: product.product_images || [],
-      primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                          (product.product_images || [])[0]?.image_url ||
-                          null,
-    }));
+    return mapProductsWithImages(flaggedProducts);
   }
 
   const { data: latestProducts, error: latestError } = await supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       product_images (
         id,
@@ -150,7 +177,8 @@ export async function getNewArrivals(limit: number = 4): Promise<ProductWithImag
         is_primary,
         display_order
       )
-    `)
+    `,
+    )
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -160,37 +188,26 @@ export async function getNewArrivals(limit: number = 4): Promise<ProductWithImag
     return [];
   }
 
-  return (latestProducts || []).map(product => ({
-    ...product,
-    images: product.product_images || [],
-    primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                        (product.product_images || [])[0]?.image_url ||
-                        null,
-  }));
+  return mapProductsWithImages(latestProducts);
 }
 
+/* ------------------------------------------------------------------ */
+/*  SAREES PAGE: PRODUCTS + FILTER OPTIONS                             */
+/* ------------------------------------------------------------------ */
+
 export async function getSareeProducts(filters?: {
-  fabric?: string;
-  color?: string;
-  occasion?: string;
+  fabric?: string[];
+  color?: string[];
+  occasion?: string[];
   minPrice?: number;
   maxPrice?: number;
 }): Promise<ProductWithImages[]> {
   const supabase = getSupabaseClient();
-  const { data: sareeCategory } = await supabase
-    .from('categories')
-    .select('id')
-    .eq('slug', 'sarees')
-    .maybeSingle();
-
-  if (!sareeCategory) {
-    console.warn('Sarees category not found');
-    return [];
-  }
 
   let query = supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       product_images (
         id,
@@ -198,16 +215,25 @@ export async function getSareeProducts(filters?: {
         is_primary,
         display_order
       )
-    `)
-    .eq('category_id', sareeCategory.id)
+    `,
+    )
     .eq('is_active', true)
+    .eq('show_in_sarees', true)
     .order('created_at', { ascending: false });
 
-  if (filters?.minPrice) {
+  if (filters?.fabric && filters.fabric.length > 0) {
+    query = query.in('fabric', filters.fabric);
+  }
+  if (filters?.color && filters.color.length > 0) {
+    query = query.in('color', filters.color);
+  }
+  if (filters?.occasion && filters.occasion.length > 0) {
+    query = query.in('occasion', filters.occasion);
+  }
+  if (typeof filters?.minPrice === 'number') {
     query = query.gte('base_price_inr', filters.minPrice);
   }
-
-  if (filters?.maxPrice) {
+  if (typeof filters?.maxPrice === 'number') {
     query = query.lte('base_price_inr', filters.maxPrice);
   }
 
@@ -218,14 +244,46 @@ export async function getSareeProducts(filters?: {
     return [];
   }
 
-  return (data || []).map(product => ({
-    ...product,
-    images: product.product_images || [],
-    primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                        (product.product_images || [])[0]?.image_url ||
-                        null,
-  }));
+  return mapProductsWithImages(data);
 }
+
+/** Returns all distinct fabrics / colors / occasions used by saree products */
+export async function getFilterOptions(): Promise<{
+  fabrics: string[];
+  colors: string[];
+  occasions: string[];
+}> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('fabric, color, occasion')
+    .eq('show_in_sarees', true)
+    .eq('is_active', true);
+
+  if (error || !data) {
+    console.error('Error fetching filter options:', error);
+    return { fabrics: [], colors: [], occasions: [] };
+  }
+
+  const fabrics = Array.from(
+    new Set(data.map((p: any) => p.fabric).filter(Boolean)),
+  ) as string[];
+
+  const colors = Array.from(
+    new Set(data.map((p: any) => p.color).filter(Boolean)),
+  ) as string[];
+
+  const occasions = Array.from(
+    new Set(data.map((p: any) => p.occasion).filter(Boolean)),
+  ) as string[];
+
+  return { fabrics, colors, occasions };
+}
+
+/* ------------------------------------------------------------------ */
+/*  COLLECTIONS                                                        */
+/* ------------------------------------------------------------------ */
 
 export async function getAllCollections(): Promise<Collection[]> {
   const supabase = getSupabaseClient();
@@ -243,7 +301,9 @@ export async function getAllCollections(): Promise<Collection[]> {
   return data || [];
 }
 
-export async function getCollectionBySlug(slug: string): Promise<Collection | null> {
+export async function getCollectionBySlug(
+  slug: string,
+): Promise<Collection | null> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('collections')
@@ -260,7 +320,9 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | nu
   return data;
 }
 
-export async function getCollectionProducts(slug: string): Promise<ProductWithImages[]> {
+export async function getCollectionProducts(
+  slug: string,
+): Promise<ProductWithImages[]> {
   const collection = await getCollectionBySlug(slug);
 
   if (!collection) {
@@ -271,7 +333,8 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('products')
-      .select(`
+      .select(
+        `
         *,
         product_images (
           id,
@@ -279,7 +342,8 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
           is_primary,
           display_order
         )
-      `)
+      `,
+      )
       .eq('category_id', collection.category_id)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
@@ -289,19 +353,14 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
       return [];
     }
 
-    return (data || []).map(product => ({
-      ...product,
-      images: product.product_images || [],
-      primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                          (product.product_images || [])[0]?.image_url ||
-                          null,
-    }));
+    return mapProductsWithImages(data);
   }
 
   const supabase = getSupabaseClient();
   const { data: collectionProductsData, error } = await supabase
     .from('collection_products')
-    .select(`
+    .select(
+      `
       sort_order,
       products (
         *,
@@ -312,7 +371,8 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
           display_order
         )
       )
-    `)
+    `,
+    )
     .eq('collection_id', collection.id)
     .order('sort_order', { ascending: true });
 
@@ -322,20 +382,60 @@ export async function getCollectionProducts(slug: string): Promise<ProductWithIm
   }
 
   return (collectionProductsData || [])
-    .filter(cp => cp.products)
-    .map(cp => {
+    .filter((cp: any) => cp.products)
+    .map((cp: any) => {
       const product = Array.isArray(cp.products) ? cp.products[0] : cp.products;
       return {
         ...product,
         images: product.product_images || [],
-        primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                            (product.product_images || [])[0]?.image_url ||
-                            null,
+        primary_image_url:
+          product.product_images?.find((img: any) => img.is_primary)?.image_url ||
+          product.product_images?.[0]?.image_url ||
+          null,
       };
     });
 }
 
-export async function getSimilarProducts(productId: string, limit: number = 4): Promise<ProductWithImages[]> {
+/* ------------------------------------------------------------------ */
+/*  FESTIVE EDIT                                                       */
+/* ------------------------------------------------------------------ */
+
+export async function getFestiveEditProducts(): Promise<ProductWithImages[]> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(
+      `
+      *,
+      product_images (
+        id,
+        image_url,
+        is_primary,
+        display_order
+      )
+    `,
+    )
+    .eq('show_in_festive_edit', true)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching festive edit products:', error);
+    return [];
+  }
+
+  return mapProductsWithImages(data);
+}
+
+/* ------------------------------------------------------------------ */
+/*  SIMILAR PRODUCTS                                                   */
+/* ------------------------------------------------------------------ */
+
+export async function getSimilarProducts(
+  productId: string,
+  limit: number = 4,
+): Promise<ProductWithImages[]> {
   const supabase = getSupabaseClient();
 
   const { data: currentProduct } = await supabase
@@ -347,7 +447,8 @@ export async function getSimilarProducts(productId: string, limit: number = 4): 
   if (!currentProduct?.category_id) {
     const { data, error } = await supabase
       .from('products')
-      .select(`
+      .select(
+        `
         *,
         product_images (
           id,
@@ -355,7 +456,8 @@ export async function getSimilarProducts(productId: string, limit: number = 4): 
           is_primary,
           display_order
         )
-      `)
+      `,
+      )
       .neq('id', productId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -366,18 +468,13 @@ export async function getSimilarProducts(productId: string, limit: number = 4): 
       return [];
     }
 
-    return (data || []).map(product => ({
-      ...product,
-      images: product.product_images || [],
-      primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                          (product.product_images || [])[0]?.image_url ||
-                          null,
-    }));
+    return mapProductsWithImages(data);
   }
 
   const { data, error } = await supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       product_images (
         id,
@@ -385,7 +482,8 @@ export async function getSimilarProducts(productId: string, limit: number = 4): 
         is_primary,
         display_order
       )
-    `)
+    `,
+    )
     .eq('category_id', currentProduct.category_id)
     .neq('id', productId)
     .eq('is_active', true)
@@ -397,11 +495,5 @@ export async function getSimilarProducts(productId: string, limit: number = 4): 
     return [];
   }
 
-  return (data || []).map(product => ({
-    ...product,
-    images: product.product_images || [],
-    primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                        (product.product_images || [])[0]?.image_url ||
-                        null,
-  }));
+  return mapProductsWithImages(data);
 }

@@ -28,6 +28,9 @@ export default function LoginPage() {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
 
+  // NEW: store 2Factor sessionId returned by /api/sms/send
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
   const handlePasswordSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -118,31 +121,113 @@ export default function LoginPage() {
     }
   };
 
+  // ---------- UPDATED: Phone OTP handlers using your /api endpoints ----------
   const handleSendPhoneOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone,
-        options: {
-          shouldCreateUser: mode === 'signup',
-        },
+      // Normalize phone if you need (server will strip non-digits)
+      const payload = { phone: phone };
+
+      const res = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (error) {
-        toast.error(error.message);
+      const json = await res.json();
+
+      if (!res.ok) {
+        console.error('sms/send failed', json);
+        toast.error(json?.error || 'Failed to send OTP via SMS');
+        setLoading(false);
         return;
       }
 
+      // store sessionId for verification; 2Factor returns it in Details
+      const sId = json.sessionId ?? json.session_id ?? null;
+      setSessionId(sId);
       setPhoneOtpSent(true);
       toast.success('OTP sent to your phone');
-    } catch (error) {
+    } catch (err) {
+      console.error(err);
       toast.error('Failed to send OTP. Phone authentication may not be enabled.');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleVerifyPhoneOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (!sessionId) {
+        toast.error('No SMS session found. Please request a new OTP.');
+        setLoading(false);
+        return;
+      }
+
+      const payload = { sessionId, otp, phone };
+
+      const res = await fetch('/api/sms/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || json.error) {
+        console.error('sms/verify failed', json);
+        toast.error(json?.error || 'OTP verification failed');
+        setLoading(false);
+        return;
+      }
+
+      // If verify was successful, mark phone verified in profiles table.
+      // We try to find an existing profile by phone; if none, we insert one.
+      // NOTE: This does not create a Supabase auth session for the user.
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('phone', phone)
+        .maybeSingle();
+
+      if (!existing) {
+        // Insert a new profile row (no auth user created here)
+        await supabase.from('profiles').insert({
+          phone,
+          name: name || '',
+          phone_verified: true,
+          role: 'customer',
+        });
+      } else {
+        // Update existing profile to mark phone verified
+        await supabase
+          .from('profiles')
+          .update({ phone_verified: true })
+          .eq('phone', phone);
+      }
+
+      toast.success('Phone verified successfully');
+
+      // Decide what you want to do next:
+      // - If this is sign-in for an existing account you will need server-side logic to
+      //   sign the user in (create a session) because Supabase auth phone OTP isn't used.
+      // - If this is a signup, you may want to create a Supabase auth user server-side
+      //   using the service role key and then return credentials/session.
+      // For now, we'll redirect to home or you can show the "set password" flow.
+      router.push('/');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to verify OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+  // -------------------------------------------------------------------------
 
   const handleVerifyEmailOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,49 +256,6 @@ export default function LoginPage() {
           await supabase.from('profiles').insert({
             id: data.user.id,
             email: data.user.email!,
-            name: name || '',
-            role: 'customer',
-          });
-        }
-
-        toast.success('Signed in successfully');
-        router.push('/');
-      }
-    } catch (error) {
-      toast.error('Failed to verify OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyPhoneOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone,
-        token: otp,
-        type: 'sms',
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (!profile) {
-          await supabase.from('profiles').insert({
-            id: data.user.id,
-            email: data.user.email || '',
-            phone: data.user.phone || '',
             name: name || '',
             role: 'customer',
           });

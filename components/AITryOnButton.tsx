@@ -1,6 +1,7 @@
 'use client';
 
 import { Camera } from 'lucide-react';
+import { AITryOnModal } from '@/components/AITryOnModal';
 
 interface AITryOnButtonProps {
   onClick: () => void;
@@ -29,3 +30,4 @@ export function AITryOnButton({ onClick }: AITryOnButtonProps) {
     </button>
   );
 }
+

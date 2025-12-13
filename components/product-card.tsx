@@ -53,7 +53,7 @@ export function ProductCard({ product, image, currency, rate }: ProductCardProps
 
   return (
     <Link href={`/products/${product.slug}`} className="group">
-      <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100">
+      <div className="relative aspect-square overflow-hidden rounded-lg bg-[#111]">
         {image ? (
           <Image
             src={image.image_url}
@@ -62,32 +62,41 @@ export function ProductCard({ product, image, currency, rate }: ProductCardProps
             className="object-cover transition-transform group-hover:scale-105"
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex items-center justify-center h-full text-gray-500">
             No Image
           </div>
         )}
+
         {user && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+            className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 backdrop-blur-md"
             onClick={toggleWishlist}
             disabled={loading}
           >
             <Heart
-              className={`h-5 w-5 ${isWishlisted ? 'fill-red-500 text-red-500' : ''}`}
+              className={`h-5 w-5 ${
+                isWishlisted ? 'fill-red-500 text-red-500' : 'text-white'
+              }`}
             />
           </Button>
         )}
       </div>
+
       <div className="mt-3">
-        <h3 className="text-sm font-medium text-gray-900 line-clamp-2">
+        {/* Product Name */}
+        <h3 className="text-sm font-medium text-white line-clamp-2">
           {product.name}
         </h3>
+
+        {/* Brand */}
         {product.brand && (
-          <p className="text-xs text-gray-500 mt-1">{product.brand}</p>
+          <p className="text-xs text-gray-300 mt-1">{product.brand}</p>
         )}
-        <p className="mt-1 text-sm font-semibold">
+
+        {/* Price */}
+        <p className="mt-1 text-sm font-semibold text-[#D4AF37]">
           {formatPrice(product.base_price_inr, currency, rate)}
         </p>
       </div>

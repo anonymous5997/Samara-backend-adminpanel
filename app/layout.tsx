@@ -16,16 +16,21 @@ const cormorant = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: 'Samara - Best Handcrafted Sambalpuri Sarees | Traditional Indian Sarees',
-  description: 'Discover the finest handcrafted Sambalpuri sarees at Samara. Authentic traditional Indian sarees woven with heritage craftsmanship, featuring exquisite designs and premium quality. Shop genuine Sambalpuri silk sarees, cotton sarees, and ethnic wear for every occasion.',
+  description: 'Discover the finest handcrafted Sambalpuri sarees at Samara. Authentic traditional Indian sarees woven with heritage craftsmanship, featuring exquisite designs and premium quality.',
   keywords: 'sambalpuri saree, handcrafted sarees, traditional sarees, sambalpuri silk saree, indian sarees online, ethnic wear, handloom sarees, authentic sambalpuri, samara sarees, traditional indian wear',
+
   openGraph: {
     title: 'Samara - Best Handcrafted Sambalpuri Sarees',
     description: 'Authentic handcrafted Sambalpuri sarees woven with traditional Indian craftsmanship. Premium quality ethnic wear for the modern woman.',
     type: 'website',
     locale: 'en_IN',
   },
+
+  // ✅ UPDATED FAVICON HERE
   icons: {
-    icon: '/img_2599 copy.jpeg',
+    icon: '/img_2601.jpeg',
+    shortcut: '/img_2601.jpeg',
+    apple: '/img_2601.jpeg',
   },
 };
 
@@ -39,6 +44,7 @@ export default function RootLayout({
       <head>
         <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
       </head>
+
       <body className={`${inter.variable} ${playfair.variable} ${cormorant.variable} font-sans antialiased`}>
         <AuthProvider>
           <CartProvider>

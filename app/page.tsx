@@ -1,15 +1,24 @@
+// app/page.tsx
+
 import Link from 'next/link';
+import nextdynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import { HeroSlider } from '@/components/HeroSlider';
 import { SectionHeading } from '@/components/SectionHeading';
 import { CollectionsGrid } from '@/components/CollectionsGrid';
-import { AITryOn } from '@/components/AITryOn';
+// import { AITryOn } from '@/components/AITryOn'; // kept commented out
 import { ProductSection } from '@/components/ProductSection';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// dynamically load the client-only component that runs the auto-currency hook
+const AutoCurrencyClient = nextdynamic(
+  () => import('@/components/AutoCurrencyClient'),
+  { ssr: false }
+);
 
 export default async function Home() {
   const mostLovedProducts = await getMostLovedProducts(4);
@@ -17,6 +26,9 @@ export default async function Home() {
 
   return (
     <div className="bg-[#000000]">
+      {/* Client-only auto-currency runner (doesn't render anything) */}
+      <AutoCurrencyClient />
+
       <HeroSlider />
 
       {mostLovedProducts.length > 0 && (
@@ -37,9 +49,7 @@ export default async function Home() {
                   <div
                     key={index}
                     className={`h-2 rounded-full transition-all duration-300 ${
-                      index === 0
-                        ? 'w-8 bg-[#D4AF37]'
-                        : 'w-2 bg-[#D4AF37]/30'
+                      index === 0 ? 'w-8 bg-[#D4AF37]' : 'w-2 bg-[#D4AF37]/30'
                     }`}
                   />
                 ))}
@@ -56,9 +66,7 @@ export default async function Home() {
               <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] heading-line-height mb-4">
                 New Arrivals
               </h2>
-              <p className="text-lg text-[#CFCFCF]">
-                Fresh designs for the season
-              </p>
+              <p className="text-lg text-[#CFCFCF]">Fresh designs for the season</p>
             </div>
             <ProductSection products={newArrivals} showNew={true} />
             <div className="text-center mt-12">
@@ -105,7 +113,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <AITryOn />
+      {/* <AITryOn /> */}
     </div>
   );
 }

@@ -3,26 +3,48 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import {
+  Heart,
+  ShoppingCart,
+  Check,
+  Share2,
+  Truck,
+  ShieldCheck,
+  Sparkles,
+  Camera,
+  Zap,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
-import { Heart, ShoppingCart, Check, Share2, Truck, ShieldCheck, Sparkles, Camera, Zap } from 'lucide-react';
-import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
 import { ProductTryOnModal } from '@/components/ProductTryOnModal';
 import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
 import { getSimilarProducts } from '@/lib/content';
+import {
+  getCurrencyRates,
+  convertPriceSync,
+  formatPriceSync,
+} from '@/lib/currency-utils';
 
 interface Product {
   id: string;
   name: string;
   slug: string;
-  description: string;
-  brand: string;
+  description: string | null;
+  brand: string | null;
   base_price_inr: number;
   is_active: boolean;
+
+  // extra fields for details/highlights
+  fabric?: string | null;
+  occasion?: string | null;
+  care_instructions?: string | null;
+  shipping_time?: string | null;
+  why_women_love?: string | null;
 }
 
 interface ProductImage {
@@ -32,56 +54,82 @@ interface ProductImage {
   display_order: number;
 }
 
-export default function ProductDetailPageLuxury() {
+export default function ProductDetailPage() {
   const params = useParams();
   const slug = params.slug as string;
+
   const { user } = useAuth();
-  const { addToCart } = useCart();
+  const { addToCart, currency } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
-  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedIndex, setSelectedIndex] = useState(0); // <— track index instead of URL
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
   const [tryOnModalOpen, setTryOnModalOpen] = useState(false);
   const [buyNowModalOpen, setBuyNowModalOpen] = useState(false);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
+  const [rates, setRates] = useState<Map<string, number> | null>(null);
 
+  // Load product
   useEffect(() => {
     fetchProduct();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
+
+  // Load currency rates once
+  useEffect(() => {
+    getCurrencyRates()
+      .then((r) => setRates(r))
+      .catch((err) => {
+        console.error('Error loading currency rates:', err);
+      });
+  }, []);
 
   const fetchProduct = async () => {
     try {
-      const { data: productData } = await supabase
+      setLoading(true);
+
+      const { data: productData, error: productError } = await supabase
         .from('products')
         .select('*')
         .eq('slug', slug)
         .maybeSingle();
 
+      if (productError) throw productError;
+
       if (!productData) {
+        setProduct(null);
+        setImages([]);
+        setSelectedIndex(0);
         setLoading(false);
         return;
       }
 
-      const { data: imageData } = await supabase
+      const { data: imageData, error: imageError } = await supabase
         .from('product_images')
         .select('*')
         .eq('product_id', productData.id)
         .order('display_order');
 
+      if (imageError) throw imageError;
+
+      const orderedImages = imageData || [];
+      setImages(orderedImages);
+
+      // choose primary image index; fallback to first image
+      const primaryIndex = orderedImages.findIndex((img) => img.is_primary);
+      setSelectedIndex(primaryIndex >= 0 ? primaryIndex : 0);
+
       setProduct(productData);
-      setImages(imageData || []);
 
-      const primaryImage = imageData?.find(img => img.is_primary)?.image_url || imageData?.[0]?.image_url || '';
-      setSelectedImage(primaryImage);
-
-      if (productData?.id) {
+      if (productData.id) {
         const similar = await getSimilarProducts(productData.id, 4);
         setSimilarProducts(similar);
       }
-    } catch (error) {
-      console.error('Error fetching product:', error);
+    } catch (err) {
+      console.error('Error fetching product:', err);
+      toast.error('Failed to load product');
     } finally {
       setLoading(false);
     }
@@ -93,9 +141,10 @@ export default function ProductDetailPageLuxury() {
     setAddingToCart(true);
     try {
       await addToCart(String(product.id), undefined, 1);
-      toast.success('Added to cart!');
-    } catch (error) {
-      toast.error('Failed to add to cart');
+      toast.success('Added to cart');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to add to bag');
     } finally {
       setAddingToCart(false);
     }
@@ -113,7 +162,9 @@ export default function ProductDetailPageLuxury() {
     return (
       <div className="bg-black text-white min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="font-serif text-3xl font-bold text-gold mb-4">Product Not Found</h2>
+          <h2 className="font-serif text-3xl font-bold text-gold mb-4">
+            Product Not Found
+          </h2>
           <Link href="/sarees" className="text-gold hover:underline">
             Browse All Sarees
           </Link>
@@ -122,8 +173,39 @@ export default function ProductDetailPageLuxury() {
     );
   }
 
-  const mrp = Math.round(product.base_price_inr * 1.15);
-  const discount = Math.round(((mrp - product.base_price_inr) / mrp) * 100);
+  // ---------- PRICING ----------
+  const mrpInInr = Math.round(product.base_price_inr * 1.15);
+  const discount = Math.round(
+    ((mrpInInr - product.base_price_inr) / mrpInInr) * 100
+  );
+
+  const priceInCurrency = convertPriceSync(
+    product.base_price_inr,
+    currency,
+    rates
+  );
+  const mrpInCurrency = convertPriceSync(mrpInInr, currency, rates);
+
+  const priceLabel = formatPriceSync(priceInCurrency, currency);
+  const mrpLabel = formatPriceSync(mrpInCurrency, currency);
+  // -----------------------------
+
+  // currently selected image URL (based on index)
+  const selectedImage =
+    images[selectedIndex]?.image_url || images[0]?.image_url || '';
+
+  // Key highlights for overlay
+  const highlights: string[] = [
+    product.fabric ? `Fabric: ${product.fabric}` : '',
+    product.occasion ? `Occasion: ${product.occasion}` : '',
+    product.care_instructions ? `Care: ${product.care_instructions}` : '',
+    product.shipping_time ? `Shipping: ${product.shipping_time}` : '',
+    product.why_women_love || '',
+  ].filter(Boolean) as string[];
+
+  const finalHighlights = highlights.length
+    ? highlights
+    : ['Premium quality saree'];
 
   return (
     <div className="bg-black text-white min-h-screen">
@@ -132,9 +214,10 @@ export default function ProductDetailPageLuxury() {
       <section className="py-12 bg-gradient-to-b from-black to-luxury-charcoal">
         <div className="container mx-auto px-4 md:px-8">
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
+            {/* LEFT: image + overlay + thumbs + AI button */}
             <div>
-              <div className="sticky top-24">
-                <div className="aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden mb-4 shadow-2xl shadow-gold/10">
+              <div className="sticky top-24 space-y-4">
+                <div className="relative aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden shadow-2xl shadow-gold/10">
                   {selectedImage ? (
                     <img
                       src={selectedImage}
@@ -146,16 +229,42 @@ export default function ProductDetailPageLuxury() {
                       Product Image
                     </div>
                   )}
+
+                  {/* Key Highlights overlay – ONLY on the 2nd image (index 1) */}
+                  {finalHighlights.length > 0 &&
+                    images.length > 1 &&
+                    selectedIndex === 1 && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/80 via-black/50 to-transparent px-4 sm:px-8 py-6 sm:py-10">
+                        <div className="max-w-xs space-y-4 text-left">
+                          <h3 className="text-xl sm:text-2xl font-bold leading-tight">
+                            Key Highlights
+                          </h3>
+                          <ul className="space-y-3 text-xs sm:text-sm">
+                            {finalHighlights.slice(0, 4).map((text, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-start gap-2 text-gray-100"
+                              >
+                                <span className="mt-0.5 sm:mt-1">
+                                  <Check className="h-4 w-4 text-gold" />
+                                </span>
+                                <span>{text}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                 </div>
 
                 {images.length > 1 && (
-                  <div className="flex gap-3 overflow-x-auto pb-2 mb-4">
-                    {images.map((image) => (
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {images.map((image, index) => (
                       <button
                         key={image.id}
-                        onClick={() => setSelectedImage(image.image_url)}
+                        onClick={() => setSelectedIndex(index)}
                         className={`flex-shrink-0 w-20 h-20 rounded border-2 overflow-hidden transition-all ${
-                          selectedImage === image.image_url
+                          index === selectedIndex
                             ? 'border-gold shadow-lg shadow-gold/30'
                             : 'border-gold/20 hover:border-gold/50'
                         }`}
@@ -170,66 +279,86 @@ export default function ProductDetailPageLuxury() {
                   </div>
                 )}
 
-                <Button
+                {/* <Button
                   onClick={() => setTryOnModalOpen(true)}
                   className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-xl hover:shadow-[#D4AF37]/50 text-black font-bold py-6 text-lg border-2 border-black/10 hover:scale-[1.02] transition-all"
                 >
                   <Camera className="h-5 w-5 mr-2" />
                   Try With AI Camera
-                </Button>
+                </Button> */}
               </div>
             </div>
 
+            {/* RIGHT: details */}
             <div className="space-y-6">
               <div>
                 <h1 className="font-serif text-4xl md:text-5xl font-bold text-gold mb-3 tracking-tighter">
                   {product.name}
                 </h1>
                 {product.brand && (
-                  <p className="text-gray-400 text-lg mb-6">by {product.brand}</p>
+                  <p className="text-gray-400 text-lg mb-6">
+                    by {product.brand}
+                  </p>
                 )}
               </div>
 
+              {/* PRICE using current currency */}
               <div className="border-t border-b border-gold/20 py-6">
                 <div className="flex items-baseline gap-4 mb-2">
                   <span className="font-serif text-4xl font-bold text-gold">
-                    ₹{product.base_price_inr.toLocaleString('en-IN')}
+                    {priceLabel}
                   </span>
                   <span className="text-xl text-gray-500 line-through">
-                    ₹{mrp.toLocaleString('en-IN')}
+                    {mrpLabel}
                   </span>
                   <span className="bg-gold text-black px-3 py-1 rounded-full text-sm font-bold">
                     {discount}% OFF
                   </span>
                 </div>
-                <p className="text-sm text-gray-500">Inclusive of all taxes</p>
+                <p className="text-sm text-gray-500">
+                  Inclusive of all taxes
+                </p>
               </div>
 
               {product.description && (
                 <div>
-                  <h3 className="font-serif text-xl font-semibold text-gold mb-3">Description</h3>
-                  <p className="text-gray-400 leading-relaxed">{product.description}</p>
+                  <h3 className="font-serif text-xl font-semibold text-gold mb-3">
+                    Description
+                  </h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    {product.description}
+                  </p>
                 </div>
               )}
 
               <div className="space-y-4">
-                <h3 className="font-serif text-xl font-semibold text-gold">Product Details</h3>
+                <h3 className="font-serif text-xl font-semibold text-gold">
+                  Product Details
+                </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
                     <p className="text-gray-500 mb-1">Fabric</p>
-                    <p className="text-white font-medium">Pure Silk</p>
+                    <p className="text-white font-medium">
+                      {product.fabric || '—'}
+                    </p>
                   </div>
                   <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
                     <p className="text-gray-500 mb-1">Occasion</p>
-                    <p className="text-white font-medium">Festive</p>
+                    <p className="text-white font-medium">
+                      {product.occasion || '—'}
+                    </p>
                   </div>
                   <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
                     <p className="text-gray-500 mb-1">Wash Care</p>
-                    <p className="text-white font-medium">Dry Clean Only</p>
+                    <p className="text-white font-medium">
+                      {product.care_instructions || '—'}
+                    </p>
                   </div>
                   <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
                     <p className="text-gray-500 mb-1">Shipping</p>
-                    <p className="text-white font-medium">3-5 Days</p>
+                    <p className="text-white font-medium">
+                      {product.shipping_time || '—'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -292,30 +421,10 @@ export default function ProductDetailPageLuxury() {
           </div>
 
           <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-[#D4AF37]/20">
-            <div className="bg-luxury-charcoal rounded-lg p-8 border border-[#D4AF37]/20">
-              <h3 className="font-serif text-2xl font-bold text-[#D4AF37] mb-6 text-center">
-                Why Women Love This Saree
-              </h3>
-              <div className="grid md:grid-cols-3 gap-6">
-                {[
-                  'Handwoven by master artisans',
-                  'Premium quality materials',
-                  'Perfect for special occasions',
-                ].map((reason, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Check className="h-4 w-4 text-[#D4AF37]" />
-                    </div>
-                    <p className="text-gray-400">{reason}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SimilarProductsSection products={similarProducts} />
           </div>
         </div>
       </section>
-
-      <SimilarProductsSection products={similarProducts} />
 
       <ProductTryOnModal
         isOpen={tryOnModalOpen}

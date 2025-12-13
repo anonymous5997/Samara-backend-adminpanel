@@ -36,12 +36,14 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full bg-[#050505] border-b border-[#D4AF37]/20">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex h-[72px] items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative w-48 h-14 transition-all duration-300 group-hover:scale-105">
+          {/* LEFT: Logo */}
+          <div className="flex items-center gap-4 h-full">
+            <Link href="/" className="flex items-center group">
+              {/* parent must be relative for Image fill */}
+              <div className="relative h-14 w-44 flex items-center">
                 <Image
-                  src="/img_2599 copy.jpeg"
-                  alt="Samara - Best Handcrafted Sambalpuri Sarees"
+                  src="/samara-logo.png"
+                  alt="Samara - Woven for every woman"
                   fill
                   className="object-contain"
                   priority
@@ -50,6 +52,7 @@ export function Header() {
             </Link>
           </div>
 
+          {/* CENTER: nav (desktop) */}
           <nav className="hidden lg:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
             {navLinks.map((link) => (
               <Link
@@ -62,27 +65,43 @@ export function Header() {
             ))}
           </nav>
 
+          {/* RIGHT: actions */}
           <div className="flex items-center gap-4">
             <div className="hidden md:block">
               <CurrencySelector currency={currency} onChange={setCurrency} />
             </div>
 
-            <Button variant="ghost" size="icon" asChild className="hidden md:inline-flex text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="hidden md:inline-flex text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
+            >
               <Link href="/search">
                 <Search className="h-5 w-5" />
               </Link>
             </Button>
 
             {user && (
-              <Button variant="ghost" size="icon" asChild className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
+              >
                 <Link href="/wishlist">
                   <Heart className="h-5 w-5" />
                 </Link>
               </Button>
             )}
 
-            <Button variant="ghost" size="icon" asChild className="relative text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
-              <Link href="/cart">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="relative text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
+            >
+              <Link href="/cart" className="relative">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemsCount > 0 && (
                   <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#D4AF37] text-xs text-black flex items-center justify-center font-semibold">
@@ -95,7 +114,11 @@ export function Header() {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
+                  >
                     <User className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -149,3 +172,5 @@ export function Header() {
     </header>
   );
 }
+
+export default Header;
