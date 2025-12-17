@@ -64,12 +64,12 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/track-order" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Shipping Info  & Tracking
+                  Track Order
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Returns
+                <Link href="/return-policy" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                  Return Policy
                 </Link>
               </li>
             </ul>
