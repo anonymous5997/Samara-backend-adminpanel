@@ -40,23 +40,25 @@ export default function LoginPage() {
 
       if (error) {
         toast.error(error.message);
+        setLoading(false);
         return;
       }
 
-      if (data.user) {
+      if (data.session) {
         console.log('[Login] Sign in successful:', data.user.email);
-        console.log('[Login] Session:', data.session?.access_token ? 'Yes' : 'No');
+        console.log('[Login] Session established');
+
         toast.success('Signed in successfully');
 
-        // Force a small delay to ensure session is set
-        setTimeout(() => {
-          router.push('/');
-          router.refresh();
-        }, 500);
+        // Wait for auth state to propagate, then redirect
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Use window.location for hard navigation to ensure cookies are sent
+        window.location.href = '/';
       }
     } catch (error) {
+      console.error('[Login] Sign in error:', error);
       toast.error('Failed to sign in');
-    } finally {
       setLoading(false);
     }
   };
@@ -78,23 +80,23 @@ export default function LoginPage() {
 
       if (error) {
         toast.error(error.message);
+        setLoading(false);
         return;
       }
 
-      if (data.user) {
-        await supabase.from('profiles').insert({
-          id: data.user.id,
-          email: data.user.email!,
-          name,
-          role: 'customer',
-        });
-
+      if (data.session) {
+        // Profile is created automatically via database trigger
         toast.success('Account created successfully');
-        router.push('/');
+
+        // Wait for auth state to propagate
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Use window.location for hard navigation
+        window.location.href = '/';
       }
     } catch (error) {
+      console.error('[Signup] Error:', error);
       toast.error('Failed to create account');
-    } finally {
       setLoading(false);
     }
   };
@@ -215,14 +217,15 @@ export default function LoginPage() {
       }
 
       toast.success('Signed in successfully');
-      setTimeout(() => {
-        router.push('/');
-        router.refresh();
-      }, 500);
+
+      // Wait for auth state to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Use window.location for hard navigation
+      window.location.href = '/';
     } catch (err: any) {
       console.error('Phone OTP verification error:', err);
       toast.error(err.message || 'Failed to verify OTP');
-    } finally {
       setLoading(false);
     }
   };
@@ -240,31 +243,23 @@ export default function LoginPage() {
 
       if (error) {
         toast.error(error.message);
+        setLoading(false);
         return;
       }
 
-      if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (!profile) {
-          await supabase.from('profiles').insert({
-            id: data.user.id,
-            email: data.user.email!,
-            name: name || '',
-            role: 'customer',
-          });
-        }
-
+      if (data.session) {
+        // Profile is created automatically via database trigger
         toast.success('Signed in successfully');
-        router.push('/');
+
+        // Wait for auth state to propagate
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Use window.location for hard navigation
+        window.location.href = '/';
       }
     } catch (error) {
+      console.error('[EmailOTP] Error:', error);
       toast.error('Failed to verify OTP');
-    } finally {
       setLoading(false);
     }
   };
