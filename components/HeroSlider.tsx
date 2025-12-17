@@ -10,10 +10,9 @@ interface HeroSlide {
   id: string;
   title: string;
   subtitle: string | null;
-  cta_label: string | null;
-  cta_href: string | null;
-  media_type: 'image' | 'video' | null;
-  media_url: string | null;
+  primary_cta_label: string | null;
+  primary_cta_url: string | null;
+  image_url: string | null;
 }
 
 export function HeroSlider() {
@@ -25,9 +24,9 @@ export function HeroSlider() {
   useEffect(() => {
     const fetchSlides = async () => {
       const { data, error } = await supabase
-        .from('hero_slides')
+        .from('home_hero_slides')
         .select(
-          'id, title, subtitle, cta_label, cta_href, media_type, media_url, sort_order, is_active'
+          'id, title, subtitle, primary_cta_label, primary_cta_url, image_url, sort_order, is_active'
         )
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
@@ -97,13 +96,13 @@ export function HeroSlider() {
               </p>
             )}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              {slide.cta_label && slide.cta_href && (
+              {slide.primary_cta_label && slide.primary_cta_url && (
                 <Button
                   size="lg"
                   asChild
                   className="bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold px-10 py-6 text-lg transition-all duration-300 border-0 hover:scale-105"
                 >
-                  <Link href={slide.cta_href}>{slide.cta_label}</Link>
+                  <Link href={slide.primary_cta_url}>{slide.primary_cta_label}</Link>
                 </Button>
               )}
             </div>
@@ -112,24 +111,13 @@ export function HeroSlider() {
           {/* RIGHT: image / video */}
           <div className="relative flex justify-center lg:justify-end lg:ml-20 lg:self-center">
             <div className="w-[420px] h-[560px] md:w-[480px] md:h-[600px] rounded-2xl bg-gradient-to-br from-[#2a2a2a] via-[#1a1a1a] to-[#0a0a0a] border border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/30 hover:shadow-[#D4AF37]/50 transition-all duration-500 flex flex-col items-center justify-center p-2 overflow-hidden">
-              {slide.media_url ? (
-                slide.media_type === 'video' ? (
-                  <video
-                    src={slide.media_url}
-                    className="w-full h-full object-cover rounded-2xl"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={slide.media_url}
-                    alt={slide.title}
-                    className="w-full h-full object-cover rounded-2xl"
-                  />
-                )
+              {slide.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={slide.image_url}
+                  alt={slide.title}
+                  className="w-full h-full object-cover rounded-2xl"
+                />
               ) : (
                 <>
                   <div className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 flex items-center justify-center">
