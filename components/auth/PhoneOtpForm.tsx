@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
 
 declare global {
   interface Window {
@@ -49,18 +50,35 @@ export default function PhoneOtpForm() {
   const verifyOtp = async () => {
     try {
       setLoading(true);
-      const result = await window.confirmationResult.confirm(otp);
-      const token = await result.user.getIdToken();
 
-      await fetch('/api/auth/firebase-sync', {
+      const result = await window.confirmationResult.confirm(otp);
+      const token = await result.user.getIdToken(true);
+
+      const response = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firebaseToken: token }),
       });
 
-      window.location.href = '/'; // ✅ redirect works
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Firebase sync failed:', data);
+        alert(data.error || 'Failed to verify OTP. Please try again.');
+        return;
+      }
+
+      if (data.accessToken && data.refreshToken) {
+        await supabase.auth.setSession({
+          access_token: data.accessToken,
+          refresh_token: data.refreshToken,
+        });
+      }
+
+      window.location.href = '/';
     } catch (err: any) {
-      alert(err.message);
+      console.error('OTP verification error:', err);
+      alert(err.message || 'Failed to verify OTP. Please try again.');
     } finally {
       setLoading(false);
     }
