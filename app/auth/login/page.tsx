@@ -28,9 +28,6 @@ export default function LoginPage() {
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
 
-  // NEW: store 2Factor sessionId returned by /api/sms/send
-  const [sessionId, setSessionId] = useState<string | null>(null);
-
   const handlePasswordSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -128,38 +125,29 @@ export default function LoginPage() {
     }
   };
 
-  // ---------- UPDATED: Phone OTP handlers using your /api endpoints ----------
   const handleSendPhoneOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Normalize phone if you need (server will strip non-digits)
-      const payload = { phone: phone };
+      const { getAuth, signInWithPhoneNumber, RecaptchaVerifier } = await import('firebase/auth');
+      const { auth } = await import('@/lib/firebase-client');
 
-      const res = await fetch('/api/sms/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        console.error('sms/send failed', json);
-        toast.error(json?.error || 'Failed to send OTP via SMS');
-        setLoading(false);
-        return;
+      if (typeof window !== 'undefined' && !(window as any).recaptchaVerifier) {
+        (window as any).recaptchaVerifier = new RecaptchaVerifier(getAuth(), 'recaptcha-container', {
+          size: 'invisible',
+        });
       }
 
-      // store sessionId for verification; 2Factor returns it in Details
-      const sId = json.sessionId ?? json.session_id ?? null;
-      setSessionId(sId);
+      const appVerifier = (window as any).recaptchaVerifier;
+      const confirmationResult = await signInWithPhoneNumber(auth, phone, appVerifier);
+      (window as any).confirmationResult = confirmationResult;
+
       setPhoneOtpSent(true);
       toast.success('OTP sent to your phone');
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to send OTP. Phone authentication may not be enabled.');
+    } catch (err: any) {
+      console.error('Firebase phone auth error:', err);
+      toast.error(err.message || 'Failed to send OTP');
     } finally {
       setLoading(false);
     }
@@ -170,71 +158,74 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (!sessionId) {
-        toast.error('No SMS session found. Please request a new OTP.');
+      const confirmationResult = (window as any).confirmationResult;
+      if (!confirmationResult) {
+        toast.error('No confirmation result. Please request a new OTP.');
         setLoading(false);
         return;
       }
 
-      const payload = { sessionId, otp, phone };
+      const credential = await confirmationResult.confirm(otp);
+      const firebaseUser = credential.user;
+      const firebaseToken = await firebaseUser.getIdToken();
 
-      const res = await fetch('/api/sms/verify', {
+      const response = await fetch('/api/auth/phone-signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ firebaseToken }),
       });
 
-      const json = await res.json();
+      const result = await response.json();
 
-      if (!res.ok || json.error) {
-        console.error('sms/verify failed', json);
-        toast.error(json?.error || 'OTP verification failed');
+      if (!response.ok || result.error) {
+        console.error('Phone sign-in failed:', result);
+        toast.error(result.error || 'Failed to sign in');
         setLoading(false);
         return;
       }
 
-      // If verify was successful, mark phone verified in profiles table.
-      // We try to find an existing profile by phone; if none, we insert one.
-      // NOTE: This does not create a Supabase auth session for the user.
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('phone', phone)
-        .maybeSingle();
-
-      if (!existing) {
-        // Insert a new profile row (no auth user created here)
-        await supabase.from('profiles').insert({
-          phone,
-          name: name || '',
-          phone_verified: true,
-          role: 'customer',
+      if (result.accessToken && result.refreshToken) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
         });
+
+        if (sessionError) {
+          console.error('Failed to set Supabase session:', sessionError);
+          toast.error('Failed to complete sign in');
+          setLoading(false);
+          return;
+        }
+      } else if (result.tempPassword && result.email) {
+        const { data: pwdSignIn, error: pwdError } = await supabase.auth.signInWithPassword({
+          email: result.email,
+          password: result.tempPassword,
+        });
+
+        if (pwdError) {
+          console.error('Failed to sign in with temp password:', pwdError);
+          toast.error('Failed to complete sign in');
+          setLoading(false);
+          return;
+        }
       } else {
-        // Update existing profile to mark phone verified
-        await supabase
-          .from('profiles')
-          .update({ phone_verified: true })
-          .eq('phone', phone);
+        toast.error('Invalid response from server');
+        setLoading(false);
+        return;
       }
 
-      toast.success('Phone verified successfully');
-
-      // Decide what you want to do next:
-      // - If this is sign-in for an existing account you will need server-side logic to
-      //   sign the user in (create a session) because Supabase auth phone OTP isn't used.
-      // - If this is a signup, you may want to create a Supabase auth user server-side
-      //   using the service role key and then return credentials/session.
-      // For now, we'll redirect to home or you can show the "set password" flow.
-      router.push('/');
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to verify OTP');
+      toast.success('Signed in successfully');
+      setTimeout(() => {
+        router.push('/');
+        router.refresh();
+      }, 500);
+    } catch (err: any) {
+      console.error('Phone OTP verification error:', err);
+      toast.error(err.message || 'Failed to verify OTP');
     } finally {
       setLoading(false);
     }
   };
-  // -------------------------------------------------------------------------
 
   const handleVerifyEmailOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,6 +272,7 @@ export default function LoginPage() {
   return (
     <>
       <Toaster />
+      <div id="recaptcha-container"></div>
       <div className="min-h-screen bg-[#000000] flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">

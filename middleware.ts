@@ -15,10 +15,8 @@ const PROTECTED_ROUTES = ['/profile', '/orders', '/wishlist', '/checkout'];
 const ADMIN_ROUTES = ['/admin'];
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  let supabaseResponse = NextResponse.next({
+    request,
   });
 
   const supabase = createServerClient(
@@ -30,14 +28,8 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request,
-          });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options)
           );
         },
       },
@@ -90,7 +82,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Admin verified - allow access
-    return response;
+    return supabaseResponse;
   }
 
   // Protected route (non-admin)
@@ -103,11 +95,11 @@ export async function middleware(request: NextRequest) {
     }
 
     // Authenticated - allow access
-    return response;
+    return supabaseResponse;
   }
 
   // Public route - allow access
-  return response;
+  return supabaseResponse;
 }
 
 export const config = {

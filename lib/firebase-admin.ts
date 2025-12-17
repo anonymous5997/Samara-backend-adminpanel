@@ -26,3 +26,8 @@ export async function verifyFirebaseToken(token: string) {
   initializeFirebase();
   return admin.auth().verifyIdToken(token);
 }
+
+export function getAdminAuth() {
+  initializeFirebase();
+  return admin.auth();
+}
