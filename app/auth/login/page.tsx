@@ -46,12 +46,29 @@ export default function LoginPage() {
 
       if (data.session) {
         console.log('[Login] Sign in successful:', data.user.email);
-        console.log('[Login] Session established');
 
+        // Set session server-side to ensure cookies are properly set
+        const sessionResponse = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+          }),
+        });
+
+        if (!sessionResponse.ok) {
+          console.error('[Login] Failed to set session server-side');
+          toast.error('Failed to complete sign in');
+          setLoading(false);
+          return;
+        }
+
+        console.log('[Login] Session established server-side');
         toast.success('Signed in successfully');
 
-        // Wait for auth state to propagate, then redirect
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait a moment for cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Use window.location for hard navigation to ensure cookies are sent
         window.location.href = '/';
@@ -85,11 +102,27 @@ export default function LoginPage() {
       }
 
       if (data.session) {
-        // Profile is created automatically via database trigger
+        // Set session server-side to ensure cookies are properly set
+        const sessionResponse = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+          }),
+        });
+
+        if (!sessionResponse.ok) {
+          console.error('[Signup] Failed to set session server-side');
+          toast.error('Failed to complete signup');
+          setLoading(false);
+          return;
+        }
+
         toast.success('Account created successfully');
 
-        // Wait for auth state to propagate
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait a moment for cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Use window.location for hard navigation
         window.location.href = '/';
@@ -186,40 +219,54 @@ export default function LoginPage() {
         return;
       }
 
-      if (result.accessToken && result.refreshToken) {
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: result.accessToken,
-          refresh_token: result.refreshToken,
-        });
+      let accessToken: string;
+      let refreshToken: string;
 
-        if (sessionError) {
-          console.error('Failed to set Supabase session:', sessionError);
-          toast.error('Failed to complete sign in');
-          setLoading(false);
-          return;
-        }
+      if (result.accessToken && result.refreshToken) {
+        accessToken = result.accessToken;
+        refreshToken = result.refreshToken;
       } else if (result.tempPassword && result.email) {
         const { data: pwdSignIn, error: pwdError } = await supabase.auth.signInWithPassword({
           email: result.email,
           password: result.tempPassword,
         });
 
-        if (pwdError) {
+        if (pwdError || !pwdSignIn.session) {
           console.error('Failed to sign in with temp password:', pwdError);
           toast.error('Failed to complete sign in');
           setLoading(false);
           return;
         }
+
+        accessToken = pwdSignIn.session.access_token;
+        refreshToken = pwdSignIn.session.refresh_token;
       } else {
         toast.error('Invalid response from server');
         setLoading(false);
         return;
       }
 
+      // Set session server-side to ensure cookies are properly set
+      const sessionResponse = await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken,
+          refreshToken,
+        }),
+      });
+
+      if (!sessionResponse.ok) {
+        console.error('[PhoneOTP] Failed to set session server-side');
+        toast.error('Failed to complete sign in');
+        setLoading(false);
+        return;
+      }
+
       toast.success('Signed in successfully');
 
-      // Wait for auth state to propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait a moment for cookies to be set
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Use window.location for hard navigation
       window.location.href = '/';
@@ -248,11 +295,27 @@ export default function LoginPage() {
       }
 
       if (data.session) {
-        // Profile is created automatically via database trigger
+        // Set session server-side to ensure cookies are properly set
+        const sessionResponse = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+          }),
+        });
+
+        if (!sessionResponse.ok) {
+          console.error('[EmailOTP] Failed to set session server-side');
+          toast.error('Failed to complete sign in');
+          setLoading(false);
+          return;
+        }
+
         toast.success('Signed in successfully');
 
-        // Wait for auth state to propagate
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait a moment for cookies to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
 
         // Use window.location for hard navigation
         window.location.href = '/';
