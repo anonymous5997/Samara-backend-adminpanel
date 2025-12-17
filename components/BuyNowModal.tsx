@@ -9,6 +9,9 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { X, Loader2 } from 'lucide-react';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { PhoneOtpForm } from '@/components/auth/PhoneOtpForm';
+
 
 interface BuyNowModalProps {
   isOpen: boolean;
@@ -63,7 +66,7 @@ export function BuyNowModal({
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.href,
+          shouldCreateUser: true,
         },
       });
 
@@ -86,13 +89,16 @@ export function BuyNowModal({
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data , error } = await supabase.auth.verifyOtp({
         email,
         token: otp,
         type: 'email',
       });
 
       if (error) throw error;
+      if (!data?.user) {
+  throw new Error('Authentication failed');
+};
 
       toast.success('Logged in successfully!');
       setStep('address');
@@ -309,7 +315,7 @@ export function BuyNowModal({
                   onChange={(e) => setOtp(e.target.value)}
                   placeholder="Enter 6-digit OTP"
                   className="bg-[#111] border-[#D4AF37]/30 text-white"
-                  maxLength={6}
+                  maxLength={8}
                 />
               </div>
             )}

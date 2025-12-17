@@ -18,17 +18,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
 import { Order } from '@/lib/types';
-import { Eye } from 'lucide-react';
+import { Eye, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { format } from 'date-fns';
+
+/* ---------------- TRACKING META ---------------- */
+
+const STATUS_TRACKING_MAP: Record<
+  string,
+  { title: string; description: string }
+> = {
+  pending: {
+    title: 'Order Placed',
+    description: 'Your order has been placed successfully',
+  },
+  confirmed: {
+    title: 'Order Confirmed',
+    description: 'Your order has been confirmed',
+  },
+  packed: {
+    title: 'Order Packed',
+    description: 'Your items are packed and ready for shipment',
+  },
+  shipped: {
+    title: 'Order Shipped',
+    description: 'Your order has been shipped',
+  },
+  delivered: {
+    title: 'Order Delivered',
+    description: 'Your order has been delivered successfully',
+  },
+};
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // NEW: tracking inputs
+  const [trackingInput, setTrackingInput] = useState<{
+    [key: string]: { tracking_number: string; carrier: string };
+  }>({});
 
   useEffect(() => {
     fetchOrders();
@@ -46,31 +82,81 @@ export default function AdminOrdersPage() {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
+
       setOrders(data || []);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch orders');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  /* ---------------- STATUS UPDATE ---------------- */
+
+  const handleStatusChange = async (
+    orderId: string,
+    newStatus: string
+  ) => {
     try {
-      const { error } = await supabase
+      await supabase
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId);
 
-      if (error) throw error;
+      const meta = STATUS_TRACKING_MAP[newStatus];
+      if (meta) {
+        await supabase.from('order_tracking_events').insert({
+          order_id: orderId,
+          status: newStatus === 'pending'
+            ? 'order_placed'
+            : newStatus,
+          title: meta.title,
+          description: meta.description,
+        });
+      }
 
       toast.success('Order status updated');
       fetchOrders();
-    } catch (error) {
+    } catch {
       toast.error('Failed to update order status');
     }
   };
+
+  /* ---------------- TRACKING SAVE (NEW) ---------------- */
+
+  const saveTracking = async (orderId: string) => {
+    const values = trackingInput[orderId];
+    if (!values?.tracking_number) {
+      toast.error('Tracking number required');
+      return;
+    }
+
+    try {
+      await supabase
+        .from('orders')
+        .update({
+          tracking_number: values.tracking_number,
+          carrier: values.carrier,
+          status: 'shipped',
+        })
+        .eq('id', orderId);
+
+      await supabase.from('order_tracking_events').insert({
+        order_id: orderId,
+        status: 'shipped',
+        title: 'Order Shipped',
+        description: `Shipped via ${values.carrier || 'courier'}`,
+      });
+
+      toast.success('Tracking details saved');
+      fetchOrders();
+    } catch {
+      toast.error('Failed to save tracking');
+    }
+  };
+
+  /* ---------------- UI ---------------- */
 
   return (
     <>
@@ -78,20 +164,6 @@ export default function AdminOrdersPage() {
       <div>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Orders</h1>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="packed">Packed</SelectItem>
-              <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {loading ? (
@@ -101,36 +173,36 @@ export default function AdminOrdersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order Number</TableHead>
+                  <TableHead>Order</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Payment</TableHead>
+                  <TableHead>Tracking</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {orders.map((order) => (
+                {orders.map(order => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">
-                      {order.order_number}
-                    </TableCell>
+                    <TableCell>{order.order_number}</TableCell>
+
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{order.shipping_name}</p>
-                        <p className="text-sm text-gray-600">
-                          {order.shipping_email}
-                        </p>
-                      </div>
+                      <p className="font-medium">{order.shipping_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {order.shipping_email}
+                      </p>
                     </TableCell>
+
                     <TableCell>
                       ₹{Number(order.total_amount_inr).toFixed(2)}
                     </TableCell>
+
                     <TableCell>
                       <Select
                         value={order.status}
-                        onValueChange={(value) =>
+                        onValueChange={value =>
                           handleStatusChange(order.id, value)
                         }
                       >
@@ -143,26 +215,65 @@ export default function AdminOrdersPage() {
                           <SelectItem value="packed">Packed</SelectItem>
                           <SelectItem value="shipped">Shipped</SelectItem>
                           <SelectItem value="delivered">Delivered</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
+
+                    {/* 🔹 TRACKING INPUT (NEW) */}
                     <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          order.payment_status === 'paid'
-                            ? 'bg-green-100 text-green-800'
-                            : order.payment_status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {order.payment_status}
-                      </span>
+                      {order.tracking_number ? (
+                        <div className="text-xs">
+                          <p>{order.tracking_number}</p>
+                          <p className="text-gray-500">{order.carrier}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <Input
+                            placeholder="Tracking #"
+                            className="h-7 text-xs"
+                            onChange={e =>
+                              setTrackingInput(prev => ({
+                                ...prev,
+                                [order.id]: {
+                                  ...prev[order.id],
+                                  tracking_number: e.target.value,
+                                },
+                              }))
+                            }
+                          />
+                          <Input
+                            placeholder="Carrier"
+                            className="h-7 text-xs"
+                            onChange={e =>
+                              setTrackingInput(prev => ({
+                                ...prev,
+                                [order.id]: {
+                                  ...prev[order.id],
+                                  carrier: e.target.value,
+                                },
+                              }))
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full h-7"
+                            onClick={() => saveTracking(order.id)}
+                          >
+                            <Truck className="w-3 h-3 mr-1" />
+                            Save
+                          </Button>
+                        </div>
+                      )}
                     </TableCell>
+
                     <TableCell>
-                      {format(new Date(order.created_at), 'MMM dd, yyyy')}
+                      {format(
+                        new Date(order.created_at),
+                        'MMM dd, yyyy'
+                      )}
                     </TableCell>
+
                     <TableCell>
                       <Button variant="ghost" size="icon" asChild>
                         <Link href={`/admin/orders/${order.id}`}>

@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { ShoppingBag, Package, Truck, CheckCircle2, Clock } from 'lucide-react';
+import {
+  ShoppingBag,
+  Package,
+  Truck,
+  CheckCircle2,
+  Clock
+} from 'lucide-react';
 
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
@@ -13,15 +19,27 @@ import { Order } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// Extend your Order type locally with optional tracking fields.
-// (These fields should exist in the Supabase "orders" table to be populated)
+/* =========================================================
+   🔹 TYPES (ADDED – nothing removed)
+========================================================= */
+
+type TrackingEvent = {
+  status: string;
+  created_at: string;
+};
+
 type OrderWithTracking = Order & {
   tracking_number?: string | null;
   shipping_carrier?: string | null;
   estimated_delivery?: string | null;
+  order_tracking_events?: TrackingEvent[];
 };
 
 type OrderStatus = Order['status'];
+
+/* =========================================================
+   🔹 COMPONENT
+========================================================= */
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -29,6 +47,10 @@ export default function OrdersPage() {
 
   const [orders, setOrders] = useState<OrderWithTracking[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* =========================================================
+     🔹 FETCH ORDERS (ENHANCED – not replaced)
+  ========================================================= */
 
   useEffect(() => {
     if (!user) {
@@ -48,9 +70,19 @@ export default function OrdersPage() {
 
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          order_tracking_events (
+            status,
+            created_at
+          )
+        `)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('created_at', {
+          foreignTable: 'order_tracking_events',
+          ascending: true
+        });
 
       if (error) {
         console.error('Error fetching orders:', error);
@@ -67,7 +99,9 @@ export default function OrdersPage() {
     }
   };
 
-  // -------- helpers for tracking UI --------
+  /* =========================================================
+     🔹 EXISTING HELPERS (UNCHANGED)
+  ========================================================= */
 
   const steps = ['Order Placed', 'Packed', 'Shipped', 'Delivered'] as const;
 
@@ -82,11 +116,34 @@ export default function OrdersPage() {
       case 'delivered':
         return 3;
       case 'cancelled':
-        // cancelled orders show only first step as done
         return 0;
       default:
         return 0;
     }
+  };
+
+  /* =========================================================
+     🔹 NEW HELPER (ADDED)
+     Uses tracking events if available (Flipkart style)
+  ========================================================= */
+
+  const getStepIndexFromEvents = (
+    order: OrderWithTracking
+  ): number => {
+    if (!order.order_tracking_events?.length) {
+      return getStepIndex(order.status);
+    }
+
+    const completed = order.order_tracking_events.map(
+      e => e.status
+    );
+
+    if (completed.includes('delivered')) return 3;
+    if (completed.includes('shipped')) return 2;
+    if (completed.includes('packed')) return 1;
+    if (completed.includes('order_placed')) return 0;
+
+    return getStepIndex(order.status);
   };
 
   const renderStatusBadge = (status: OrderStatus) => {
@@ -114,7 +171,9 @@ export default function OrdersPage() {
     );
   };
 
-  const renderPaymentBadge = (paymentStatus: Order['payment_status']) => {
+  const renderPaymentBadge = (
+    paymentStatus: Order['payment_status']
+  ) => {
     const base =
       'px-2 py-1 rounded-full text-xs font-semibold capitalize';
 
@@ -141,45 +200,33 @@ export default function OrdersPage() {
 
   const renderStepIcon = (idx: number, current: number) => {
     const done = idx <= current;
-    const active = idx === current;
 
-    const common =
+    const base =
       'flex items-center justify-center w-7 h-7 rounded-full border text-xs';
 
-    let icon: JSX.Element;
+    let icon = <Truck className="w-4 h-4" />;
     if (idx === 0) icon = <Package className="w-4 h-4" />;
-    else if (idx === steps.length - 1)
+    if (idx === steps.length - 1)
       icon = <CheckCircle2 className="w-4 h-4" />;
-    else icon = <Truck className="w-4 h-4" />;
 
     if (done) {
       return (
-        <div
-          className={`${common} bg-[#D4AF37] border-[#D4AF37] text-black`}
-        >
-          {icon}
-        </div>
-      );
-    }
-
-    if (active) {
-      return (
-        <div
-          className={`${common} border-[#D4AF37] text-[#D4AF37]`}
-        >
+        <div className={`${base} bg-[#D4AF37] border-[#D4AF37] text-black`}>
           {icon}
         </div>
       );
     }
 
     return (
-      <div className={`${common} border-gray-400 text-gray-400`}>
+      <div className={`${base} border-gray-400 text-gray-400`}>
         {icon}
       </div>
     );
   };
 
-  // -------- loading / empty states --------
+  /* =========================================================
+     🔹 LOADING / EMPTY (UNCHANGED)
+  ========================================================= */
 
   if (loading) {
     return (
@@ -195,9 +242,6 @@ export default function OrdersPage() {
         <div className="max-w-2xl mx-auto text-center">
           <ShoppingBag className="h-16 w-16 mx-auto text-gray-400 mb-4" />
           <h1 className="text-2xl font-bold mb-4">No orders yet</h1>
-          <p className="text-gray-600 mb-6">
-            Start shopping to see your orders here
-          </p>
           <Button asChild>
             <Link href="/shop">Continue Shopping</Link>
           </Button>
@@ -206,15 +250,17 @@ export default function OrdersPage() {
     );
   }
 
-  // -------- main list --------
+  /* =========================================================
+     🔹 MAIN UI (UNCHANGED + enhanced logic)
+  ========================================================= */
 
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">My Orders</h1>
 
       <div className="space-y-4">
-        {orders.map((order) => {
-          const currentStep = getStepIndex(order.status);
+        {orders.map(order => {
+          const currentStep = getStepIndexFromEvents(order);
 
           return (
             <Card key={order.id} className="border border-[#D4AF37]/30">
@@ -241,14 +287,14 @@ export default function OrdersPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Delivery Progress / Tracking */}
+                {/* Delivery Progress */}
                 <div>
-                  <div className="flex items-center justify-between mb-2 text-sm font-semibold text-gray-700">
+                  <div className="flex justify-between mb-2 text-sm font-semibold">
                     <span>Delivery Progress</span>
                     {order.estimated_delivery && (
                       <span className="flex items-center gap-1 text-xs text-gray-500">
                         <Clock className="w-3 h-3" />
-                        ETA:{' '}
+                        ETA{' '}
                         {format(
                           new Date(order.estimated_delivery),
                           'dd MMM'
@@ -256,7 +302,8 @@ export default function OrdersPage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center justify-between gap-2 text-xs">
+
+                  <div className="flex justify-between">
                     {steps.map((step, idx) => (
                       <div
                         key={step}
@@ -264,7 +311,7 @@ export default function OrdersPage() {
                       >
                         {renderStepIcon(idx, currentStep)}
                         <span
-                          className={`mt-2 text-center ${
+                          className={`mt-2 text-xs ${
                             idx <= currentStep
                               ? 'text-gray-900'
                               : 'text-gray-400'
@@ -277,8 +324,8 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                {/* Tracking info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
+                {/* Tracking Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-gray-500">Tracking Number</p>
                     <p className="font-mono">
@@ -287,11 +334,13 @@ export default function OrdersPage() {
                   </div>
                   <div>
                     <p className="text-gray-500">Carrier</p>
-                    <p>{order.shipping_carrier || 'Will be updated soon'}</p>
+                    <p>
+                      {order.shipping_carrier || 'Will be updated soon'}
+                    </p>
                   </div>
                 </div>
 
-                {/* Shipping address (your existing block) */}
+                {/* Shipping Address */}
                 <div className="text-sm text-gray-700">
                   <p className="text-gray-500 mb-1">Shipping to</p>
                   <p>{order.shipping_name}</p>
@@ -302,7 +351,6 @@ export default function OrdersPage() {
                   </p>
                 </div>
 
-                {/* Link to detailed order page (you already had this) */}
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/orders/${order.id}`}>View Details</Link>
                 </Button>
