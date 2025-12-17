@@ -47,8 +47,15 @@ export default function LoginPage() {
       }
 
       if (data.user) {
+        console.log('[Login] Sign in successful:', data.user.email);
+        console.log('[Login] Session:', data.session?.access_token ? 'Yes' : 'No');
         toast.success('Signed in successfully');
-        router.push('/');
+
+        // Force a small delay to ensure session is set
+        setTimeout(() => {
+          router.push('/');
+          router.refresh();
+        }, 500);
       }
     } catch (error) {
       toast.error('Failed to sign in');

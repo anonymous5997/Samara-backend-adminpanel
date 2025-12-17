@@ -47,7 +47,14 @@ export async function middleware(request: NextRequest) {
   // Get user session
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
+
+  // Debug logging
+  if (error) {
+    console.log('[Middleware] Auth error:', error.message);
+  }
+  console.log('[Middleware] Path:', request.nextUrl.pathname, 'User:', user?.email || 'none');
 
   const path = request.nextUrl.pathname;
 
@@ -113,6 +120,6 @@ export const config = {
      * - public folder
      * - api routes
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

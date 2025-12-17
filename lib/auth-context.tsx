@@ -106,7 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
+      console.log('[AuthContext] Initial session check:', {
+        hasSession: !!data.session,
+        user: data.session?.user?.email,
+        error: error?.message,
+      });
+
       if (data.session?.user) {
         setUser(data.session.user);
         fetchProfile(data.session.user.id).then(() => {
