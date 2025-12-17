@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 /**
  * Session Manager for Production Auth System
@@ -10,17 +10,6 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
  * 3. Server-side only - NEVER expose to client
  * 4. Use service role key for session management
  */
-
-const supabaseAdmin = createAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
 
 /**
  * Kill all existing sessions for a user
@@ -39,33 +28,6 @@ export async function killAllUserSessions(userId: string): Promise<void> {
     console.log(`[SessionManager] Killed all sessions for user: ${userId}`);
   } catch (error) {
     console.error('Fatal error in killAllUserSessions:', error);
-    throw error;
-  }
-}
-
-/**
- * Create a new session for a user after killing existing ones
- * Returns session data that can be used to set cookies
- */
-export async function createFreshSession(userId: string) {
-  try {
-    // First, kill all existing sessions
-    await killAllUserSessions(userId);
-
-    // Create a new session using admin
-    const { data, error } = await supabaseAdmin.auth.admin.createSession({
-      user_id: userId,
-    });
-
-    if (error) {
-      console.error('Error creating fresh session:', error);
-      throw new Error('Failed to create new session');
-    }
-
-    console.log(`[SessionManager] Created fresh session for user: ${userId}`);
-    return data;
-  } catch (error) {
-    console.error('Fatal error in createFreshSession:', error);
     throw error;
   }
 }

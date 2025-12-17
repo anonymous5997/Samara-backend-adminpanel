@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { X, Loader2 } from 'lucide-react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
-import { PhoneOtpForm } from '@/components/auth/PhoneOtpForm';
+import PhoneOtpForm from '@/components/auth/PhoneOtpForm';
 
 
 interface BuyNowModalProps {

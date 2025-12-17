@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 
 export type CurrencyOption = {
-  code: 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD';
+  code: 'INR' | 'USD' | 'AED';
   label: string;
   symbol: string;
   flag: string; // emoji flag
@@ -26,8 +26,6 @@ export function CurrencySelector({
     { code: 'INR', label: 'India', symbol: '₹', flag: '🇮🇳' },
     { code: 'USD', label: 'United States', symbol: '$', flag: '🇺🇸' },
     { code: 'AED', label: 'UAE', symbol: 'د.إ', flag: '🇦🇪' },
-    { code: 'GBP', label: 'United Kingdom', symbol: '£', flag: '🇬🇧' },
-    { code: 'CAD', label: 'Canada', symbol: 'C$', flag: '🇨🇦' },
   ];
 
   const [open, setOpen] = useState(false);

@@ -46,12 +46,8 @@ async function detectUserCurrency(): Promise<Currency> {
         return "AED";
       case "US":
         return "USD";
-      case "GB":
-        return "GBP";
-      case "CA":
-        return "CAD";
       default:
-        return "USD"; // fallback currency
+        return "INR"; // fallback currency
     }
   } catch (err) {
     console.error("GeoIP error:", err);

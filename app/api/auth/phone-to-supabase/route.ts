@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { createFreshSession } from '@/lib/auth/session-manager';
+import { killAllUserSessions } from '@/lib/auth/session-manager';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Firebase Phone OTP → Supabase Auth Bridge
@@ -92,8 +94,8 @@ export async function POST(req: Request) {
       console.log(`[Phone Bridge] Found existing Supabase user: ${supabaseUser.id}`);
     }
 
-    // Kill all existing sessions and create a fresh one
-    const sessionData = await createFreshSession(supabaseUser.id);
+    // Kill existing sessions
+    await killAllUserSessions(supabaseUser.id);
 
     // Ensure profile exists
     const { data: profile } = await supabaseAdmin
@@ -114,11 +116,28 @@ export async function POST(req: Request) {
       console.log(`[Phone Bridge] Created profile for user: ${supabaseUser.id}`);
     }
 
-    // Return session data to client
+    // Generate OTP for sign-in (client will verify)
+    const { data: otpData, error: otpError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: supabaseUser.email || `${phone}@phone.local`,
+      options: {
+        redirectTo: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+      },
+    });
+
+    if (otpError) {
+      console.error('Error generating sign-in link:', otpError);
+      return NextResponse.json(
+        { error: 'Failed to generate sign-in credentials' },
+        { status: 500 }
+      );
+    }
+
+    // Return user data and hashed token for client to create session
     return NextResponse.json({
       success: true,
-      session: sessionData.session,
-      user: sessionData.user,
+      user: supabaseUser,
+      token: otpData.properties?.hashed_token,
     });
   } catch (error) {
     console.error('Fatal error in phone-to-supabase bridge:', error);

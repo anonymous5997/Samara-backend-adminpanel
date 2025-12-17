@@ -1,14 +1,14 @@
 'use client';
 
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { firebaseAuth } from '@/lib/firebase/client';
+import { auth } from '@/lib/firebase/client';
 import { toast } from 'sonner';
 
 export function GoogleSignInButton() {
   const handleGoogleSignIn = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(firebaseAuth, provider);
+      const result = await signInWithPopup(auth, provider);
 
       const user = result.user;
       console.log('Google user:', user);

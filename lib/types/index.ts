@@ -77,6 +77,8 @@ export interface Order {
   shipping_city?: string;
   shipping_state?: string;
   shipping_pincode?: string;
+  tracking_number?: string;
+  carrier?: string;
   created_at: string;
 }
 

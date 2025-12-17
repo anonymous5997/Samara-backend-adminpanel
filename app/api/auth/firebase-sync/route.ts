@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyFirebaseToken } from "@/lib/firebase-admin";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
@@ -22,7 +19,7 @@ export async function POST(req: Request) {
     const phone = decoded.phone_number;
 
     // Check user
-    let { data: user } = await supabase
+    let { data: user } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("firebase_uid", firebase_uid)
@@ -30,7 +27,7 @@ export async function POST(req: Request) {
 
     // Create user AFTER OTP
     if (!user) {
-      const { data } = await supabase
+      const { data } = await supabaseAdmin
         .from("profiles")
         .insert({ firebase_uid, phone })
         .select()
