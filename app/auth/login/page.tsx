@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import SupabasePhoneAuth from '@/components/auth/SupabasePhoneAuth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,13 +20,11 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
 
   const handlePasswordSignIn = async (e: React.FormEvent) => {
@@ -160,122 +159,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSendPhoneOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { getAuth, signInWithPhoneNumber, RecaptchaVerifier } = await import('firebase/auth');
-      const { auth } = await import('@/lib/firebase-client');
-
-      if (typeof window !== 'undefined' && !(window as any).recaptchaVerifier) {
-        (window as any).recaptchaVerifier = new RecaptchaVerifier(getAuth(), 'recaptcha-container', {
-          size: 'invisible',
-        });
-      }
-
-      const appVerifier = (window as any).recaptchaVerifier;
-      const confirmationResult = await signInWithPhoneNumber(auth, phone, appVerifier);
-      (window as any).confirmationResult = confirmationResult;
-
-      setPhoneOtpSent(true);
-      toast.success('OTP sent to your phone');
-    } catch (err: any) {
-      console.error('Firebase phone auth error:', err);
-      toast.error(err.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyPhoneOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const confirmationResult = (window as any).confirmationResult;
-      if (!confirmationResult) {
-        toast.error('No confirmation result. Please request a new OTP.');
-        setLoading(false);
-        return;
-      }
-
-      const credential = await confirmationResult.confirm(otp);
-      const firebaseUser = credential.user;
-      const firebaseToken = await firebaseUser.getIdToken();
-
-      const response = await fetch('/api/auth/phone-signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firebaseToken }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        console.error('Phone sign-in failed:', result);
-        toast.error(result.error || 'Failed to sign in');
-        setLoading(false);
-        return;
-      }
-
-      let accessToken: string;
-      let refreshToken: string;
-
-      if (result.accessToken && result.refreshToken) {
-        accessToken = result.accessToken;
-        refreshToken = result.refreshToken;
-      } else if (result.tempPassword && result.email) {
-        const { data: pwdSignIn, error: pwdError } = await supabase.auth.signInWithPassword({
-          email: result.email,
-          password: result.tempPassword,
-        });
-
-        if (pwdError || !pwdSignIn.session) {
-          console.error('Failed to sign in with temp password:', pwdError);
-          toast.error('Failed to complete sign in');
-          setLoading(false);
-          return;
-        }
-
-        accessToken = pwdSignIn.session.access_token;
-        refreshToken = pwdSignIn.session.refresh_token;
-      } else {
-        toast.error('Invalid response from server');
-        setLoading(false);
-        return;
-      }
-
-      // Set session server-side to ensure cookies are properly set
-      const sessionResponse = await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accessToken,
-          refreshToken,
-        }),
-      });
-
-      if (!sessionResponse.ok) {
-        console.error('[PhoneOTP] Failed to set session server-side');
-        toast.error('Failed to complete sign in');
-        setLoading(false);
-        return;
-      }
-
-      toast.success('Signed in successfully');
-
-      // Wait a moment for cookies to be set
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Use window.location for hard navigation
-      window.location.href = '/';
-    } catch (err: any) {
-      console.error('Phone OTP verification error:', err);
-      toast.error(err.message || 'Failed to verify OTP');
-      setLoading(false);
-    }
-  };
 
   const handleVerifyEmailOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -330,7 +213,6 @@ export default function LoginPage() {
   return (
     <>
       <Toaster />
-      <div id="recaptcha-container"></div>
       <div className="min-h-screen bg-[#000000] flex items-center justify-center py-12 px-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
@@ -509,85 +391,7 @@ export default function LoginPage() {
               </TabsContent>
 
               <TabsContent value="phone-otp">
-                {!phoneOtpSent ? (
-                  <form onSubmit={handleSendPhoneOTP} className="space-y-4">
-                    {mode === 'signup' && (
-                      <div>
-                        <Label htmlFor="name-phone" className="text-[#F5F5F5]">Full Name</Label>
-                        <Input
-                          id="name-phone"
-                          type="text"
-                          required
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="Your name"
-                          className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <Label htmlFor="phone-otp" className="text-[#F5F5F5]">Phone Number</Label>
-                      <Input
-                        id="phone-otp"
-                        type="tel"
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+1234567890"
-                        className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                      />
-                      <p className="text-sm text-[#666] mt-1">Include country code (e.g., +91 for India)</p>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
-                      disabled={loading}
-                    >
-                      {loading ? 'Sending...' : 'Send OTP'}
-                    </Button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifyPhoneOTP} className="space-y-4">
-                    <div>
-                      <Label htmlFor="otp-phone" className="text-[#F5F5F5]">Enter OTP</Label>
-                      <Input
-                        id="otp-phone"
-                        type="text"
-                        required
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value)}
-                        placeholder="000000"
-                        maxLength={6}
-                        className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                      />
-                      <p className="text-sm text-[#888] mt-2">
-                        OTP sent to {phone}
-                      </p>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
-                      disabled={loading}
-                    >
-                      {loading ? 'Verifying...' : 'Verify OTP'}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-[#D4AF37] hover:text-[#F4D03F]"
-                      onClick={() => {
-                        setPhoneOtpSent(false);
-                        setOtp('');
-                      }}
-                    >
-                      Use different phone
-                    </Button>
-                  </form>
-                )}
+                <SupabasePhoneAuth />
               </TabsContent>
             </Tabs>
 
