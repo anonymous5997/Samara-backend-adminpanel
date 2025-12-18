@@ -60,14 +60,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('Error fetching profile:', error);
         setProfile(null);
-        return;
+        return false;
       }
 
       setProfile(data);
       console.log('[AuthContext] Profile loaded:', data?.role);
+      return true;
     } catch (error) {
       console.error('Fatal error fetching profile:', error);
       setProfile(null);
+      return false;
     }
   }, []);
 
@@ -106,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data, error }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
       console.log('[AuthContext] Initial session check:', {
         hasSession: !!data.session,
         user: data.session?.user?.email,
@@ -115,9 +117,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data.session?.user) {
         setUser(data.session.user);
-        fetchProfile(data.session.user.id).then(() => {
-          setLoading(false);
-        });
+        const profileFetched = await fetchProfile(data.session.user.id);
+
+        // Always set loading to false, even if profile fetch fails
+        // This prevents UI from getting stuck in loading state
+        setLoading(false);
+
+        if (!profileFetched) {
+          console.warn('[AuthContext] Profile fetch failed, but session exists - allowing access');
+        }
       } else {
         setLoading(false);
       }
@@ -130,9 +138,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (event === 'SIGNED_IN' && session?.user) {
           setUser(session.user);
-          await fetchProfile(session.user.id);
-          // Ensure profile exists after sign in
-          setTimeout(() => ensureProfile(), 100);
+          const profileFetched = await fetchProfile(session.user.id);
+
+          // If profile fetch fails, try to ensure profile exists
+          if (!profileFetched) {
+            console.warn('[AuthContext] Profile fetch failed after sign in, attempting to create');
+            setTimeout(() => ensureProfile(), 100);
+          } else {
+            // Ensure profile exists after successful sign in
+            setTimeout(() => ensureProfile(), 100);
+          }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
