@@ -13,6 +13,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const PROTECTED_ROUTES = ['/profile', '/orders', '/wishlist', '/checkout'];
 const ADMIN_ROUTES = ['/admin'];
+const PUBLIC_AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -52,6 +53,12 @@ export async function middleware(request: NextRequest) {
   console.log('[Middleware] Path:', request.nextUrl.pathname, 'User:', user?.email || 'none');
 
   const path = request.nextUrl.pathname;
+
+  // Allow public auth routes
+  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some((route) => path.startsWith(route));
+  if (isPublicAuthRoute) {
+    return supabaseResponse;
+  }
 
   // Check if route is admin route
   const isAdminRoute = ADMIN_ROUTES.some((route) => path.startsWith(route));

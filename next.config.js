@@ -11,7 +11,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'ewwxgjullmtolxdmgbdq.supabase.co', // your Supabase project
+        hostname: 'wsrobuiqcuzpfgfnmh.supabase.co',
       },
     ],
   },
