@@ -54,7 +54,7 @@ export default function PhoneOtpForm() {
       const result = await window.confirmationResult.confirm(otp);
       const token = await result.user.getIdToken(true);
 
-      const response = await fetch('/api/auth/firebase-sync', {
+      const response = await fetch('/api/auth/phone-signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ firebaseToken: token }),
@@ -63,7 +63,7 @@ export default function PhoneOtpForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Firebase sync failed:', data);
+        console.error('Phone sign-in failed:', data);
         alert(data.error || 'Failed to verify OTP. Please try again.');
         return;
       }

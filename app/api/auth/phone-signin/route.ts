@@ -1,157 +1,178 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { getAdminAuth } from '@/lib/firebase-admin';
+import { verifyFirebaseToken } from '@/lib/firebase-admin';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     const { firebaseToken } = await req.json();
 
     if (!firebaseToken) {
-      return NextResponse.json(
-        { error: 'Firebase token is required' },
-        { status: 400 }
-      );
+      console.error('[Phone Sign-in] Missing Firebase token');
+      return NextResponse.json({ error: 'Missing Firebase token' }, { status: 400 });
     }
 
-    let decodedToken;
+    // Step 1: Verify Firebase ID token using Firebase Admin SDK
+    let decoded;
     try {
-      const adminAuth = getAdminAuth();
-      decodedToken = await adminAuth.verifyIdToken(firebaseToken);
-    } catch (error) {
-      console.error('Firebase token verification failed:', error);
+      decoded = await verifyFirebaseToken(firebaseToken);
+      console.log('[Phone Sign-in] Firebase token verified for UID:', decoded.uid);
+    } catch (verifyError: any) {
+      console.error('[Phone Sign-in] Firebase token verification failed:', verifyError);
       return NextResponse.json(
-        { error: 'Invalid Firebase token' },
+        {
+          error: 'Invalid Firebase token',
+          details: verifyError.message,
+        },
         { status: 401 }
       );
     }
 
-    const phoneNumber = decodedToken.phone_number;
-    if (!phoneNumber) {
+    // Step 2: Extract phone number from decoded token
+    const phone = decoded.phone_number;
+
+    if (!phone) {
+      console.error('[Phone Sign-in] Phone number not found in token');
       return NextResponse.json(
-        { error: 'Phone number not found in token' },
+        { error: 'Phone number not found in Firebase token' },
         { status: 400 }
       );
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('phone', phoneNumber)
-      .maybeSingle();
+    console.log('[Phone Sign-in] Processing phone number:', phone);
 
-    let userId: string;
+    // Step 3: Find user in Supabase using phone number
+    const { data: existingUsers, error: fetchError } = await supabaseAdmin.auth.admin.listUsers();
 
-    if (profile) {
-      userId = profile.id;
-    } else {
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        phone: phoneNumber,
-        phone_confirm: true,
-        user_metadata: {
-          phone_verified: true,
-        },
-      });
-
-      if (createError) {
-        console.error('Error creating Supabase user:', createError);
-        return NextResponse.json(
-          { error: 'Failed to create user' },
-          { status: 500 }
-        );
-      }
-
-      userId = newUser.user.id;
-
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: userId,
-          phone: phoneNumber,
-          phone_verified: true,
-          role: 'customer',
-        });
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-      }
-    }
-
-    const tempPassword = `temp_${firebaseToken.substring(0, 32)}_${Date.now()}`;
-
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password: tempPassword }
-    );
-
-    if (updateError) {
-      console.error('Error setting temporary password:', updateError);
+    if (fetchError) {
+      console.error('[Phone Sign-in] Error listing users:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to prepare authentication' },
+        { error: 'Failed to fetch users' },
         { status: 500 }
       );
     }
 
-    const fakeEmail = `${phoneNumber.replace(/\+/g, '').replace(/[^0-9]/g, '')}@phone.local`;
+    let supabaseUserId: string | null = null;
+    const existingUser = existingUsers.users.find((u) => u.phone === phone);
 
-    const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-      email: fakeEmail,
-      password: tempPassword,
-    });
+    if (existingUser) {
+      // User exists
+      supabaseUserId = existingUser.id;
+      console.log('[Phone Sign-in] Found existing user:', supabaseUserId);
+    } else {
+      // Step 4: Create new Supabase user if not exists
+      console.log('[Phone Sign-in] Creating new user for phone:', phone);
 
-    if (signInError) {
-      console.log('Email sign-in failed, trying with phone...');
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        phone,
+        phone_confirm: true,
+        user_metadata: {
+          phone,
+        },
+      });
 
-      const { data: updateEmailResult, error: emailError } = await supabaseAdmin.auth.admin.updateUserById(
-        userId,
-        { email: fakeEmail }
+      if (createError || !newUser.user) {
+        console.error('[Phone Sign-in] Error creating Supabase user:', createError);
+        return NextResponse.json(
+          { error: 'Failed to create user account', details: createError?.message },
+          { status: 500 }
+        );
+      }
+
+      supabaseUserId = newUser.user.id;
+      console.log('[Phone Sign-in] Created new user:', supabaseUserId);
+
+      // Create profile row linked to user ID
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: supabaseUserId,
+          phone,
+          role: 'customer',
+        });
+
+      if (profileError) {
+        console.error('[Phone Sign-in] Error creating profile:', profileError);
+        // Continue even if profile creation fails - the auth user is created
+      } else {
+        console.log('[Phone Sign-in] Profile created successfully');
+      }
+    }
+
+    // Step 5: Ensure user has an email for generateLink (required by Supabase)
+    // This is NOT a fake email - it's a system email for phone-auth users
+    const systemEmail = `${supabaseUserId}@phone.auth.supabase`;
+
+    const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUserId);
+
+    if (getUserError || !userData.user) {
+      console.error('[Phone Sign-in] Error fetching user:', getUserError);
+      return NextResponse.json(
+        { error: 'Failed to fetch user data' },
+        { status: 500 }
+      );
+    }
+
+    if (!userData.user.email) {
+      console.log('[Phone Sign-in] Adding system email for phone-authenticated user');
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        supabaseUserId,
+        { email: systemEmail }
       );
 
-      if (emailError) {
-        console.error('Failed to set email:', emailError);
+      if (updateError) {
+        console.error('[Phone Sign-in] Error updating user with system email:', updateError);
       }
-
-      const { data: retrySignIn, error: retryError } = await supabaseAdmin.auth.signInWithPassword({
-        email: fakeEmail,
-        password: tempPassword,
-      });
-
-      if (retryError || !retrySignIn.session) {
-        console.error('Retry sign-in failed:', retryError);
-        return NextResponse.json({
-          success: true,
-          userId,
-          tempPassword,
-          email: fakeEmail,
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        userId,
-        accessToken: retrySignIn.session.access_token,
-        refreshToken: retrySignIn.session.refresh_token,
-      });
     }
 
-    if (!signInData.session) {
-      return NextResponse.json({
-        success: true,
-        userId,
-        tempPassword,
-        email: fakeEmail,
-      });
+    // Step 6: Create Supabase session using OFFICIAL method
+    // Use recovery link to generate session tokens (works without password)
+    console.log('[Phone Sign-in] Generating session tokens via recovery link');
+
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email: userData.user.email || systemEmail,
+    });
+
+    if (linkError || !linkData) {
+      console.error('[Phone Sign-in] Error generating recovery link:', linkError);
+      return NextResponse.json(
+        { error: 'Failed to create session', details: linkError?.message },
+        { status: 500 }
+      );
     }
 
+    // Extract tokens from the action link URL
+    const actionLink = linkData.properties.action_link;
+    const url = new URL(actionLink);
+    const token = url.hash.substring(1); // Remove the # at the start
+    const params = new URLSearchParams(token);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken || !refreshToken) {
+      console.error('[Phone Sign-in] Tokens not found in recovery link');
+      return NextResponse.json(
+        { error: 'Failed to extract session tokens' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Phone Sign-in] Successfully generated session tokens');
+
+    // Step 7: Return tokens to frontend
     return NextResponse.json({
       success: true,
-      userId,
-      accessToken: signInData.session.access_token,
-      refreshToken: signInData.session.refresh_token,
+      accessToken,
+      refreshToken,
+      userId: supabaseUserId,
     });
-  } catch (error) {
-    console.error('Phone sign-in error:', error);
+
+  } catch (err: any) {
+    console.error('[Phone Sign-in] Unexpected error:', err);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: err.message || 'Internal server error' },
       { status: 500 }
     );
   }
