@@ -1,11 +1,9 @@
-// lib/cart-context.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { CartItem, Currency } from './types';
 import { supabase } from './supabase/client';
 import { useAuth } from './auth-context';
-import { trackAnalyticsEvent } from './analytics';
 
 import {
   getCurrencyRates,
@@ -18,45 +16,52 @@ interface CartContextType {
   rate: number;
   ratesMap: Map<string, number> | null;
   loading: boolean;
-  addToCart: (productId: string, variantId?: string, quantity?: number) => Promise<void>;
+
+  addToCart: (
+    productId: string,
+    variantId?: string,
+    quantity?: number
+  ) => Promise<void>;
+
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
   setCurrency: (currency: Currency) => void;
+
   getCartTotalInINR: () => number;
   getCartTotalInSelectedCurrency: () => number;
+
+  addBuyNowItem: (item: CartItem) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 // ----------------------------------------------------------------------
-//  AUTO-CURRENCY BASED ON USER LOCATION
+// AUTO-CURRENCY
 // ----------------------------------------------------------------------
 async function detectUserCurrency(): Promise<Currency> {
   try {
-    const res = await fetch("https://ipapi.co/json/");
+    const res = await fetch('https://ipapi.co/json/');
     const data = await res.json();
 
-    const country = data.country_code;
-
-    switch (country) {
-      case "IN":
-        return "INR";
-      case "AE":
-        return "AED";
-      case "US":
-        return "USD";
+    switch (data.country_code) {
+      case 'IN':
+        return 'INR';
+      case 'AE':
+        return 'AED';
+      case 'US':
+        return 'USD';
       default:
-        return "INR"; // fallback currency
+        return 'INR';
     }
-  } catch (err) {
-    console.error("GeoIP error:", err);
-    return "USD"; // fallback
+  } catch {
+    return 'INR';
   }
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [currency, setCurrency] = useState<Currency>('INR');
   const [loading, setLoading] = useState(true);
@@ -65,30 +70,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [rate, setRate] = useState<number>(1);
 
   // ----------------------------------------------------------------------
-  // 1️⃣ Detect auto currency on mount (only when user hasn't chosen manually)
+  // Detect currency
   // ----------------------------------------------------------------------
   useEffect(() => {
-    const storedCurrency = localStorage.getItem("samara_currency");
-
-    if (!storedCurrency) {
-      detectUserCurrency().then((detected) => {
-        setCurrency(detected);
-        localStorage.setItem("samara_currency", detected);
-      });
+    const stored = localStorage.getItem('samara_currency');
+    if (stored) {
+      setCurrency(stored as Currency);
     } else {
-      setCurrency(storedCurrency as Currency);
+      detectUserCurrency().then((c) => {
+        setCurrency(c);
+        localStorage.setItem('samara_currency', c);
+      });
     }
   }, []);
 
-  // ----------------------------------------------------------------------
-  // 2️⃣ Save currency whenever user changes it manually
-  // ----------------------------------------------------------------------
   useEffect(() => {
-    localStorage.setItem("samara_currency", currency);
+    localStorage.setItem('samara_currency', currency);
   }, [currency]);
 
   // ----------------------------------------------------------------------
-  // 3️⃣ Fetch cart items
+  // Fetch cart
   // ----------------------------------------------------------------------
   const fetchCart = async () => {
     if (!user) {
@@ -108,27 +109,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         `)
         .eq('user_id', user.id);
 
-      if (data) {
-        const cartItems: CartItem[] = await Promise.all(
-          data.map(async (item: any) => {
-            const { data: img } = await supabase
-              .from('product_images')
-              .select('image_url')
-              .eq('product_id', item.product.id)
-              .eq('is_primary', true)
-              .maybeSingle();
-
-            return {
-              id: item.id,
-              product: item.product,
-              variant: item.variant,
-              quantity: item.quantity,
-              image_url: img?.image_url,
-            };
-          })
-        );
-        setItems(cartItems);
+      if (!data) {
+        setItems([]);
+        return;
       }
+
+      const cartItems: CartItem[] = await Promise.all(
+        data.map(async (item: any) => {
+          const { data: img } = await supabase
+            .from('product_images')
+            .select('image_url')
+            .eq('product_id', item.product.id)
+            .eq('is_primary', true)
+            .maybeSingle();
+
+          return {
+            id: item.id,
+            product: item.product,
+            variant: item.variant,
+            quantity: item.quantity,
+            image_url: img?.image_url,
+          };
+        })
+      );
+
+      setItems(cartItems);
     } finally {
       setLoading(false);
     }
@@ -139,16 +144,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   // ----------------------------------------------------------------------
-  // 4️⃣ Fetch currency rates (INR → other currencies)
+  // Currency rates
   // ----------------------------------------------------------------------
   useEffect(() => {
     (async () => {
       try {
         const map = await getCurrencyRates();
         setRatesMap(map);
-
-        if (currency === "INR") setRate(1);
-        else setRate(map.get(currency) || 1);
+        setRate(currency === 'INR' ? 1 : map.get(currency) || 1);
       } catch {
         setRatesMap(null);
         setRate(1);
@@ -156,26 +159,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  // Update rate when currency changes
   useEffect(() => {
     if (!ratesMap) {
       setRate(1);
       return;
     }
-
-    if (currency === "INR") {
-      setRate(1);
-    } else {
-      const r = ratesMap.get(currency);
-      setRate(r && r > 0 ? r : 1);
-    }
+    setRate(currency === 'INR' ? 1 : ratesMap.get(currency) || 1);
   }, [currency, ratesMap]);
 
   // ----------------------------------------------------------------------
-  // CART OPERATIONS
+  // Cart ops
   // ----------------------------------------------------------------------
-
-  const addToCart = async (productId: string, variantId?: string, quantity: number = 1) => {
+  const addToCart = async (
+    productId: string,
+    variantId?: string,
+    quantity: number = 1
+  ) => {
     if (!user) return;
 
     await supabase
@@ -224,31 +223,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = async () => {
     if (!user) return;
-
     await supabase.from('cart_items').delete().eq('user_id', user.id);
     setItems([]);
   };
 
-  // ----------------------------------------------------------------------
-  // TOTALS
-  // ----------------------------------------------------------------------
+  const addBuyNowItem = (item: CartItem) => {
+    setItems([item]);
+  };
 
-  const getCartTotalInINR = () => {
-    return items.reduce((sum, item) => {
+  const getCartTotalInINR = () =>
+    items.reduce((sum, item) => {
       const price =
         (item.product.base_price_inr || 0) +
         (item.variant?.additional_price_inr || 0);
-
       return sum + price * item.quantity;
     }, 0);
-  };
 
-  const getCartTotalInSelectedCurrency = () => {
-    const totalInINR = getCartTotalInINR();
-    return convertPriceSync(totalInINR, currency, ratesMap);
-  };
+  const getCartTotalInSelectedCurrency = () =>
+    convertPriceSync(getCartTotalInINR(), currency, ratesMap);
 
-  // ----------------------------------------------------------------------
   return (
     <CartContext.Provider
       value={{
@@ -264,6 +257,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setCurrency,
         getCartTotalInINR,
         getCartTotalInSelectedCurrency,
+        addBuyNowItem,
       }}
     >
       {children}
@@ -271,8 +265,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useCart() {
+/* ---------------------------------------------------------------------- */
+/* 🔥 SAFE HOOK (FIXES YOUR CRASH) */
+/* ---------------------------------------------------------------------- */
+export function useCart(): CartContextType {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart must be inside CartProvider");
+
+  if (!ctx) {
+    return {
+      items: [],
+      currency: 'INR',
+      rate: 1,
+      ratesMap: null,
+      loading: false,
+
+      addToCart: async () => {},
+      updateQuantity: async () => {},
+      removeFromCart: async () => {},
+      clearCart: async () => {},
+      setCurrency: () => {},
+
+      getCartTotalInINR: () => 0,
+      getCartTotalInSelectedCurrency: () => 0,
+
+      addBuyNowItem: () => {},
+    };
+  }
+
   return ctx;
 }

@@ -177,17 +177,17 @@ export default function AdminHeroPage() {
           </div>
 
           <div>
-            <Label htmlFor="sortOrder">Slide Order (1–4)</Label>
+            <Label htmlFor="sortOrder">Slide Order (1–6)</Label>
             <Input
               id="sortOrder"
               type="number"
               min={1}
-              max={4}
+              max={6}
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Use different numbers (1, 2, 3, 4) for each hero banner.
+              Use different numbers (1, 2, 3, 4,5,6 ) for each hero banner.
             </p>
           </div>
 

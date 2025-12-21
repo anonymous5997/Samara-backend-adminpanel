@@ -1,364 +1,158 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
-import {
-  ShoppingBag,
-  Package,
-  Truck,
-  CheckCircle2,
-  Clock
-} from 'lucide-react';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { supabase } from '@/lib/supabase/client'
 
-import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase/client';
-import { Order } from '@/lib/types';
-
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-/* =========================================================
-   🔹 TYPES (ADDED – nothing removed)
-========================================================= */
-
-type TrackingEvent = {
-  status: string;
-  created_at: string;
-};
-
-type OrderWithTracking = Order & {
-  tracking_number?: string | null;
-  shipping_carrier?: string | null;
-  estimated_delivery?: string | null;
-  order_tracking_events?: TrackingEvent[];
-};
-
-type OrderStatus = Order['status'];
-
-/* =========================================================
-   🔹 COMPONENT
-========================================================= */
+type OrderRow = {
+  order_id: string
+  created_at: string
+  order_status: string
+  payment_status: string
+  total_amount_inr: number
+  product_name: string
+  image_url: string | null
+}
 
 export default function OrdersPage() {
-  const router = useRouter();
-  const { user } = useAuth();
-
-  const [orders, setOrders] = useState<OrderWithTracking[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  /* =========================================================
-     🔹 FETCH ORDERS (ENHANCED – not replaced)
-  ========================================================= */
+  const [orders, setOrders] = useState<OrderRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
-    if (!user) {
-      router.push('/auth/login');
-      return;
+    fetchOrders()
+  }, [])
+
+  async function fetchOrders() {
+    setLoading(true)
+
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        created_at,
+        status,
+        payment_status,
+        total_amount_inr,
+        order_items (
+          product_name,
+          product_image_url
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Orders fetch error:', error)
+      setLoading(false)
+      return
     }
 
-    fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+    const mapped: OrderRow[] =
+      data?.map((o: any) => {
+        const item = o.order_items?.[0]
 
-  const fetchOrders = async () => {
-    if (!user) return;
+        return {
+          order_id: o.id,
+          created_at: o.created_at,
+          order_status:
+            o.payment_status === 'paid' && o.status === 'pending'
+              ? 'confirmed'
+              : o.status,
+          payment_status: o.payment_status,
+          total_amount_inr: o.total_amount_inr,
+          product_name: item?.product_name ?? 'Product',
+          image_url: item?.product_image_url ?? null,
+        }
+      }) ?? []
 
-    try {
-      setLoading(true);
+    setOrders(mapped)
+    setLoading(false)
+  }
 
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_tracking_events (
-            status,
-            created_at
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .order('created_at', {
-          foreignTable: 'order_tracking_events',
-          ascending: true
-        });
-
-      if (error) {
-        console.error('Error fetching orders:', error);
-        return;
-      }
-
-      if (data) {
-        setOrders(data as OrderWithTracking[]);
-      }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* =========================================================
-     🔹 EXISTING HELPERS (UNCHANGED)
-  ========================================================= */
-
-  const steps = ['Order Placed', 'Packed', 'Shipped', 'Delivered'] as const;
-
-  const getStepIndex = (status: OrderStatus): number => {
-    switch (status) {
-      case 'pending':
-        return 0;
-      case 'packed':
-        return 1;
-      case 'shipped':
-        return 2;
-      case 'delivered':
-        return 3;
-      case 'cancelled':
-        return 0;
-      default:
-        return 0;
-    }
-  };
-
-  /* =========================================================
-     🔹 NEW HELPER (ADDED)
-     Uses tracking events if available (Flipkart style)
-  ========================================================= */
-
-  const getStepIndexFromEvents = (
-    order: OrderWithTracking
-  ): number => {
-    if (!order.order_tracking_events?.length) {
-      return getStepIndex(order.status);
-    }
-
-    const completed = order.order_tracking_events.map(
-      e => e.status
-    );
-
-    if (completed.includes('delivered')) return 3;
-    if (completed.includes('shipped')) return 2;
-    if (completed.includes('packed')) return 1;
-    if (completed.includes('order_placed')) return 0;
-
-    return getStepIndex(order.status);
-  };
-
-  const renderStatusBadge = (status: OrderStatus) => {
-    const base =
-      'px-2 py-1 rounded-full text-xs font-semibold capitalize';
-
-    if (status === 'delivered') {
-      return (
-        <span className={`${base} bg-green-100 text-green-800`}>
-          delivered
-        </span>
-      );
-    }
-    if (status === 'cancelled') {
-      return (
-        <span className={`${base} bg-red-100 text-red-800`}>
-          cancelled
-        </span>
-      );
-    }
-    return (
-      <span className={`${base} bg-blue-100 text-blue-800`}>
-        {status}
-      </span>
-    );
-  };
-
-  const renderPaymentBadge = (
-    paymentStatus: Order['payment_status']
-  ) => {
-    const base =
-      'px-2 py-1 rounded-full text-xs font-semibold capitalize';
-
-    if (paymentStatus === 'paid') {
-      return (
-        <span className={`${base} bg-green-100 text-green-800`}>
-          paid
-        </span>
-      );
-    }
-    if (paymentStatus === 'failed') {
-      return (
-        <span className={`${base} bg-red-100 text-red-800`}>
-          failed
-        </span>
-      );
-    }
-    return (
-      <span className={`${base} bg-yellow-100 text-yellow-800`}>
-        {paymentStatus}
-      </span>
-    );
-  };
-
-  const renderStepIcon = (idx: number, current: number) => {
-    const done = idx <= current;
-
-    const base =
-      'flex items-center justify-center w-7 h-7 rounded-full border text-xs';
-
-    let icon = <Truck className="w-4 h-4" />;
-    if (idx === 0) icon = <Package className="w-4 h-4" />;
-    if (idx === steps.length - 1)
-      icon = <CheckCircle2 className="w-4 h-4" />;
-
-    if (done) {
-      return (
-        <div className={`${base} bg-[#D4AF37] border-[#D4AF37] text-black`}>
-          {icon}
-        </div>
-      );
-    }
-
-    return (
-      <div className={`${base} border-gray-400 text-gray-400`}>
-        {icon}
-      </div>
-    );
-  };
-
-  /* =========================================================
-     🔹 LOADING / EMPTY (UNCHANGED)
-  ========================================================= */
+  const filtered = orders.filter(o =>
+    o.product_name.toLowerCase().includes(search.toLowerCase())
+  )
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
+    return <div className="p-10 text-center text-white">Loading…</div>
   }
-
-  if (orders.length === 0) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto text-center">
-          <ShoppingBag className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-          <h1 className="text-2xl font-bold mb-4">No orders yet</h1>
-          <Button asChild>
-            <Link href="/shop">Continue Shopping</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  /* =========================================================
-     🔹 MAIN UI (UNCHANGED + enhanced logic)
-  ========================================================= */
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">My Orders</h1>
+    <div className="max-w-5xl mx-auto px-4 py-8 text-white">
+      <h1 className="text-3xl font-semibold mb-6">My Orders</h1>
+
+      <input
+        className="w-full mb-6 rounded-md px-4 py-3 bg-black border border-[#D4AF37] text-white"
+        placeholder="Search your orders"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+      />
+
+      {filtered.length === 0 && (
+        <p className="text-gray-400">No orders found</p>
+      )}
 
       <div className="space-y-4">
-        {orders.map(order => {
-          const currentStep = getStepIndexFromEvents(order);
+        {filtered.map(order => (
+          <Link
+            key={order.order_id}
+            href={`/orders/${order.order_id}`}
+            className="block bg-black border border-[#D4AF37]/40 rounded-lg p-4 hover:border-[#D4AF37] transition"
+          >
+            <div className="flex gap-4 items-center">
+              <div className="w-20 h-28 bg-gray-800 rounded overflow-hidden flex items-center justify-center text-xs text-gray-400">
+                {order.image_url ? (
+                  <Image
+                    src={order.image_url}
+                    alt={order.product_name}
+                    width={80}
+                    height={120}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  'No Image'
+                )}
+              </div>
 
-          return (
-            <Card key={order.id} className="border border-[#D4AF37]/30">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">
-                      Order #{order.order_number}
-                    </CardTitle>
-                    <p className="text-sm text-gray-600">
-                      {format(new Date(order.created_at), 'MMMM dd, yyyy')}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      ₹{Number(order.total_amount_inr).toFixed(2)}
-                    </p>
-                    <div className="flex gap-2 mt-2 justify-end">
-                      {renderStatusBadge(order.status)}
-                      {renderPaymentBadge(order.payment_status)}
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
+              <div className="flex-1">
+                <p className="font-medium text-lg">
+                  {order.product_name}
+                </p>
 
-              <CardContent className="space-y-4">
-                {/* Delivery Progress */}
-                <div>
-                  <div className="flex justify-between mb-2 text-sm font-semibold">
-                    <span>Delivery Progress</span>
-                    {order.estimated_delivery && (
-                      <span className="flex items-center gap-1 text-xs text-gray-500">
-                        <Clock className="w-3 h-3" />
-                        ETA{' '}
-                        {format(
-                          new Date(order.estimated_delivery),
-                          'dd MMM'
-                        )}
-                      </span>
-                    )}
-                  </div>
+                <p className="text-sm text-gray-400">
+                  Ordered on{' '}
+                  {new Date(order.created_at).toLocaleDateString()}
+                </p>
 
-                  <div className="flex justify-between">
-                    {steps.map((step, idx) => (
-                      <div
-                        key={step}
-                        className="flex-1 flex flex-col items-center"
-                      >
-                        {renderStepIcon(idx, currentStep)}
-                        <span
-                          className={`mt-2 text-xs ${
-                            idx <= currentStep
-                              ? 'text-gray-900'
-                              : 'text-gray-400'
-                          }`}
-                        >
-                          {step}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <p className="text-sm mt-1">
+                  Order:{' '}
+                  <span className="text-[#D4AF37] capitalize">
+                    {order.order_status}
+                  </span>
+                </p>
 
-                {/* Tracking Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-gray-500">Tracking Number</p>
-                    <p className="font-mono">
-                      {order.tracking_number || 'Not assigned yet'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Carrier</p>
-                    <p>
-                      {order.shipping_carrier || 'Will be updated soon'}
-                    </p>
-                  </div>
-                </div>
+                <p className="text-sm">
+                  Payment:{' '}
+                  <span
+                    className={
+                      order.payment_status === 'paid'
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                    }
+                  >
+                    {order.payment_status}
+                  </span>
+                </p>
+              </div>
 
-                {/* Shipping Address */}
-                <div className="text-sm text-gray-700">
-                  <p className="text-gray-500 mb-1">Shipping to</p>
-                  <p>{order.shipping_name}</p>
-                  <p>{order.shipping_address}</p>
-                  <p>
-                    {order.shipping_city}, {order.shipping_state} -{' '}
-                    {order.shipping_pincode}
-                  </p>
-                </div>
-
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/orders/${order.id}`}>View Details</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
+              <div className="text-lg font-semibold">
+                ₹{order.total_amount_inr}
+              </div>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
-  );
+  )
 }

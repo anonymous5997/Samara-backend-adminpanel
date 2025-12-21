@@ -1,37 +1,65 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
-import { formatPrice } from '@/lib/currency';
 import { supabase } from '@/lib/supabase/client';
+import { formatPrice } from '@/lib/currency';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
-import Image from 'next/image';
-import { trackAnalyticsEvent } from '@/lib/analytics';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, profile } = useAuth();
+  const cart = useCart();
 
-  const { user } = useAuth();
+  const mode = searchParams.get('mode');
+  const isBuyNow = mode === 'buynow';
 
-  const {
-    items,
-    currency,
-    rate,
-    getCartTotalInINR,
-    getCartTotalInSelectedCurrency,
-    clearCart,
-  } = useCart();
-
+  const [buyNowItem, setBuyNowItem] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [discountINR, setDiscountINR] = useState(0);
 
+  /* ---------------- COUPON ---------------- */
+  const [couponCode, setCouponCode] = useState('');
+  const [discountINR, setDiscountINR] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponApplied, setCouponApplied] = useState(false);
+
+  /* ---------------- RAZORPAY SCRIPT ---------------- */
+  useEffect(() => {
+    if (window.Razorpay) return;
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+
+  /* ---------------- BUY NOW ---------------- */
+  useEffect(() => {
+    if (!isBuyNow) return;
+    const raw = sessionStorage.getItem('buynow_product');
+    if (!raw) router.replace('/');
+    else setBuyNowItem(JSON.parse(raw));
+  }, [isBuyNow, router]);
+
+  /* ---------------- AUTH ---------------- */
+  useEffect(() => {
+    if (!user) router.replace('/auth/login');
+    if (!isBuyNow && cart.items.length === 0) router.replace('/cart');
+  }, [user, cart.items.length, isBuyNow, router]);
+
+  /* ---------------- FORM ---------------- */
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -42,330 +70,273 @@ export default function CheckoutPage() {
     pincode: '',
   });
 
-  const couponCode = searchParams.get('coupon');
-  const [checkoutTracked, setCheckoutTracked] = useState(false);
-
-  // Load logic
   useEffect(() => {
-    if (!user) {
-      router.push('/auth/login');
-      return;
+    if (!profile) return;
+    setFormData({
+      name: profile.name || '',
+      email: profile.email || '',
+      phone: profile.phone || '',
+      address: profile.house
+        ? `${profile.house}, ${profile.building}, ${profile.locality}`
+        : '',
+      city: profile.city || '',
+      state: profile.state || '',
+      pincode: profile.pin || '',
+    });
+  }, [profile]);
+
+  /* ---------------- ITEMS ---------------- */
+  const items = useMemo(() => {
+    if (isBuyNow && buyNowItem) {
+      return [
+        {
+          id: 'buynow',
+          quantity: 1,
+          product: {
+            id: buyNowItem.productId,
+            name: buyNowItem.productName,
+            base_price_inr: buyNowItem.productPrice,
+          },
+          image_url: buyNowItem.image,
+        },
+      ];
     }
+    return cart.items;
+  }, [isBuyNow, buyNowItem, cart.items]);
 
-    if (items.length === 0) {
-      router.push('/cart');
-      return;
+  /* ---------------- TOTALS ---------------- */
+  const subtotalINR = items.reduce(
+    (sum, item) => sum + item.product.base_price_inr * item.quantity,
+    0
+  );
+
+  const shippingINR = 0;
+  const totalINR = subtotalINR - discountINR + shippingINR;
+
+  /* ---------------- APPLY COUPON ---------------- */
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+
+    setCouponLoading(true);
+    try {
+      const code = couponCode.trim().toUpperCase();
+
+      const { data: coupon } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', code)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (!coupon) {
+        toast.error('Invalid coupon');
+        return;
+      }
+
+      /* ✅ MINIMUM ORDER CHECK */
+      if (
+        coupon.min_order_value_inr &&
+        subtotalINR < coupon.min_order_value_inr
+      ) {
+        toast.error(
+          `Minimum order ₹${coupon.min_order_value_inr} required for this coupon`
+        );
+        return;
+      }
+
+      let discount = 0;
+      if (coupon.type === 'PERCENTAGE') {
+        discount = (subtotalINR * coupon.value) / 100;
+      } else {
+        discount = coupon.value;
+      }
+
+      if (coupon.max_discount_inr) {
+        discount = Math.min(discount, coupon.max_discount_inr);
+      }
+
+      setDiscountINR(discount);
+      setCouponApplied(true);
+      toast.success('Coupon applied');
+    } finally {
+      setCouponLoading(false);
     }
-
-    if (couponCode) {
-      fetchCouponDiscount();
-    }
-
-    if (!checkoutTracked) {
-      trackAnalyticsEvent('checkout_started', undefined, undefined, user.id);
-      setCheckoutTracked(true);
-    }
-  }, [user, items, couponCode, checkoutTracked]);
-
-  const fetchCouponDiscount = async () => {
-    if (!couponCode) return;
-
-    const { data: coupon } = await supabase
-      .from('coupons')
-      .select('*')
-      .eq('code', couponCode)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (!coupon) return;
-
-    const subtotalINR = getCartTotalInINR();
-
-    let discount = 0;
-
-    if (coupon.type === 'PERCENTAGE') {
-      discount = (subtotalINR * coupon.value) / 100;
-    } else {
-      discount = coupon.value;
-    }
-
-    if (coupon.max_discount_inr && discount > coupon.max_discount_inr) {
-      discount = coupon.max_discount_inr;
-    }
-
-    setDiscountINR(discount);
   };
 
-  // Place Order
+  /* ---------------- PLACE ORDER ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
 
     try {
-      const subtotalINR = getCartTotalInINR();
-      const totalINR = subtotalINR - discountINR;
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) throw new Error('Not authenticated');
 
-      const orderNumber = `ORD${Date.now()}`;
-
-      const { data: order, error: orderError } = await supabase
+      const { data: order, error } = await supabase
         .from('orders')
         .insert({
-          user_id: user!.id,
-          order_number: orderNumber,
+          user_id: auth.user.id,
           subtotal_inr: subtotalINR,
           discount_inr: discountINR,
-          shipping_inr: 0,
+          shipping_inr: shippingINR,
           total_amount_inr: totalINR,
-          currency,
-          exchange_rate: rate,
           status: 'pending',
           payment_status: 'pending',
 
           shipping_name: formData.name,
-          shipping_email: formData.email,
           shipping_phone: formData.phone,
           shipping_address: formData.address,
           shipping_city: formData.city,
           shipping_state: formData.state,
           shipping_pincode: formData.pincode,
-
-          coupon_code: couponCode,
         })
-        .select()
+        .select('id')
         .single();
 
-      if (orderError || !order) {
-        toast.error('Failed to create order');
-        return;
-      }
+      if (error) throw error;
 
-      const orderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: item.product.id,
-        variant_id: item.variant?.id,
-        product_name: item.product.name,
-        variant_details: item.variant
-          ? `${item.variant.size || ''} ${item.variant.color || ''}`.trim()
-          : undefined,
-        quantity: item.quantity,
-        price_inr:
-          item.product.base_price_inr +
-          (item.variant?.additional_price_inr || 0),
-      }));
+      await supabase.from('order_items').insert(
+        items.map(item => ({
+          order_id: order.id,
+          product_id: item.product.id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price_inr: item.product.base_price_inr,
+          subtotal_inr:
+            item.product.base_price_inr * item.quantity,
+          image_url: item.image_url,
+        }))
+      );
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
+      if (!isBuyNow) await cart.clearCart();
+      sessionStorage.removeItem('buynow_product');
 
-      if (itemsError) {
-        toast.error('Failed to create order items');
-        return;
-      }
+      const razorpay = new window.Razorpay({
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: totalINR * 100,
+        currency: 'INR',
+        name: 'Samara',
+        description: `Order ${order.id}`,
+        handler: async () => {
+          await supabase
+            .from('orders')
+            .update({ payment_status: 'paid' })
+            .eq('id', order.id);
 
-      await trackAnalyticsEvent('order_placed', undefined, order.id, user!.id);
-      await clearCart();
+          router.replace(`/orders/${order.id}`);
+        },
+      });
 
-      toast.success('Order placed successfully!');
-      router.push(`/orders/${order.id}`);
-    } catch (error) {
-      toast.error('Failed to place order');
-      console.error(error);
+      razorpay.open();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Order failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // Totals
-  const subtotalINR = getCartTotalInINR();
-  const totalINR = subtotalINR - discountINR;
-
-  const subtotalConverted = subtotalINR / rate;
-  const discountConverted = discountINR / rate;
-  const totalConverted = totalINR / rate;
-
+  /* ---------------- UI ---------------- */
   return (
     <>
       <Toaster />
-      <div className="container mx-auto px-4 py-8 text-white">
-        <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+      <div className="min-h-screen bg-black text-white px-4 py-10">
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-extrabold tracking-widest">
+            CHECKOUT
+          </h1>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <form
+            onSubmit={handleSubmit}
+            className="lg:col-span-2 space-y-4 border border-[#D4AF37]/30 rounded-xl p-6"
+          >
+            <h2 className="text-xl font-bold text-[#D4AF37] mb-4">
+              Shipping Details
+            </h2>
 
-          {/* LEFT SIDE — FORM */}
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="space-y-6 text-white">
+            {Object.entries(formData).map(([key, value]) => (
+              <Input
+                key={key}
+                className="bg-black text-white border-gray-700"
+                placeholder={key.toUpperCase()}
+                value={value}
+                onChange={e =>
+                  setFormData({ ...formData, [key]: e.target.value })
+                }
+              />
+            ))}
 
-              <h2 className="text-xl font-semibold mb-4">Shipping Information</h2>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#D4AF37] text-black font-bold"
+            >
+              {loading ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
+            </Button>
+          </form>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border border-[#D4AF37]/30 rounded-xl p-6 h-fit">
+            <h2 className="text-xl font-bold mb-4">Order Summary</h2>
 
-                {/* NAME */}
-                <div className="md:col-span-2">
-                  <Label className="text-white">Full Name</Label>
-                  <Input
-                    required
-                    className="bg-white text-black"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
+            {items.map(item => (
+              <div key={item.id} className="flex gap-3 mb-4">
+                {item.image_url && (
+                  <Image
+                    src={item.image_url}
+                    alt={item.product.name}
+                    width={64}
+                    height={64}
+                    className="rounded object-cover"
                   />
-                </div>
-
-                {/* EMAIL */}
-                <div>
-                  <Label className="text-white">Email</Label>
-                  <Input
-                    type="email"
-                    required
-                    className="bg-white text-black"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* PHONE */}
-                <div>
-                  <Label className="text-white">Phone</Label>
-                  <Input
-                    type="tel"
-                    required
-                    className="bg-white text-black"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* ADDRESS */}
-                <div className="md:col-span-2">
-                  <Label className="text-white">Address</Label>
-                  <Input
-                    required
-                    className="bg-white text-black"
-                    value={formData.address}
-                    onChange={(e) =>
-                      setFormData({ ...formData, address: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* CITY */}
-                <div>
-                  <Label className="text-white">City</Label>
-                  <Input
-                    required
-                    className="bg-white text-black"
-                    value={formData.city}
-                    onChange={(e) =>
-                      setFormData({ ...formData, city: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* STATE */}
-                <div>
-                  <Label className="text-white">State</Label>
-                  <Input
-                    required
-                    className="bg-white text-black"
-                    value={formData.state}
-                    onChange={(e) =>
-                      setFormData({ ...formData, state: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* PINCODE */}
-                <div>
-                  <Label className="text-white">Pincode</Label>
-                  <Input
-                    required
-                    className="bg-white text-black"
-                    value={formData.pincode}
-                    onChange={(e) =>
-                      setFormData({ ...formData, pincode: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                {loading ? 'Processing...' : 'Place Order'}
-              </Button>
-            </form>
-          </div>
-
-          {/* RIGHT SIDE — ORDER SUMMARY */}
-          <div>
-            <div className="border border-gray-700 rounded-lg p-6 sticky top-24 text-white">
-
-              <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-
-              <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
-                {items.map((item) => {
-                  const priceINR =
-                    item.product.base_price_inr +
-                    (item.variant?.additional_price_inr || 0);
-
-                  const priceConverted = priceINR / rate;
-
-                  return (
-                    <div key={item.id} className="flex gap-3">
-                      <div className="relative w-16 h-16 rounded bg-gray-800 overflow-hidden">
-                        {item.image_url && (
-                          <Image
-                            src={item.image_url}
-                            alt={item.product.name}
-                            fill
-                            className="object-cover"
-                          />
-                        )}
-                      </div>
-
-                      <div className="flex-1 text-sm">
-                        <p className="font-medium">{item.product.name}</p>
-                        <p className="text-gray-400 text-xs">Qty: {item.quantity}</p>
-                        <p className="font-semibold text-[#D4AF37]">
-                          {formatPrice(priceConverted * item.quantity, currency)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="space-y-2 mb-6 pb-6 border-b border-gray-700">
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Subtotal</span>
-                  <span className="text-[#D4AF37]">
-                    {formatPrice(subtotalConverted, currency)}
-                  </span>
-                </div>
-
-                {discountINR > 0 && (
-                  <div className="flex justify-between text-[#4ADE80]">
-                    <span>Discount</span>
-                    <span>-{formatPrice(discountConverted, currency)}</span>
-                  </div>
                 )}
-
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Shipping</span>
-                  <span className="text-gray-300">Free</span>
+                <div>
+                  <p>{item.product.name}</p>
+                  <p className="text-[#D4AF37]">
+                    {formatPrice(item.product.base_price_inr, 'INR')}
+                  </p>
                 </div>
               </div>
+            ))}
 
-              <div className="flex justify-between text-xl font-bold">
+            <div className="flex gap-2 mt-4">
+              <Input
+                placeholder="Coupon code"
+                value={couponCode}
+                onChange={e => setCouponCode(e.target.value)}
+                className="bg-white text-black placeholder:text-gray-500"
+              />
+              <Button
+                onClick={applyCoupon}
+                disabled={couponLoading}
+                className="bg-[#D4AF37] text-black"
+              >
+                Apply
+              </Button>
+            </div>
+
+            <div className="border-t border-gray-700 pt-4 mt-4 space-y-2">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotalINR, 'INR')}</span>
+              </div>
+
+              {couponApplied && (
+                <div className="flex justify-between text-green-400">
+                  <span>Discount</span>
+                  <span>-{formatPrice(discountINR, 'INR')}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
                 <span className="text-[#D4AF37]">
-                  {formatPrice(totalConverted, currency)}
+                  {formatPrice(totalINR, 'INR')}
                 </span>
               </div>
-
             </div>
           </div>
         </div>

@@ -11,7 +11,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'wsrobuiqcuzpfgfnmh.supabase.co',
+        hostname: 'wrsrobuicquzpfgnfnmh.supabase.co', // ✅ FIXED
       },
     ],
   },

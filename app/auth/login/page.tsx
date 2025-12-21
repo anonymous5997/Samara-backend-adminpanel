@@ -2,423 +2,284 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
-import { Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import SupabasePhoneAuth from '@/components/auth/SupabasePhoneAuth';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Eye } from 'lucide-react';
+
+type AuthMode =
+  | 'login'
+  | 'signup'
+  | 'forgot'
+  | 'verify-otp'
+  | 'set-password';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [loginMethod, setLoginMethod] = useState<'password' | 'email-otp' | 'phone-otp'>('password');
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [loading, setLoading] = useState(false);
+  /* ---------------- STATE ---------------- */
+  const [tab, setTab] = useState<'password' | 'email' | 'phone'>('password');
+  const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
 
-  const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    otp: '',
+  });
 
-  const handlePasswordSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [loading, setLoading] = useState(false);
+
+  /* ---------------- HELPERS ---------------- */
+  const update = (k: string, v: string) =>
+    setForm(prev => ({ ...prev, [k]: v }));
+
+  /* ---------------- LOGIN ---------------- */
+  const loginPassword = async () => {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
+    setLoading(false);
+
+    if (error) toast.error(error.message);
+    else router.push('/');
+  };
+
+  /* ---------------- SEND OTP ---------------- */
+  const sendOtp = async () => {
     setLoading(true);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const payload =
+      tab === 'phone'
+        ? { phone: form.phone }
+        : { email: form.email };
 
-      if (error) {
-        toast.error(error.message);
-        setLoading(false);
-        return;
-      }
+    const { error } = await supabase.auth.signInWithOtp(payload);
 
-      if (data.session) {
-        console.log('[Login] Sign in successful:', data.user.email);
+    setLoading(false);
 
-        // Set session server-side to ensure cookies are properly set
-        const sessionResponse = await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }),
-        });
-
-        if (!sessionResponse.ok) {
-          console.error('[Login] Failed to set session server-side');
-          toast.error('Failed to complete sign in');
-          setLoading(false);
-          return;
-        }
-
-        console.log('[Login] Session established server-side');
-        toast.success('Signed in successfully');
-
-        // Wait a moment for cookies to be set
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Use window.location for hard navigation to ensure cookies are sent
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error('[Login] Sign in error:', error);
-      toast.error('Failed to sign in');
-      setLoading(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('OTP sent');
+      setMode('verify-otp');
     }
   };
 
-  const handlePasswordSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /* ---------------- VERIFY OTP ---------------- */
+  const verifyOtp = async () => {
     setLoading(true);
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-        },
-      });
+    const payload =
+      tab === 'phone'
+        ? { phone: form.phone, token: form.otp, type: 'sms' }
+        : { email: form.email, token: form.otp, type: 'email' };
 
-      if (error) {
-        toast.error(error.message);
-        setLoading(false);
-        return;
-      }
+    const { error } = await supabase.auth.verifyOtp(payload as any);
 
-      if (data.session) {
-        // Set session server-side to ensure cookies are properly set
-        const sessionResponse = await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }),
-        });
+    setLoading(false);
 
-        if (!sessionResponse.ok) {
-          console.error('[Signup] Failed to set session server-side');
-          toast.error('Failed to complete signup');
-          setLoading(false);
-          return;
-        }
+    if (error) toast.error(error.message);
+    else setMode('set-password');
+  };
 
-        toast.success('Account created successfully');
+  /* ---------------- SET PASSWORD ---------------- */
+  const setPassword = async () => {
+    if (!form.password || form.password.length < 8) {
+      toast.error(
+        'Password must be at least 8 characters, include 1 capital & 1 special character'
+      );
+      return;
+    }
 
-        // Wait a moment for cookies to be set
-        await new Promise(resolve => setTimeout(resolve, 100));
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({
+      password: form.password,
+    });
+    setLoading(false);
 
-        // Use window.location for hard navigation
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error('[Signup] Error:', error);
-      toast.error('Failed to create account');
-      setLoading(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Password reset successfully');
+      router.push('/');
     }
   };
 
-  const handleSendEmailOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: mode === 'signup',
-        },
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      setEmailOtpSent(true);
-      toast.success('OTP sent to your email');
-    } catch (error) {
-      toast.error('Failed to send OTP');
-    } finally {
-      setLoading(false);
+  /* ---------------- SIGNUP START ---------------- */
+  const signupStart = async () => {
+    if (!form.name) {
+      toast.error('Name is required');
+      return;
     }
+    await sendOtp();
   };
 
-
-  const handleVerifyEmailOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: 'email',
-      });
-
-      if (error) {
-        toast.error(error.message);
-        setLoading(false);
-        return;
-      }
-
-      if (data.session) {
-        // Set session server-side to ensure cookies are properly set
-        const sessionResponse = await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }),
-        });
-
-        if (!sessionResponse.ok) {
-          console.error('[EmailOTP] Failed to set session server-side');
-          toast.error('Failed to complete sign in');
-          setLoading(false);
-          return;
-        }
-
-        toast.success('Signed in successfully');
-
-        // Wait a moment for cookies to be set
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Use window.location for hard navigation
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error('[EmailOTP] Error:', error);
-      toast.error('Failed to verify OTP');
-      setLoading(false);
-    }
+  /* ---------------- FORGOT PASSWORD ---------------- */
+  const forgotStart = async () => {
+    await sendOtp();
   };
 
+  /* ---------------- SUBMIT HANDLER ---------------- */
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (mode === 'login' && tab === 'password') return loginPassword();
+    if (mode === 'signup') return signupStart();
+    if (mode === 'forgot') return forgotStart();
+    if (mode === 'verify-otp') return verifyOtp();
+    if (mode === 'set-password') return setPassword();
+  };
+
+  /* ---------------- UI ---------------- */
   return (
-    <>
-      <Toaster />
-      <div className="min-h-screen bg-[#000000] flex items-center justify-center py-12 px-4">
-        <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#D4AF37] to-[#F4D03F] flex items-center justify-center shadow-lg shadow-[#D4AF37]/30">
-                <span className="text-black font-serif text-2xl font-bold">S</span>
-              </div>
-              <span className="font-serif text-2xl font-bold text-[#D4AF37] tracking-wide">SAMARA</span>
-            </Link>
-            <h1 className="text-3xl font-serif font-bold text-[#D4AF37] mb-2">
-              {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
-            </h1>
-            <p className="text-[#888]">
-              {mode === 'signin' ? 'Sign in to continue shopping' : 'Join Samara today'}
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <form
+        onSubmit={onSubmit}
+        className="w-[380px] rounded-2xl border border-[#D4AF37]/40 p-8 bg-black text-white"
+      >
+        {/* LOGO */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-xl bg-[#D4AF37] text-black flex items-center justify-center font-bold text-xl">
+            S
           </div>
+          <span className="text-[#D4AF37] text-xl font-semibold tracking-widest">
+            SAMARA
+          </span>
+        </div>
 
-          <div className="bg-[#111111] border border-[#D4AF37]/20 rounded-lg p-8 shadow-xl">
-            <Tabs defaultValue="password" onValueChange={(val) => setLoginMethod(val as any)} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6 bg-[#1a1a1a]">
-                <TabsTrigger value="password" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-black">
-                  <Lock className="h-4 w-4 mr-2" />
-                  Password
-                </TabsTrigger>
-                <TabsTrigger value="email-otp" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-black">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Email
-                </TabsTrigger>
-                <TabsTrigger value="phone-otp" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-black">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Phone
-                </TabsTrigger>
-              </TabsList>
+        <h2 className="text-2xl font-semibold text-[#D4AF37] text-center">
+          Welcome Back
+        </h2>
+        <p className="text-center text-gray-400 text-sm mb-6">
+          Sign in to continue
+        </p>
 
-              <TabsContent value="password">
-                <form onSubmit={mode === 'signin' ? handlePasswordSignIn : handlePasswordSignUp} className="space-y-4">
-                  {mode === 'signup' && (
-                    <div>
-                      <Label htmlFor="name" className="text-[#F5F5F5]">Full Name</Label>
-                      <Input
-                        id="name"
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Your name"
-                        className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                      />
-                    </div>
-                  )}
+        {/* TABS */}
+        <div className="flex mb-5 bg-[#111] rounded-lg p-1">
+          {['password', 'email', 'phone'].map(t => (
+            <button
+              key={t}
+              type="button"
+              className={`flex-1 py-2 rounded-md text-sm ${
+                tab === t
+                  ? 'bg-white text-black'
+                  : 'text-gray-400'
+              }`}
+              onClick={() => {
+                setTab(t as any);
+                setMode('login');
+              }}
+            >
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
 
-                  <div>
-                    <Label htmlFor="email" className="text-[#F5F5F5]">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                    />
-                  </div>
+        {/* NAME */}
+        {mode === 'signup' && (
+          <Input
+            placeholder="Name"
+            value={form.name}
+            onChange={e => update('name', e.target.value)}
+            className="mb-3 bg-white text-black"
+          />
+        )}
 
-                  <div>
-                    <Label htmlFor="password" className="text-[#F5F5F5]">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37] pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888] hover:text-[#D4AF37]"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
+        {/* EMAIL / PHONE */}
+        {tab !== 'phone' && (
+          <Input
+            placeholder="Email"
+            value={form.email}
+            onChange={e => update('email', e.target.value)}
+            className="mb-3 bg-white text-black"
+          />
+        )}
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
-                    disabled={loading}
-                  >
-                    {loading ? 'Please wait...' : mode === 'signin' ? 'Sign In' : 'Create Account'}
-                  </Button>
-                </form>
-              </TabsContent>
+        {tab === 'phone' && (
+          <Input
+            placeholder="Phone"
+            value={form.phone}
+            onChange={e => update('phone', e.target.value)}
+            className="mb-3 bg-white text-black"
+          />
+        )}
 
-              <TabsContent value="email-otp">
-                {!emailOtpSent ? (
-                  <form onSubmit={handleSendEmailOTP} className="space-y-4">
-                    {mode === 'signup' && (
-                      <div>
-                        <Label htmlFor="name-email" className="text-[#F5F5F5]">Full Name</Label>
-                        <Input
-                          id="name-email"
-                          type="text"
-                          required
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="Your name"
-                          className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                        />
-                      </div>
-                    )}
+        {/* PASSWORD — ONLY WHEN NEEDED */}
+        {(mode === 'login' && tab === 'password') ||
+        mode === 'set-password' ? (
+          <div className="relative mb-3">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={form.password}
+              onChange={e => update('password', e.target.value)}
+              className="bg-white text-black pr-10"
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+              onClick={() => setShowPassword(p => !p)}
+            >
+              <Eye size={18} />
+            </button>
+          </div>
+        ) : null}
 
-                    <div>
-                      <Label htmlFor="email-otp" className="text-[#F5F5F5]">Email</Label>
-                      <Input
-                        id="email-otp"
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                      />
-                    </div>
+        {/* OTP */}
+        {mode === 'verify-otp' && (
+          <Input
+            placeholder="Enter OTP"
+            value={form.otp}
+            onChange={e => update('otp', e.target.value)}
+            className="mb-3 bg-white text-black"
+          />
+        )}
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
-                      disabled={loading}
-                    >
-                      {loading ? 'Sending...' : 'Send OTP'}
-                    </Button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifyEmailOTP} className="space-y-4">
-                    <div>
-                      <Label htmlFor="otp-email" className="text-[#F5F5F5]">Enter OTP</Label>
-                      <Input
-                        id="otp-email"
-                        type="text"
-                        required
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value)}
-                        placeholder="000000"
-                        maxLength={6}
-                        className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
-                      />
-                      <p className="text-sm text-[#888] mt-2">
-                        OTP sent to {email}
-                      </p>
-                    </div>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full mt-2 bg-[#1a1a1a] text-white"
+        >
+          {loading ? 'Please wait...' : 'Sign In'}
+        </Button>
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
-                      disabled={loading}
-                    >
-                      {loading ? 'Verifying...' : 'Verify OTP'}
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-[#D4AF37] hover:text-[#F4D03F]"
-                      onClick={() => {
-                        setEmailOtpSent(false);
-                        setOtp('');
-                      }}
-                    >
-                      Use different email
-                    </Button>
-                  </form>
-                )}
-              </TabsContent>
-
-              <TabsContent value="phone-otp">
-                <SupabasePhoneAuth />
-              </TabsContent>
-            </Tabs>
-
-            <div className="mt-6 text-center">
+        {/* LINKS */}
+        {mode === 'login' && (
+          <div className="text-center mt-5 text-sm">
+            <button
+              type="button"
+              className="text-[#D4AF37]"
+              onClick={() => setMode('forgot')}
+            >
+              Forgot password?
+            </button>
+            <div className="mt-3 text-gray-400">
+              Don&apos;t have an account?{' '}
               <button
-                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                className="text-sm text-[#D4AF37] hover:text-[#F4D03F] font-medium"
+                type="button"
+                className="text-[#D4AF37]"
+                onClick={() => setMode('signup')}
               >
-                {mode === 'signin' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
+                Sign Up
               </button>
             </div>
-
-            <div className="mt-6 text-center text-sm text-[#666]">
-              <p>
-                By continuing, you agree to our{' '}
-                <Link href="/terms" className="text-[#D4AF37] hover:underline">
-                  Terms
-                </Link>{' '}
-                and{' '}
-                <Link href="/privacy" className="text-[#D4AF37] hover:underline">
-                  Privacy Policy
-                </Link>
-              </p>
-            </div>
           </div>
-        </div>
-      </div>
-    </>
+        )}
+
+        {mode === 'verify-otp' && (
+          <button
+            type="button"
+            className="text-xs text-[#D4AF37] mt-4 block mx-auto"
+            onClick={sendOtp}
+          >
+            Resend OTP
+          </button>
+        )}
+      </form>
+    </div>
   );
 }

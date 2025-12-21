@@ -279,7 +279,7 @@ export default function AdminEditHeroSlidePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="sortOrder">Slide Order (1–4)</Label>
+              <Label htmlFor="sortOrder">Slide Order (1–6)</Label>
               <Input
                 id="sortOrder"
                 type="number"
@@ -288,7 +288,7 @@ export default function AdminEditHeroSlidePage() {
                 onChange={(e) => setSortOrder(e.target.value)}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Homepage shows up to 4 active slides by lowest order.
+                Homepage shows up to 6 active slides by lowest order.
               </p>
             </div>
             <div className="flex items-center gap-3 pt-6">

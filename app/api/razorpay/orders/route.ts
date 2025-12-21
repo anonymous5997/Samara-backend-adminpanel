@@ -5,25 +5,35 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
 export async function POST(request: NextRequest) {
   try {
-    const { amount, orderId } = await request.json();
+    const body = await request.json();
+    const { amount, orderId } = body;
 
-    if (!amount || !orderId) {
+    /* ---------------- VALIDATION ---------------- */
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
       return NextResponse.json(
-        { error: 'Amount and orderId are required' },
+        { error: 'Valid amount is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!orderId || typeof orderId !== 'string') {
+      return NextResponse.json(
+        { error: 'Valid orderId is required' },
         { status: 400 }
       );
     }
 
     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-      console.error('Razorpay credentials not configured');
+      console.error('❌ Razorpay credentials missing');
       return NextResponse.json(
         { error: 'Payment gateway not configured' },
         { status: 500 }
       );
     }
 
+    /* ---------------- RAZORPAY PAYLOAD ---------------- */
     const razorpayOrderPayload = {
-      amount: Math.round(amount * 100),
+      amount: Math.round(amount * 100), // INR → paise
       currency: 'INR',
       receipt: orderId,
       notes: {
@@ -31,6 +41,7 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    /* ---------------- CREATE ORDER ---------------- */
     const response = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -42,22 +53,22 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(razorpayOrderPayload),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Razorpay API error:', errorData);
+      console.error('❌ Razorpay API Error:', data);
       return NextResponse.json(
-        { error: 'Failed to create Razorpay order' },
+        { error: data?.error?.description || 'Razorpay order failed' },
         { status: response.status }
       );
     }
 
-    const razorpayOrder = await response.json();
-
-    return NextResponse.json(razorpayOrder);
+    /* ---------------- SUCCESS ---------------- */
+    return NextResponse.json(data);
   } catch (error: any) {
-    console.error('Create Razorpay order error:', error);
+    console.error('❌ Razorpay Order Exception:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

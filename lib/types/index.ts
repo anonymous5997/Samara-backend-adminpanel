@@ -68,8 +68,18 @@ export interface Order {
   shipping_inr: number;
   total_amount_inr: number;
   currency: Currency;
-  status: 'pending' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  status:
+    | 'pending'
+    | 'confirmed'
+    | 'packed'
+    | 'shipped'
+    | 'delivered'
+    | 'cancelled';
+  payment_status:
+    | 'pending'
+    | 'paid'
+    | 'failed'
+    | 'refunded';
   shipping_name?: string;
   shipping_email?: string;
   shipping_phone?: string;
@@ -105,10 +115,22 @@ export interface Coupon {
   is_active: boolean;
 }
 
+/* ================================
+   UPDATED PROFILE (ONLY ADDITIONS)
+================================ */
+
 export interface Profile {
   id: string;
   email: string;
   name?: string;
   phone?: string;
   role: 'customer' | 'admin';
+
+  /* 🔹 Address fields used in checkout */
+  house?: string;
+  building?: string;
+  locality?: string;
+  city?: string;
+  state?: string;
+  pin?: string;
 }

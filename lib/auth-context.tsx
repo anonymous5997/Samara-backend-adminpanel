@@ -1,20 +1,20 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from 'react';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 
-/**
- * Production Auth Context
- *
- * CRITICAL RULES:
- * 1. Profile role is the source of truth for authorization
- * 2. Never trust client-side role checks alone
- * 3. Always fetch fresh profile data after sign-in
- * 4. Session is killed server-side before new login
- * 5. Skip profile operations on /auth/* routes to prevent loops
- */
+/* ======================================================
+   TYPES
+====================================================== */
 
 type Profile = {
   id: string;
@@ -36,6 +36,10 @@ type AuthContextType = {
   ensureProfile: () => Promise<void>;
 };
 
+/* ======================================================
+   CONTEXT
+====================================================== */
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
@@ -46,72 +50,68 @@ const AuthContext = createContext<AuthContextType>({
   ensureProfile: async () => {},
 });
 
+/* ======================================================
+   PROVIDER
+====================================================== */
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const profileEnsuredRef = useRef(false);
-  const isFetchingProfile = useRef(false);
 
-  // Check if we're on an auth route
+  // 🔐 Guards
+  const isFetchingProfile = useRef(false);
+  const profileEnsuredRef = useRef(false);
+  const hasInitializedSession = useRef(false);
+
   const isAuthRoute = pathname?.startsWith('/auth');
 
-  const fetchProfile = useCallback(async (userId: string, skipIfAuthRoute = true) => {
-    // Skip if on auth route to prevent infinite loops
-    if (skipIfAuthRoute && isAuthRoute) {
-      console.log('[AuthContext] Skipping profile fetch on auth route');
-      return false;
-    }
+  /* ======================================================
+     FETCH PROFILE
+  ===================================================== */
 
-    // Prevent concurrent fetches
-    if (isFetchingProfile.current) {
-      console.log('[AuthContext] Profile fetch already in progress');
-      return false;
-    }
+  const fetchProfile = useCallback(
+    async (userId: string, skipIfAuthRoute = true) => {
+      if (skipIfAuthRoute && isAuthRoute) return false;
+      if (isFetchingProfile.current) return false;
 
-    isFetchingProfile.current = true;
+      isFetchingProfile.current = true;
 
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
 
-      if (error) {
-        console.error('[AuthContext] Error fetching profile:', error);
-        setProfile(null);
-        return false;
+        if (error) {
+          setProfile(null);
+          return false;
+        }
+
+        setProfile(data);
+        return !!data;
+      } finally {
+        isFetchingProfile.current = false;
       }
+    },
+    [isAuthRoute]
+  );
 
-      setProfile(data);
-      console.log('[AuthContext] Profile loaded:', data?.role);
-      return !!data;
-    } catch (error) {
-      console.error('[AuthContext] Fatal error fetching profile:', error);
-      setProfile(null);
-      return false;
-    } finally {
-      isFetchingProfile.current = false;
-    }
-  }, [isAuthRoute]);
+  /* ======================================================
+     ENSURE PROFILE
+  ===================================================== */
 
   const ensureProfile = useCallback(async () => {
-    if (!user) return;
-    if (isAuthRoute) {
-      console.log('[AuthContext] Skipping profile ensure on auth route');
-      return;
-    }
-    if (profileEnsuredRef.current) {
-      console.log('[AuthContext] Profile already ensured, skipping');
-      return;
-    }
+    if (!user || isAuthRoute) return;
+    if (profileEnsuredRef.current) return;
 
     profileEnsuredRef.current = true;
 
     try {
-      const response = await fetch('/api/profile/ensure', {
+      const res = await fetch('/api/profile/ensure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,19 +122,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      if (!response.ok) {
-        console.error('[AuthContext] Failed to ensure profile');
+      if (res.ok) {
+        await fetchProfile(user.id, false);
+      } else {
         profileEnsuredRef.current = false;
-        return;
       }
-
-      // Refresh profile after ensuring it exists
-      await fetchProfile(user.id, false);
-    } catch (error) {
-      console.error('[AuthContext] Error ensuring profile:', error);
+    } catch {
       profileEnsuredRef.current = false;
     }
   }, [user, fetchProfile, isAuthRoute]);
+
+  /* ======================================================
+     REFRESH PROFILE
+  ===================================================== */
 
   const refreshProfile = useCallback(async () => {
     if (user && !isAuthRoute) {
@@ -142,61 +142,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, fetchProfile, isAuthRoute]);
 
+  /* ======================================================
+     SESSION INIT + LISTENER
+  ===================================================== */
+
   useEffect(() => {
-    // Skip profile operations on auth routes
     if (isAuthRoute) {
-      console.log('[AuthContext] On auth route, setting loading to false');
       setLoading(false);
       return;
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      console.log('[AuthContext] Initial session check:', {
-        hasSession: !!data.session,
-        user: data.session?.user?.email,
-        error: error?.message,
-      });
+    // 🔹 Initial session (RUNS ONCE)
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (hasInitializedSession.current) return;
+        hasInitializedSession.current = true;
 
-      if (data.session?.user) {
+        if (!data.session?.user) {
+          setLoading(false);
+          return;
+        }
+
         setUser(data.session.user);
         await fetchProfile(data.session.user.id, false);
         setLoading(false);
-      } else {
-        setLoading(false);
-      }
-    });
+      });
 
-    // Listen for auth changes
+    // 🔹 Auth state listener
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('[AuthContext] Auth event:', event);
-
         if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
+          setUser(prev =>
+            prev?.id === session.user.id ? prev : session.user
+          );
 
-          // Only fetch profile and ensure it exists if not on auth route
           if (!isAuthRoute) {
-            const profileFetched = await fetchProfile(session.user.id, false);
-
-            // If profile doesn't exist, try to create it (only once)
-            if (!profileFetched && !profileEnsuredRef.current) {
-              console.log('[AuthContext] Profile not found, ensuring it exists');
+            const ok = await fetchProfile(session.user.id, false);
+            if (!ok && !profileEnsuredRef.current) {
               setTimeout(() => ensureProfile(), 100);
             }
-          } else {
-            // On auth route, the login page will handle redirect
-            console.log('[AuthContext] SIGNED_IN on auth route, skipping profile operations');
           }
-        } else if (event === 'SIGNED_OUT') {
+
+          setLoading(false);
+        }
+
+        if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
           profileEnsuredRef.current = false;
-        } else if (event === 'USER_UPDATED' && session?.user) {
+          hasInitializedSession.current = false;
+          setLoading(false);
+        }
+
+        if (event === 'USER_UPDATED' && session?.user) {
           setUser(session.user);
           if (!isAuthRoute) {
             await fetchProfile(session.user.id, false);
           }
+          setLoading(false);
         }
       }
     );
@@ -204,20 +208,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [isAuthRoute, fetchProfile]);
+  }, [isAuthRoute, fetchProfile, ensureProfile]);
+
+  /* ======================================================
+     SIGN OUT
+  ===================================================== */
 
   const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setProfile(null);
-      window.location.href = '/';
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setLoading(false);
+    window.location.href = '/';
   };
 
   const isAdmin = profile?.role === 'admin';
+
+  /* ======================================================
+     PROVIDER VALUE
+  ===================================================== */
 
   return (
     <AuthContext.Provider
@@ -236,10 +245,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ======================================================
+   HOOK
+====================================================== */
+
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
     throw new Error('useAuth must be used within AuthProvider');
   }
-  return context;
+  return ctx;
 };

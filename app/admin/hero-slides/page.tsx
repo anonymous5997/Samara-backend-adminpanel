@@ -65,7 +65,7 @@ export default function HeroSlidesListPage() {
         <h1 className="text-3xl font-bold">Hero Slides</h1>
         <div className="flex items-center gap-4">
           <p className="text-sm text-gray-500">
-            Active on homepage: {slides.filter((s) => s.is_active).length} / 4
+            Active on homepage: {slides.filter((s) => s.is_active).length} / 6
           </p>
           <Button onClick={() => router.push('/admin/hero')}>
             + Add Hero Slide

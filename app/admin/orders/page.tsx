@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -10,89 +10,55 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/ui/table'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { supabase } from '@/lib/supabase/client';
-import { Order } from '@/lib/types';
-import { Eye, Truck } from 'lucide-react';
-import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
-import { format } from 'date-fns';
-
-/* ---------------- TRACKING META ---------------- */
-
-const STATUS_TRACKING_MAP: Record<
-  string,
-  { title: string; description: string }
-> = {
-  pending: {
-    title: 'Order Placed',
-    description: 'Your order has been placed successfully',
-  },
-  confirmed: {
-    title: 'Order Confirmed',
-    description: 'Your order has been confirmed',
-  },
-  packed: {
-    title: 'Order Packed',
-    description: 'Your items are packed and ready for shipment',
-  },
-  shipped: {
-    title: 'Order Shipped',
-    description: 'Your order has been shipped',
-  },
-  delivered: {
-    title: 'Order Delivered',
-    description: 'Your order has been delivered successfully',
-  },
-};
-
-/* ---------------- COMPONENT ---------------- */
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase/client'
+import { Eye, Truck } from 'lucide-react'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
+import { format } from 'date-fns'
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [orders, setOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  // NEW: tracking inputs
   const [trackingInput, setTrackingInput] = useState<{
-    [key: string]: { tracking_number: string; carrier: string };
-  }>({});
+    [key: string]: { tracking_number: string; carrier: string }
+  }>({})
 
   useEffect(() => {
-    fetchOrders();
-  }, [statusFilter]);
+    fetchOrders()
+  }, [statusFilter])
 
   const fetchOrders = async () => {
     try {
       let query = supabase
         .from('orders')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+        query = query.eq('status', statusFilter)
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data, error } = await query
+      if (error) throw error
 
-      setOrders(data || []);
+      setOrders(data || [])
     } catch {
-      toast.error('Failed to fetch orders');
+      toast.error('Failed to fetch orders')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
-  /* ---------------- STATUS UPDATE ---------------- */
+  }
 
   const handleStatusChange = async (
     orderId: string,
@@ -102,34 +68,20 @@ export default function AdminOrdersPage() {
       await supabase
         .from('orders')
         .update({ status: newStatus })
-        .eq('id', orderId);
+        .eq('id', orderId)
 
-      const meta = STATUS_TRACKING_MAP[newStatus];
-      if (meta) {
-        await supabase.from('order_tracking_events').insert({
-          order_id: orderId,
-          status: newStatus === 'pending'
-            ? 'order_placed'
-            : newStatus,
-          title: meta.title,
-          description: meta.description,
-        });
-      }
-
-      toast.success('Order status updated');
-      fetchOrders();
+      toast.success('Order status updated')
+      fetchOrders()
     } catch {
-      toast.error('Failed to update order status');
+      toast.error('Failed to update order status')
     }
-  };
-
-  /* ---------------- TRACKING SAVE (NEW) ---------------- */
+  }
 
   const saveTracking = async (orderId: string) => {
-    const values = trackingInput[orderId];
+    const values = trackingInput[orderId]
     if (!values?.tracking_number) {
-      toast.error('Tracking number required');
-      return;
+      toast.error('Tracking number required')
+      return
     }
 
     try {
@@ -140,31 +92,20 @@ export default function AdminOrdersPage() {
           carrier: values.carrier,
           status: 'shipped',
         })
-        .eq('id', orderId);
+        .eq('id', orderId)
 
-      await supabase.from('order_tracking_events').insert({
-        order_id: orderId,
-        status: 'shipped',
-        title: 'Order Shipped',
-        description: `Shipped via ${values.carrier || 'courier'}`,
-      });
-
-      toast.success('Tracking details saved');
-      fetchOrders();
+      toast.success('Tracking saved')
+      fetchOrders()
     } catch {
-      toast.error('Failed to save tracking');
+      toast.error('Failed to save tracking')
     }
-  };
-
-  /* ---------------- UI ---------------- */
+  }
 
   return (
     <>
       <Toaster />
       <div>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Orders</h1>
-        </div>
+        <h1 className="text-3xl font-bold mb-6">Orders</h1>
 
         {loading ? (
           <div>Loading...</div>
@@ -191,7 +132,7 @@ export default function AdminOrdersPage() {
                     <TableCell>
                       <p className="font-medium">{order.shipping_name}</p>
                       <p className="text-xs text-gray-500">
-                        {order.shipping_email}
+                        {order.shipping_phone}
                       </p>
                     </TableCell>
 
@@ -215,11 +156,12 @@ export default function AdminOrdersPage() {
                           <SelectItem value="packed">Packed</SelectItem>
                           <SelectItem value="shipped">Shipped</SelectItem>
                           <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="returned">Returned</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
 
-                    {/* 🔹 TRACKING INPUT (NEW) */}
                     <TableCell>
                       {order.tracking_number ? (
                         <div className="text-xs">
@@ -289,5 +231,5 @@ export default function AdminOrdersPage() {
         )}
       </div>
     </>
-  );
+  )
 }
