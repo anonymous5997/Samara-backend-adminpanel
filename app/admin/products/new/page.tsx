@@ -11,6 +11,9 @@ import { Switch } from '@/components/ui/switch';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
+// ✅ Import the server action
+import { createProduct } from './actions';
+
 function slugify(name: string) {
   return name
     .toLowerCase()
@@ -31,6 +34,16 @@ export default function AdminNewProductPage() {
   const [priceInr, setPriceInr] = useState('');
   const [mrpInr, setMrpInr] = useState('');
   const [status, setStatus] = useState<'active' | 'draft'>('active');
+
+  // regional prices
+  const [regionalPrices, setRegionalPrices] = useState({
+    IN: '',
+    US: '',
+    AE: '',
+    EU: '',
+    CA: '',
+    GB: '',
+  });
 
   // media
   const [imageFiles, setImageFiles] = useState<FileList | null>(null);
@@ -64,70 +77,78 @@ export default function AdminNewProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
+    
+    // Auth Check
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      toast.error('You must be logged in as admin');
+      setSaving(false);
+      return;
+    }
 
     if (!name || !priceInr) {
       toast.error('Name and price are required');
+      setSaving(false);
       return;
     }
 
     if (!imageFiles || imageFiles.length === 0) {
       toast.error('Please select at least one product image');
+      setSaving(false);
       return;
     }
 
-    setSaving(true);
-
     try {
-      // 1) Create product first (without images)
-      const { data: productInsertData, error: productError } = await supabase
-        .from('products')
-        .insert([
-          {
-            name,
-            brand: brand || null,
-            description: description || null,
-            base_price_inr: Number(priceInr),
-            mrp_inr: mrpInr ? Number(mrpInr) : null,
-            status,
-            is_active: status === 'active',
+      // ✅ STEP 2: Use Server Action for Product Creation
+      // Now including regionalPrices to be handled on the server
+      const result = await createProduct({
+        name,
+        brand: brand || null,
+        description: description || null,
+        base_price_inr: Number(priceInr),
+        mrp_inr: mrpInr ? Number(mrpInr) : null,
+        status, // 'active' | 'draft'
+        is_active: status === 'active', // Derived boolean
+        slug: slugify(name),
+        
+        // Attributes
+        fabric: fabric || null,
+        work: work || null,
+        occasion: occasion || null,
+        color: color || null,
+        care_instructions: careInstructions || null,
+        shipping_time: shippingTime || null,
+        why_women_love: whyWomenLove || null,
+        
+        // Flags
+        is_bestseller: isBestseller,
+        is_new_arrival: isNewArrival,
+        is_handcrafted: isHandcrafted,
+        is_premium_material: isPremiumMaterial,
+        is_perfect_for_special_occasions: isPerfectForSpecialOccasions,
+        show_in_sarees: showInSarees,
+        show_in_festive_edit: showInFestiveEdit,
 
-            is_bestseller: isBestseller,
-            is_new_arrival: isNewArrival,
-            slug: slugify(name),
+        // ✅ Prices passed to server action
+        regionalPrices, 
+      });
 
-            fabric: fabric || null,
-            work: work || null,
-            occasion: occasion || null,
-            color: color || null,
-            care_instructions: careInstructions || null,
-            shipping_time: shippingTime || null,
-
-            why_women_love: whyWomenLove || null,
-
-            is_handcrafted: isHandcrafted,
-            is_premium_material: isPremiumMaterial,
-            is_perfect_for_special_occasions: isPerfectForSpecialOccasions,
-
-            // important: these match your boolean columns
-            show_in_sarees: showInSarees,
-            show_in_festive_edit: showInFestiveEdit,
-          },
-        ])
-        .select('id')
-        .single();
-
-      if (productError || !productInsertData) {
-        console.error('Supabase product insert error:', productError);
-        toast.error(
-          productError?.message || 'Failed to create product (insert error)',
-        );
+      if (!result.success || !result.productId) {
+        console.error('Create product failed:', result.error);
+        toast.error(result.error || 'Failed to create product');
         setSaving(false);
         return;
       }
 
-      const productId = productInsertData.id as string;
+      const productId = result.productId;
 
-      // 2) Upload images to Supabase Storage
+      // -------------------------------------------------------------
+      // 3) Upload images to Supabase Storage (Client Side)
+      // -------------------------------------------------------------
       const filesArray = Array.from(imageFiles);
       const bucket = 'product-images';
 
@@ -153,7 +174,7 @@ export default function AdminNewProductPage() {
 
         if (uploadError) {
           console.error('Upload error:', uploadError);
-          toast.error('Failed to upload one of the images');
+          toast.error(`Failed to upload image ${index + 1}`);
           setSaving(false);
           return;
         }
@@ -170,7 +191,9 @@ export default function AdminNewProductPage() {
         });
       }
 
-      // 3) Insert product_images rows
+      // -------------------------------------------------------------
+      // 4) Insert product_images rows
+      // -------------------------------------------------------------
       if (imageRows.length > 0) {
         const { error: imagesError } = await supabase
           .from('product_images')
@@ -183,7 +206,7 @@ export default function AdminNewProductPage() {
           return;
         }
 
-        // 4) Update main image_url on products
+        // 5) Update main image_url on products (optional denormalization)
         const primaryImage = imageRows[0];
         const { error: updateError } = await supabase
           .from('products')
@@ -208,7 +231,7 @@ export default function AdminNewProductPage() {
   return (
     <>
       <Toaster />
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Add New Product</h1>
           <Button
@@ -320,62 +343,151 @@ export default function AdminNewProductPage() {
           </div>
 
           {/* Pricing */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-4 border-t pt-4">
+            {/* Regional Prices */}
             <div>
-              <Label htmlFor="price">Selling Price (₹)</Label>
-              <Input
-                id="price"
-                type="number"
-                min={0}
-                value={priceInr}
-                onChange={(e) => setPriceInr(e.target.value)}
-                required
-              />
+              <Label className="text-base font-semibold">
+                Regional Prices (Optional)
+              </Label>
+              <p className="text-xs text-gray-500 mb-3">
+                These override auto-converted prices for specific countries.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-xs text-gray-500">India (INR)</Label>
+                  <Input
+                    placeholder="₹ 9999"
+                    type="number"
+                    value={regionalPrices.IN}
+                    onChange={(e) =>
+                      setRegionalPrices({ ...regionalPrices, IN: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">USA (USD)</Label>
+                  <Input
+                    placeholder="$ 150"
+                    type="number"
+                    value={regionalPrices.US}
+                    onChange={(e) =>
+                      setRegionalPrices({ ...regionalPrices, US: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Dubai (AED)</Label>
+                  <Input
+                    placeholder="AED 500"
+                    type="number"
+                    value={regionalPrices.AE}
+                    onChange={(e) =>
+                      setRegionalPrices({ ...regionalPrices, AE: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Europe (EUR)</Label>
+                  <Input
+                    placeholder="€ 140"
+                    type="number"
+                    value={regionalPrices.EU}
+                    onChange={(e) =>
+                      setRegionalPrices({ ...regionalPrices, EU: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">United Kingdom (GBP)</Label>
+                  <Input
+                    placeholder="£ 135"
+                    type="number"
+                    value={regionalPrices.GB}
+                    onChange={(e) =>
+                      setRegionalPrices({ ...regionalPrices, GB: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-500">Canada (CAD)</Label>
+                  <Input
+                    placeholder="C$ 200"
+                    type="number"
+                    value={regionalPrices.CA}
+                    onChange={(e) =>
+                      setRegionalPrices({ ...regionalPrices, CA: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="mrp">MRP (₹)</Label>
-              <Input
-                id="mrp"
-                type="number"
-                min={0}
-                value={mrpInr}
-                onChange={(e) => setMrpInr(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
-                className="border rounded-md h-10 px-3 w-full text-sm"
-                value={status}
-                onChange={(e) =>
-                  setStatus(e.target.value as 'active' | 'draft')
-                }
-              >
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-              </select>
+
+            {/* Base Pricing */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
+              <div>
+                <Label>Base Selling Price (₹)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={priceInr}
+                  onChange={(e) => setPriceInr(e.target.value)}
+                  placeholder="Required"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label>MRP (₹)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={mrpInr}
+                  onChange={(e) => setMrpInr(e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div>
+                <Label>Status</Label>
+                <select
+                  className="border rounded-md h-10 px-3 w-full text-sm bg-white"
+                  value={status}
+                  onChange={(e) =>
+                    setStatus(e.target.value as 'active' | 'draft')
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="draft">Draft</option>
+                </select>
+              </div>
             </div>
           </div>
 
           {/* Image upload */}
-          <div>
-            <Label htmlFor="images">Product Images (4–6 recommended)</Label>
+          <div className="border-t pt-4">
+            <Label htmlFor="images" className="text-base font-semibold">
+              Product Images
+            </Label>
+            <p className="text-sm text-gray-500 mb-2">
+              Select 4–6 high quality images. First image will be the primary one.
+            </p>
             <Input
               id="images"
               type="file"
               accept="image/*"
               multiple
               onChange={(e) => setImageFiles(e.target.files)}
+              className="cursor-pointer"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Images will be uploaded to Supabase Storage and attached to this
-              product.
+            <p className="text-xs text-gray-400 mt-1">
+              Images are securely stored in Supabase Storage.
             </p>
           </div>
 
           {/* Why women love this saree */}
-          <div>
+          <div className="border-t pt-4">
             <Label htmlFor="whyWomenLove">Why Women Love This Saree</Label>
             <Textarea
               id="whyWomenLove"
@@ -387,12 +499,12 @@ export default function AdminNewProductPage() {
           </div>
 
           {/* Flags & tags */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between border rounded-md px-3 py-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50">
               <div>
                 <p className="text-sm font-medium">Bestseller</p>
                 <p className="text-xs text-gray-500">
-                  Show in “Most Loved by Samara Women”
+                  Adds "Bestseller" badge
                 </p>
               </div>
               <Switch
@@ -401,11 +513,11 @@ export default function AdminNewProductPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between border rounded-md px-3 py-2">
+            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50">
               <div>
                 <p className="text-sm font-medium">New Arrival</p>
                 <p className="text-xs text-gray-500">
-                  Show in “New Arrivals” section
+                  Adds "New" badge
                 </p>
               </div>
               <Switch
@@ -414,13 +526,10 @@ export default function AdminNewProductPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-2 border rounded-md px-3 py-2">
+            <div className="flex flex-col gap-2 border rounded-md px-3 py-2 bg-gray-50">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Handcrafted</p>
-                  <p className="text-xs text-gray-500">
-                    Show “Handwoven by master artisans”
-                  </p>
                 </div>
                 <Switch
                   checked={isHandcrafted}
@@ -430,9 +539,6 @@ export default function AdminNewProductPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Premium Material</p>
-                  <p className="text-xs text-gray-500">
-                    Show “Premium quality materials”
-                  </p>
                 </div>
                 <Switch
                   checked={isPremiumMaterial}
@@ -442,9 +548,6 @@ export default function AdminNewProductPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Special Occasions</p>
-                  <p className="text-xs text-gray-500">
-                    Show “Perfect for special occasions”
-                  </p>
                 </div>
                 <Switch
                   checked={isPerfectForSpecialOccasions}
@@ -455,12 +558,12 @@ export default function AdminNewProductPage() {
           </div>
 
           {/* Placement flags */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center justify-between border rounded-md px-3 py-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50">
               <div>
                 <p className="text-sm font-medium">Show in Sarees</p>
                 <p className="text-xs text-gray-500">
-                  Include this product on the Sarees page
+                  Include this product on the main Sarees page
                 </p>
               </div>
               <Switch
@@ -469,11 +572,11 @@ export default function AdminNewProductPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between border rounded-md px-3 py-2">
+            <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50">
               <div>
                 <p className="text-sm font-medium">Show in Festive Edit</p>
                 <p className="text-xs text-gray-500">
-                  Include this product in Festive Edit section
+                  Include this product in Festive Edit collection
                 </p>
               </div>
               <Switch
@@ -483,16 +586,21 @@ export default function AdminNewProductPage() {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 pt-6 border-t mt-6">
             <Button
               type="button"
               variant="outline"
               onClick={() => router.push('/admin/products')}
+              className="px-6"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save Product'}
+            <Button 
+              type="submit" 
+              disabled={saving}
+              className="px-8 bg-black text-white hover:bg-gray-800"
+            >
+              {saving ? 'Creating Product...' : 'Create Product'}
             </Button>
           </div>
         </form>

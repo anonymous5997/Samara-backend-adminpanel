@@ -11,7 +11,6 @@ import {
   Truck,
   ShieldCheck,
   Sparkles,
-  Camera,
   Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,11 +24,14 @@ import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
 import { getSimilarProducts } from '@/lib/content';
 import {
-  getCurrencyRates,
-  convertPriceSync,
   formatPriceSync,
 } from '@/lib/currency-utils';
 
+// PRICING UTILITIES
+import { resolveFinalPrice } from '@/lib/resolve-product-price';
+import { getUserRegion } from '@/lib/region/client';
+
+// INTERFACES
 interface Product {
   id: string;
   name: string;
@@ -37,9 +39,15 @@ interface Product {
   description: string | null;
   brand: string | null;
   base_price_inr: number;
+  mrp_inr?: number | null; // Database MRP (India)
   is_active: boolean;
+  product_prices?: {
+    region: string;
+    price: number;
+    currency: string;
+  }[];
 
-  // extra fields for details/highlights
+  // Extra fields for details/highlights
   fabric?: string | null;
   occasion?: string | null;
   care_instructions?: string | null;
@@ -54,37 +62,73 @@ interface ProductImage {
   display_order: number;
 }
 
+// Resolved Price State Shape
+interface ResolvedPriceState {
+  displayPrice: number;
+  currency: string;
+  inrBase: number;
+  mrp: number | null;
+  discountPct: number | null;
+  source: 'manual' | 'auto';
+}
+
 export default function ProductDetailPage() {
   const params = useParams();
   const slug = params.slug as string;
 
   const { user } = useAuth();
-  const { addToCart, currency } = useCart();
+  const { addToCart, currency } = useCart(); 
+  const region = getUserRegion();
 
+  // STATE MANAGEMENT
   const [product, setProduct] = useState<Product | null>(null);
   const [images, setImages] = useState<ProductImage[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0); // <— track index instead of URL
+  const [selectedIndex, setSelectedIndex] = useState(0); 
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
+  
+  const [resolvedPrice, setResolvedPrice] = useState<ResolvedPriceState | null>(null);
+
+  // Modals
   const [tryOnModalOpen, setTryOnModalOpen] = useState(false);
   const [buyNowModalOpen, setBuyNowModalOpen] = useState(false);
+  
+  // Data
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
-  const [rates, setRates] = useState<Map<string, number> | null>(null);
 
-  // Load product
+  // 1. Fetch Product Data
   useEffect(() => {
     fetchProduct();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  // Load currency rates once
+  // 2. Reactive Price Resolution
   useEffect(() => {
-    getCurrencyRates()
-      .then((r) => setRates(r))
-      .catch((err) => {
-        console.error('Error loading currency rates:', err);
-      });
-  }, []);
+    if (!product) return;
+
+    const loadPrice = async () => {
+      // Resolve price based on Product + Region + User Currency Preference
+      const resolved = await resolveFinalPrice(
+        product,
+        region,
+        currency 
+      );
+
+      if (resolved) {
+        setResolvedPrice({
+          displayPrice: resolved.displayPrice,
+          currency: resolved.currency,
+          inrBase: resolved.inrBase,
+          mrp: resolved.mrp,
+          discountPct: resolved.discountPct,
+          // @ts-ignore
+          source: resolved.source || 'auto' 
+        });
+      }
+    };
+
+    loadPrice();
+  }, [product, region, currency]);
 
   const fetchProduct = async () => {
     try {
@@ -92,7 +136,14 @@ export default function ProductDetailPage() {
 
       const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_prices (
+            region,
+            price,
+            currency
+          )
+        `)
         .eq('slug', slug)
         .maybeSingle();
 
@@ -106,6 +157,7 @@ export default function ProductDetailPage() {
         return;
       }
 
+      // Fetch images
       const { data: imageData, error: imageError } = await supabase
         .from('product_images')
         .select('*')
@@ -117,7 +169,6 @@ export default function ProductDetailPage() {
       const orderedImages = imageData || [];
       setImages(orderedImages);
 
-      // choose primary image index; fallback to first image
       const primaryIndex = orderedImages.findIndex((img) => img.is_primary);
       setSelectedIndex(primaryIndex >= 0 ? primaryIndex : 0);
 
@@ -150,6 +201,11 @@ export default function ProductDetailPage() {
     }
   };
 
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast.success('Link copied to clipboard!');
+  };
+
   if (loading) {
     return (
       <div className="bg-black text-white min-h-screen flex items-center justify-center">
@@ -173,28 +229,36 @@ export default function ProductDetailPage() {
     );
   }
 
-  // ---------- PRICING ----------
-  const mrpInInr = Math.round(product.base_price_inr * 1.15);
-  const discount = Math.round(
-    ((mrpInInr - product.base_price_inr) / mrpInInr) * 100
+  // =========================================================
+  // ✅ PRICING LOGIC - SINGLE SOURCE OF TRUTH
+  // =========================================================
+  
+  // 1. Get the Selling Price (Manual or Auto)
+  // If resolver isn't ready yet, fallback to base INR
+  const price = resolvedPrice?.displayPrice ?? product.base_price_inr;
+  const currencyCode = resolvedPrice?.currency ?? 'INR';
+
+  // 2. Get MRP and Discount directly from the resolver
+  // The resolver now correctly handles strict Database MRP for INR
+  // and calculated MRP for international currencies.
+  const mrp = resolvedPrice?.mrp ?? null;
+  const discount = resolvedPrice?.discountPct ?? 0;
+
+  // 3. Format Labels
+  const priceLabel = formatPriceSync(price, currencyCode);
+  const mrpLabel = mrp ? formatPriceSync(mrp, currencyCode) : null;
+
+  // =========================================================
+  // ✅ BUY NOW GUARD: STRICT CHECK
+  // =========================================================
+  const canBuyNow = Boolean(
+    resolvedPrice && 
+    price > 0 && 
+    resolvedPrice.inrBase > 0
   );
 
-  const priceInCurrency = convertPriceSync(
-    product.base_price_inr,
-    currency,
-    rates
-  );
-  const mrpInCurrency = convertPriceSync(mrpInInr, currency, rates);
+  const selectedImage = images[selectedIndex]?.image_url || images[0]?.image_url || '';
 
-  const priceLabel = formatPriceSync(priceInCurrency, currency);
-  const mrpLabel = formatPriceSync(mrpInCurrency, currency);
-  // -----------------------------
-
-  // currently selected image URL (based on index)
-  const selectedImage =
-    images[selectedIndex]?.image_url || images[0]?.image_url || '';
-
-  // Key highlights for overlay
   const highlights: string[] = [
     product.fabric ? `Fabric: ${product.fabric}` : '',
     product.occasion ? `Occasion: ${product.occasion}` : '',
@@ -203,9 +267,7 @@ export default function ProductDetailPage() {
     product.why_women_love || '',
   ].filter(Boolean) as string[];
 
-  const finalHighlights = highlights.length
-    ? highlights
-    : ['Premium quality saree'];
+  const finalHighlights = highlights.length ? highlights : ['Premium quality saree'];
 
   return (
     <div className="bg-black text-white min-h-screen">
@@ -214,7 +276,10 @@ export default function ProductDetailPage() {
       <section className="py-12 bg-gradient-to-b from-black to-luxury-charcoal">
         <div className="container mx-auto px-4 md:px-8">
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
-            {/* LEFT: image + overlay + thumbs + AI button */}
+            
+            {/* -----------------------------------------------------------
+                LEFT COLUMN: IMAGES
+               ----------------------------------------------------------- */}
             <div>
               <div className="sticky top-24 space-y-4">
                 <div className="relative aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden shadow-2xl shadow-gold/10">
@@ -230,33 +295,29 @@ export default function ProductDetailPage() {
                     </div>
                   )}
 
-                  {/* Key Highlights overlay – ONLY on the 2nd image (index 1) */}
-                  {finalHighlights.length > 0 &&
-                    images.length > 1 &&
-                    selectedIndex === 1 && (
-                      <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/80 via-black/50 to-transparent px-4 sm:px-8 py-6 sm:py-10">
-                        <div className="max-w-xs space-y-4 text-left">
-                          <h3 className="text-xl sm:text-2xl font-bold leading-tight">
-                            Key Highlights
-                          </h3>
-                          <ul className="space-y-3 text-xs sm:text-sm">
-                            {finalHighlights.slice(0, 4).map((text, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-start gap-2 text-gray-100"
-                              >
-                                <span className="mt-0.5 sm:mt-1">
-                                  <Check className="h-4 w-4 text-gold" />
-                                </span>
-                                <span>{text}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+                  {/* Highlights Overlay (Index 1) */}
+                  {finalHighlights.length > 0 && images.length > 1 && selectedIndex === 1 && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/80 via-black/50 to-transparent px-4 sm:px-8 py-6 sm:py-10">
+                      <div className="max-w-xs space-y-4 text-left">
+                        <h3 className="text-xl sm:text-2xl font-bold leading-tight">
+                          Key Highlights
+                        </h3>
+                        <ul className="space-y-3 text-xs sm:text-sm">
+                          {finalHighlights.slice(0, 4).map((text, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-gray-100">
+                              <span className="mt-0.5 sm:mt-1">
+                                <Check className="h-4 w-4 text-gold" />
+                              </span>
+                              <span>{text}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                    )}
+                    </div>
+                  )}
                 </div>
 
+                {/* Thumbnails */}
                 {images.length > 1 && (
                   <div className="flex gap-3 overflow-x-auto pb-2">
                     {images.map((image, index) => (
@@ -278,18 +339,12 @@ export default function ProductDetailPage() {
                     ))}
                   </div>
                 )}
-
-                {/* <Button
-                  onClick={() => setTryOnModalOpen(true)}
-                  className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-xl hover:shadow-[#D4AF37]/50 text-black font-bold py-6 text-lg border-2 border-black/10 hover:scale-[1.02] transition-all"
-                >
-                  <Camera className="h-5 w-5 mr-2" />
-                  Try With AI Camera
-                </Button> */}
               </div>
             </div>
 
-            {/* RIGHT: details */}
+            {/* -----------------------------------------------------------
+                RIGHT COLUMN: DETAILS
+               ----------------------------------------------------------- */}
             <div className="space-y-6">
               <div>
                 <h1 className="font-serif text-4xl md:text-5xl font-bold text-gold mb-3 tracking-tighter">
@@ -302,24 +357,34 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {/* PRICE using current currency */}
+              {/* PRICE DISPLAY */}
               <div className="border-t border-b border-gold/20 py-6">
                 <div className="flex items-baseline gap-4 mb-2">
+                  {/* Selling Price (Resolved) */}
                   <span className="font-serif text-4xl font-bold text-gold">
                     {priceLabel}
                   </span>
-                  <span className="text-xl text-gray-500 line-through">
-                    {mrpLabel}
-                  </span>
-                  <span className="bg-gold text-black px-3 py-1 rounded-full text-sm font-bold">
-                    {discount}% OFF
-                  </span>
+                  
+                  {/* MRP (Calculated via India %) */}
+                  {mrpLabel && discount > 0 && (
+                    <span className="text-xl text-gray-500 line-through">
+                      {mrpLabel}
+                    </span>
+                  )}
+                  
+                  {/* Discount Badge */}
+                  {discount > 0 && (
+                    <span className="bg-gold text-black px-3 py-1 rounded-full text-sm font-bold">
+                      {discount}% OFF
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500">
                   Inclusive of all taxes
                 </p>
               </div>
 
+              {/* Description */}
               {product.description && (
                 <div>
                   <h3 className="font-serif text-xl font-semibold text-gold mb-3">
@@ -331,6 +396,7 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
+              {/* Details Grid */}
               <div className="space-y-4">
                 <h3 className="font-serif text-xl font-semibold text-gold">
                   Product Details
@@ -363,13 +429,16 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
+              {/* ACTION BUTTONS */}
               <div className="space-y-3 pt-4">
                 <Button
                   onClick={() => setBuyNowModalOpen(true)}
-                  className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold py-7 text-lg"
+                  // ✅ FIX: BLOCK BUY NOW UNTIL INR IS READY
+                  disabled={!canBuyNow}
+                  className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold py-7 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Zap className="h-5 w-5 mr-2" />
-                  Buy Now
+                  {canBuyNow ? 'Buy Now' : 'Loading Price...'}
                 </Button>
 
                 <div className="flex gap-3">
@@ -383,6 +452,7 @@ export default function ProductDetailPage() {
                     {addingToCart ? 'Adding...' : 'Add to Bag'}
                   </Button>
 
+                  {/* Wishlist */}
                   {user && (
                     <Button
                       variant="outline"
@@ -393,16 +463,19 @@ export default function ProductDetailPage() {
                     </Button>
                   )}
 
+                  {/* Share */}
                   <Button
                     variant="outline"
                     className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
                     size="icon"
+                    onClick={handleShare}
                   >
                     <Share2 className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
 
+              {/* Trust Badges */}
               <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gold/20">
                 <div className="text-center">
                   <Truck className="h-6 w-6 text-gold mx-auto mb-2" />
@@ -420,12 +493,14 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
+          {/* Similar Products */}
           <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-[#D4AF37]/20">
             <SimilarProductsSection products={similarProducts} />
           </div>
         </div>
       </section>
 
+      {/* MODALS */}
       <ProductTryOnModal
         isOpen={tryOnModalOpen}
         onClose={() => setTryOnModalOpen(false)}
@@ -433,14 +508,26 @@ export default function ProductDetailPage() {
         productName={product.name}
       />
 
-      <BuyNowModal
-        isOpen={buyNowModalOpen}
-        onClose={() => setBuyNowModalOpen(false)}
-        productId={product.id}
-        productName={product.name}
-        productPrice={product.base_price_inr}
-        productImage={selectedImage}
-      />
+      {/* ✅ CORRECTED BUY NOW MODAL USAGE */}
+      {/* We wrap this in a check to ensure no render crashes, though the button is disabled anyway */}
+      {resolvedPrice && (
+        <BuyNowModal
+          isOpen={buyNowModalOpen}
+          onClose={() => setBuyNowModalOpen(false)}
+          productId={product.id}
+          productName={product.name}
+          
+          // DISPLAY PRICE (what user sees)
+          productPrice={price}
+          currency={currencyCode}
+
+          // PAYMENT PRICE (what Razorpay needs)
+          // ✅ FIX: STRICT USE OF RESOLVED PRICE. 
+          productPriceInr={resolvedPrice.inrBase || product.base_price_inr}
+
+          productImage={selectedImage}
+        />
+      )}
     </div>
   );
 }

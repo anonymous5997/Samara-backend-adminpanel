@@ -4,20 +4,20 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Product, ProductImage, Currency } from '@/lib/types';
+import { Product, ProductImage } from '@/lib/types';
 import { formatPrice } from '@/lib/currency';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { useState } from 'react';
+import { ResolvedPrice } from '@/lib/resolve-product-price';
 
 interface ProductCardProps {
   product: Product;
   image?: ProductImage;
-  currency: Currency;
-  rate: number;
+  price?: ResolvedPrice;
 }
 
-export function ProductCard({ product, image, currency, rate }: ProductCardProps) {
+export function ProductCard({ product, image, price }: ProductCardProps) {
   const { user } = useAuth();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,12 +36,10 @@ export function ProductCard({ product, image, currency, rate }: ProductCardProps
           .eq('product_id', product.id);
         setIsWishlisted(false);
       } else {
-        await supabase
-          .from('wishlists')
-          .insert({
-            user_id: user.id,
-            product_id: product.id,
-          });
+        await supabase.from('wishlists').insert({
+          user_id: user.id,
+          product_id: product.id,
+        });
         setIsWishlisted(true);
       }
     } catch (error) {
@@ -77,7 +75,9 @@ export function ProductCard({ product, image, currency, rate }: ProductCardProps
           >
             <Heart
               className={`h-5 w-5 ${
-                isWishlisted ? 'fill-red-500 text-red-500' : 'text-white'
+                isWishlisted
+                  ? 'fill-red-500 text-red-500'
+                  : 'text-white'
               }`}
             />
           </Button>
@@ -85,20 +85,38 @@ export function ProductCard({ product, image, currency, rate }: ProductCardProps
       </div>
 
       <div className="mt-3">
-        {/* Product Name */}
         <h3 className="text-sm font-medium text-white line-clamp-2">
           {product.name}
         </h3>
 
-        {/* Brand */}
         {product.brand && (
-          <p className="text-xs text-gray-300 mt-1">{product.brand}</p>
+          <p className="text-xs text-gray-300 mt-1">
+            {product.brand}
+          </p>
         )}
 
-        {/* Price */}
-        <p className="mt-1 text-sm font-semibold text-[#D4AF37]">
-          {formatPrice(product.base_price_inr, currency, rate)}
-        </p>
+        {/* PRICE */}
+        {!price ? (
+          <p className="mt-1 text-sm text-gray-500">—</p>
+        ) : (
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-sm font-semibold text-[#D4AF37]">
+              {formatPrice(price.displayPrice, price.currency)}
+            </span>
+
+            {price.mrp && price.mrp > price.displayPrice && (
+              <span className="text-xs text-gray-500 line-through">
+                {formatPrice(price.mrp, price.currency)}
+              </span>
+            )}
+
+            {price.discountPct && price.discountPct > 0 && (
+              <span className="text-xs font-bold text-green-400">
+                {price.discountPct}% OFF
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Link>
   );

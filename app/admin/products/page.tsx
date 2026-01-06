@@ -13,10 +13,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
-import { Product } from '@/lib/types';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
+
+interface Product {
+  id: string;
+  name: string;
+  brand: string | null;
+  base_price_inr: number;
+  is_active: boolean;
+  product_prices?: {
+    id: string;
+    region: string;
+    price: number;
+  }[];
+}
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,7 +43,15 @@ export default function AdminProductsPage() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_prices (
+            id,
+            region,
+            currency,
+            price
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -47,13 +67,16 @@ export default function AdminProductsPage() {
     if (!confirm('Are you sure you want to delete this product?')) return;
 
     try {
-      const { error } = await supabase.from('products').delete().eq('id', id);
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
 
       if (error) throw error;
 
       toast.success('Product deleted');
       fetchProducts();
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete product');
     }
   };
@@ -78,7 +101,7 @@ export default function AdminProductsPage() {
 
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search products..."
               value={search}
@@ -97,50 +120,81 @@ export default function AdminProductsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Brand</TableHead>
-                  <TableHead>Price (INR)</TableHead>
+                  <TableHead>Base Price (INR)</TableHead>
+                  <TableHead>Regional Prices</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.brand || '-'}</TableCell>
-                    <TableCell>₹{product.base_price_inr}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          product.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {product.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          asChild
+                {filteredProducts.map((product) => {
+                  const hasRegionalPrices =
+                    product.product_prices &&
+                    product.product_prices.length > 0;
+
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">
+                        {product.name}
+                      </TableCell>
+
+                      <TableCell>{product.brand || '-'}</TableCell>
+
+                      <TableCell>₹{product.base_price_inr}</TableCell>
+
+                      <TableCell>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            hasRegionalPrices
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
                         >
-                          <Link href={`/admin/products/${product.id}`}>
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(product.id)}
+                          {hasRegionalPrices ? 'Configured' : 'Not Set'}
+                        </span>
+                      </TableCell>
+
+                      <TableCell>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            product.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {product.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="icon" asChild>
+                            <Link href={`/admin/products/${product.id}`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+
+                          <Button variant="ghost" size="icon" asChild>
+                            <Link
+                              href={`/admin/products/${product.id}/prices`}
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Link>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

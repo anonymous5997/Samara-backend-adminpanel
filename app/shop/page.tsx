@@ -1,11 +1,10 @@
-// app/shop/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabase/client';
-import { Product, ProductImage, Category, Currency } from '@/lib/types';
+import { Product, ProductImage, Category } from '@/lib/types';
 import { useCart } from '@/lib/cart-context';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,11 +17,14 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 
-type CurrencyRateMap = Partial<Record<Currency, number>>;
+// ✅ IMPORT PRICING ENGINE
+import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
+import { getUserRegion } from '@/lib/region/client';
 
 export default function ShopPage() {
   const searchParams = useSearchParams();
-  const { currency } = useCart(); // 'INR' | 'USD' | 'AED'
+  const { currency } = useCart();
+  const region = getUserRegion();
 
   const [products, setProducts] = useState<
     { product: Product; image?: ProductImage }[]
@@ -30,203 +32,277 @@ export default function ShopPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // "all" instead of "" so Select never has an empty value
+  // ✅ PRICING STATE
+  const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
+
+  // Filters
   const initialCategory = searchParams.get('category') || 'all';
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
   const [sortBy, setSortBy] = useState<'newest' | 'price-asc' | 'price-desc'>(
     'newest'
   );
+  
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
 
-  // currency rates from DB: 1 USD/AED = X INR
-  const [currencyRates, setCurrencyRates] = useState<CurrencyRateMap>({
-    INR: 1,
-  });
-
+  // Initial Load
   useEffect(() => {
     fetchCategories();
-    fetchCurrencyRates();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch Products on Filter Change
   useEffect(() => {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, sortBy]);
 
+  // ✅ RESOLVE PRICES (New Logic)
+  useEffect(() => {
+    if (!products.length) return;
+
+    const loadPrices = async () => {
+      const map: Record<string, ResolvedPrice> = {};
+
+      await Promise.all(
+        products.map(async ({ product }) => {
+          try {
+            const resolved = await resolveFinalPrice(product, region, currency);
+            map[product.id] = resolved;
+          } catch (err) {
+            console.error(`Price error for ${product.name}`, err);
+          }
+        })
+      );
+
+      setPriceMap(map);
+    };
+
+    loadPrices();
+  }, [products, currency, region]);
+
+  /* -------------------------------------------------------------------------- */
+  /* DATA FETCHING                                                              */
+  /* -------------------------------------------------------------------------- */
+
   const fetchCategories = async () => {
     const { data } = await supabase
       .from('categories')
       .select('*')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('name');
 
     if (data) setCategories(data);
-  };
-
-  const fetchCurrencyRates = async () => {
-    const { data, error } = await supabase
-      .from('currency_rates')
-      .select('target_currency, rate')
-      .eq('base_currency', 'INR');
-
-    if (error || !data) return;
-
-    const map: CurrencyRateMap = { INR: 1 };
-    for (const row of data) {
-      map[row.target_currency as Currency] = Number(row.rate);
-    }
-    setCurrencyRates(map);
   };
 
   const fetchProducts = async () => {
     setLoading(true);
 
-    let query = supabase
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .gte('base_price_inr', priceRange[0])
-      .lte('base_price_inr', priceRange[1]);
+    try {
+      let query = supabase
+        .from('products')
+        .select(`
+          *,
+          product_prices (
+            region,
+            price,
+            currency
+          )
+        `)
+        .eq('is_active', true)
+        .gte('base_price_inr', priceRange[0])
+        .lte('base_price_inr', priceRange[1]);
 
-    if (selectedCategory && selectedCategory !== 'all') {
-      const category = categories.find((c) => c.slug === selectedCategory);
-      if (category) {
-        query = query.eq('category_id', category.id);
+      if (selectedCategory && selectedCategory !== 'all') {
+        const category = categories.find((c) => c.slug === selectedCategory);
+        if (category) {
+          query = query.eq('category_id', category.id);
+        }
       }
+
+      if (sortBy === 'price-asc') {
+        query = query.order('base_price_inr', { ascending: true });
+      } else if (sortBy === 'price-desc') {
+        query = query.order('base_price_inr', { ascending: false });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      if (data) {
+        const productsWithImages = await Promise.all(
+          data.map(async (product) => {
+            const { data: image } = await supabase
+              .from('product_images')
+              .select('*')
+              .eq('product_id', product.id)
+              .eq('is_primary', true)
+              .maybeSingle();
+
+            return { product, image };
+          })
+        );
+        setProducts(productsWithImages);
+      }
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    } finally {
+      setLoading(false);
     }
-
-    if (sortBy === 'price-asc') {
-      query = query.order('base_price_inr', { ascending: true });
-    } else if (sortBy === 'price-desc') {
-      query = query.order('base_price_inr', { ascending: false });
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    const { data } = await query;
-
-    if (data) {
-      const productsWithImages = await Promise.all(
-        data.map(async (product) => {
-          const { data: image } = await supabase
-            .from('product_images')
-            .select('*')
-            .eq('product_id', product.id)
-            .eq('is_primary', true)
-            .maybeSingle();
-
-          return { product, image };
-        })
-      );
-      setProducts(productsWithImages);
-    }
-
-    setLoading(false);
   };
 
+  /* -------------------------------------------------------------------------- */
+  /* RENDER                                                                     */
+  /* -------------------------------------------------------------------------- */
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">Shop All Products</h1>
+    <div className="bg-black min-h-screen text-white pb-20 pt-8">
+      <div className="container mx-auto px-4">
+        {/* ✅ Header - GOLD COLOR & BOLD */}
+        <h1 className="text-4xl font-bold mb-10 text-[#D4AF37] font-serif tracking-wide">
+          Shop All Products
+        </h1>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar filters */}
-        <aside className="w-full md:w-64 space-y-6">
-          {/* Category filter */}
-          <div>
-            <Label className="text-sm font-semibold mb-2 block">Category</Label>
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.slug}>
-                    {category.name}
-                  </SelectItem>
+        <div className="flex flex-col md:flex-row gap-12">
+          
+          {/* ------------------------------------------------------------------
+              SIDEBAR FILTERS
+             ------------------------------------------------------------------ */}
+          <aside className="w-full md:w-64 space-y-8 h-fit">
+            
+            {/* Category Filter */}
+            <div className="space-y-3 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
+              <Label className="text-lg font-serif font-medium text-[#D4AF37]">
+                Category
+              </Label>
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
+                <SelectTrigger className="w-full bg-[#111] text-white border-gray-700 h-10 mt-2">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#111] text-white border-gray-700">
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.slug}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Price Range Filter */}
+            <div className="space-y-4 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
+              <div className="flex justify-between items-center">
+                <Label className="text-lg font-serif font-medium text-[#D4AF37]">
+                  Price
+                </Label>
+              </div>
+              
+              <div className="flex justify-between text-xs text-gray-400 mb-2 font-mono">
+                <span>₹{priceRange[0].toLocaleString('en-IN')}</span>
+                <span>₹{priceRange[1].toLocaleString('en-IN')}</span>
+              </div>
+
+              <Slider
+                min={0}
+                max={50000}
+                step={1000}
+                value={priceRange}
+                onValueChange={(value) =>
+                  setPriceRange(value as [number, number])
+                }
+                className="py-2"
+                // Note: To force slider color, you often need global CSS or a specialized component.
+                // Standard shade defaults to generic colors, but 'accent' might work depending on setup.
+              />
+              
+              <Button 
+                onClick={fetchProducts} 
+                className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold h-10 rounded-md transition-colors mt-2"
+              >
+                APPLY FILTER
+              </Button>
+            </div>
+          </aside>
+
+          {/* ------------------------------------------------------------------
+              PRODUCT GRID
+             ------------------------------------------------------------------ */}
+          <div className="flex-1">
+            {/* Sort & Count Header */}
+            <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+              <p className="text-sm text-gray-400 font-medium">
+                Showing <span className="text-[#D4AF37]">{products.length}</span> products
+              </p>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Sort by:</span>
+                <Select
+                  value={sortBy}
+                  onValueChange={(val: 'newest' | 'price-asc' | 'price-desc') =>
+                    setSortBy(val)
+                  }
+                >
+                  <SelectTrigger className="w-40 bg-transparent text-white border-none h-10 focus:ring-0 text-right">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#111] text-white border-gray-700">
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                    <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Grid Content */}
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="space-y-3 animate-pulse">
+                    <div className="aspect-[3/4] bg-[#111] rounded-lg border border-gray-900" />
+                    <div className="h-4 bg-[#111] rounded w-3/4" />
+                    <div className="h-4 bg-[#111] rounded w-1/4" />
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-24 rounded-lg border border-dashed border-gray-800 bg-[#0a0a0a]">
+                <h3 className="text-xl font-medium text-[#D4AF37] mb-2">No products found</h3>
+                <p className="text-gray-500">Try adjusting your filters.</p>
+                <Button 
+                  variant="link" 
+                  onClick={() => setPriceRange([0, 50000])}
+                  className="text-white underline mt-2"
+                >
+                  Reset Price
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {products.map(({ product, image }) => {
+                  
+                  // ✅ PASS RESOLVED PRICE
+                  const resolvedPrice = priceMap[product.id];
+
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      image={image}
+                      // Correctly passing the resolved object to update UI
+                      price={resolvedPrice}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
-
-          {/* Price range filter */}
-          <div>
-            <Label className="text-sm font-semibold mb-2 block">
-              Price Range (INR)
-            </Label>
-            <Slider
-              min={0}
-              max={50000}
-              step={1000}
-              value={priceRange}
-              onValueChange={(value) =>
-                setPriceRange(value as [number, number])
-              }
-              className="mb-2"
-            />
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>₹{priceRange[0]}</span>
-              <span>₹{priceRange[1]}</span>
-            </div>
-            <Button onClick={fetchProducts} size="sm" className="w-full mt-2">
-              Apply Filter
-            </Button>
-          </div>
-        </aside>
-
-        {/* Products grid */}
-        <div className="flex-1">
-          <div className="flex justify-between items-center mb-6">
-            <p className="text-sm text-gray-600">
-              {products.length} products
-            </p>
-            <Select
-              value={sortBy}
-              onValueChange={(val: 'newest' | 'price-asc' | 'price-desc') =>
-                setSortBy(val)
-              }
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest First</SelectItem>
-                <SelectItem value="price-asc">Price: Low to High</SelectItem>
-                <SelectItem value="price-desc">Price: High to Low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {loading ? (
-            <div className="text-center py-12">Loading...</div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600">No products found</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map(({ product, image }) => {
-                const rateForCurrency =
-                  currency === 'INR'
-                    ? 1
-                    : currencyRates[currency] ?? 1;
-
-                return (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    image={image}
-                    currency={currency}
-                    rate={rateForCurrency}
-                  />
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     </div>

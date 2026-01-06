@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase/client';
-import { DollarSign, TrendingUp } from 'lucide-react';
+import { DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { format } from 'date-fns';
@@ -31,6 +31,7 @@ export default function CurrencyManagementPage() {
   const [rates, setRates] = useState<CurrencyRate[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Inputs are now strictly for "1 Foreign Currency = X INR"
   const [usdRate, setUsdRate] = useState('');
   const [aedRate, setAedRate] = useState('');
   const [gbpRate, setGbpRate] = useState('');
@@ -44,21 +45,24 @@ export default function CurrencyManagementPage() {
 
   const fetchRates = async () => {
     try {
+      // ✅ STEP 1 FIX: Fetch where we convert TO INR (target = INR)
       const { data, error } = await supabase
         .from('currency_rates')
         .select('*')
-        .eq('base_currency', 'INR')
-        .order('target_currency');
+        .eq('target_currency', 'INR') // Corrected from base_currency
+        .order('base_currency');
 
       if (error) throw error;
 
       setRates(data || []);
 
-      const usd = data?.find((r) => r.target_currency === 'USD');
-      const aed = data?.find((r) => r.target_currency === 'AED');
-      const gbp = data?.find((r) => r.target_currency === 'GBP');
-      const cad = data?.find((r) => r.target_currency === 'CAD');
+      // Map based on BASE currency (Foreign Source)
+      const usd = data?.find((r) => r.base_currency === 'USD');
+      const aed = data?.find((r) => r.base_currency === 'AED');
+      const gbp = data?.find((r) => r.base_currency === 'GBP');
+      const cad = data?.find((r) => r.base_currency === 'CAD');
 
+      // Load existing rates (should be whole numbers like 90.13)
       if (usd) setUsdRate(usd.rate.toString());
       if (aed) setAedRate(aed.rate.toString());
       if (gbp) setGbpRate(gbp.rate.toString());
@@ -84,9 +88,13 @@ export default function CurrencyManagementPage() {
       { code: 'CAD', rate: parseFloat(cadRate) },
     ];
 
+    // ✅ STEP 4 FIX: VALIDATION (Block fractional values)
+    // We expect values like 90, 110, 22. Not 0.012.
     for (const u of updates) {
-      if (isNaN(u.rate) || u.rate <= 0) {
-        toast.error(`Invalid rate for ${u.code}`);
+      if (isNaN(u.rate) || u.rate < 10 || u.rate > 500) {
+        toast.error(
+          `Invalid rate for ${u.code}. Enter value like 90.13 (1 ${u.code} = ₹90.13)`
+        );
         return;
       }
     }
@@ -94,29 +102,32 @@ export default function CurrencyManagementPage() {
     setSaving(true);
     try {
       for (const entry of updates) {
+        // Find existing row where Foreign Currency matches base
         const existingRow = rates.find(
-          (r) => r.target_currency === entry.code
+          (r) => r.base_currency === entry.code
         );
+
+        // ✅ STEP 5 FIX: SAVE STRUCTURE
+        // base = Foreign, target = INR
+        const payload = {
+          base_currency: entry.code,  // USD, AED...
+          target_currency: 'INR',     // Always INR
+          rate: entry.rate,
+          updated_at: new Date().toISOString(),
+        };
 
         if (existingRow) {
           await supabase
             .from('currency_rates')
-            .update({
-              rate: entry.rate,
-              updated_at: new Date().toISOString(),
-            })
+            .update(payload)
             .eq('id', existingRow.id);
         } else {
-          await supabase.from('currency_rates').insert({
-            base_currency: 'INR',
-            target_currency: entry.code,
-            rate: entry.rate,
-          });
+          await supabase.from('currency_rates').insert(payload);
         }
       }
 
       toast.success('Exchange rates updated successfully');
-      fetchRates();
+      fetchRates(); // Refresh table
     } catch (error) {
       console.error('Error saving currency rates:', error);
       toast.error('Failed to save currency rates');
@@ -125,10 +136,14 @@ export default function CurrencyManagementPage() {
     }
   };
 
-  // Example Conversion Preview
-  const exampleINR = 10000;
+  // ✅ STEP 6 FIX: PREVIEW LOGIC
+  // Foreign Amount * Rate = INR Amount
+  const exampleForeign = 150; 
+  
   const convertExample = (rate: number) => {
-    return rate > 0 ? (exampleINR / rate).toFixed(2) : 'N/A';
+    return rate > 0 
+      ? `₹${Math.round(exampleForeign * rate).toLocaleString('en-IN')}` 
+      : 'N/A';
   };
 
   return (
@@ -137,8 +152,9 @@ export default function CurrencyManagementPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Currency Management</h1>
+          {/* ✅ PAGE DESCRIPTION UPDATE */}
           <p className="text-neutral-600 mt-2">
-            Manage exchange rates for INR → USD, AED, GBP, CAD
+            Configure how much 1 unit of Foreign Currency is worth in INR.
           </p>
         </div>
 
@@ -152,52 +168,65 @@ export default function CurrencyManagementPage() {
           </CardHeader>
 
           <CardContent className="pt-6 space-y-6">
-            {/* USD */}
-            <div>
-              <Label>USD Rate (1 USD = ? INR)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="e.g., 83.50"
-                value={usdRate}
-                onChange={(e) => setUsdRate(e.target.value)}
-              />
+            
+            {/* ✅ STEP 3 FIX: WARNING TEXT */}
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-800">
+                <strong>Important:</strong> Enter the value of <b>1 FOREIGN currency</b> in INR.<br/>
+                Example: If 1 USD = ₹90.13, enter <b>90.13</b>.
+              </div>
             </div>
 
-            {/* AED */}
-            <div>
-              <Label>AED Rate (1 AED = ? INR)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="e.g., 22.75"
-                value={aedRate}
-                onChange={(e) => setAedRate(e.target.value)}
-              />
-            </div>
+            {/* ✅ STEP 2 FIX: INPUT LABELS */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* USD */}
+              <div>
+                <Label>USD Rate (1 USD = ? INR)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 90.13"
+                  value={usdRate}
+                  onChange={(e) => setUsdRate(e.target.value)}
+                />
+              </div>
 
-            {/* GBP */}
-            <div>
-              <Label>GBP Rate (1 GBP = ? INR)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="e.g., 105.20"
-                value={gbpRate}
-                onChange={(e) => setGbpRate(e.target.value)}
-              />
-            </div>
+              {/* AED */}
+              <div>
+                <Label>AED Rate (1 AED = ? INR)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 22.50"
+                  value={aedRate}
+                  onChange={(e) => setAedRate(e.target.value)}
+                />
+              </div>
 
-            {/* CAD */}
-            <div>
-              <Label>CAD Rate (1 CAD = ? INR)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="e.g., 61.50"
-                value={cadRate}
-                onChange={(e) => setCadRate(e.target.value)}
-              />
+              {/* GBP */}
+              <div>
+                <Label>GBP Rate (1 GBP = ? INR)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 105.20"
+                  value={gbpRate}
+                  onChange={(e) => setGbpRate(e.target.value)}
+                />
+              </div>
+
+              {/* CAD */}
+              <div>
+                <Label>CAD Rate (1 CAD = ? INR)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 60.45"
+                  value={cadRate}
+                  onChange={(e) => setCadRate(e.target.value)}
+                />
+              </div>
             </div>
 
             <Button
@@ -219,6 +248,9 @@ export default function CurrencyManagementPage() {
             </div>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
+            <p className="text-sm text-gray-500 mb-2">
+              Checking INR charge for <b>{exampleForeign} Foreign Units</b> based on entered rates:
+            </p>
             {[
               { name: 'USD', rate: usdRate },
               { name: 'AED', rate: aedRate },
@@ -227,13 +259,13 @@ export default function CurrencyManagementPage() {
             ].map((r) => (
               <div
                 key={r.name}
-                className="flex justify-between bg-amber-50 px-4 py-2 rounded border border-amber-200"
+                className="flex justify-between bg-white px-4 py-3 rounded border border-gray-100 shadow-sm"
               >
                 <span className="font-medium text-neutral-700">
-                  {r.name} for ₹{exampleINR.toLocaleString('en-IN')}
+                  {exampleForeign} {r.name}
                 </span>
                 <span className="font-bold text-amber-700">
-                  {convertExample(parseFloat(r.rate))} {r.name}
+                  = {convertExample(parseFloat(r.rate))}
                 </span>
               </div>
             ))}
@@ -249,10 +281,10 @@ export default function CurrencyManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Base</TableHead>
-                  <TableHead>Currency</TableHead>
-                  <TableHead>Rate</TableHead>
-                  <TableHead>Updated</TableHead>
+                  <TableHead>Base (Foreign)</TableHead>
+                  <TableHead>Target (INR)</TableHead>
+                  <TableHead>Rate (Stored)</TableHead>
+                  <TableHead>Last Updated</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -260,19 +292,19 @@ export default function CurrencyManagementPage() {
                 {rates.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-neutral-500">
-                      No data
+                      No rates found. Please save rates above.
                     </TableCell>
                   </TableRow>
                 ) : (
                   rates.map((rate) => (
                     <TableRow key={rate.id}>
-                      <TableCell>{rate.base_currency}</TableCell>
+                      <TableCell className="font-medium">{rate.base_currency}</TableCell>
                       <TableCell>{rate.target_currency}</TableCell>
                       <TableCell>
-                        1 {rate.target_currency} = ₹{rate.rate.toFixed(2)}
+                        1 {rate.base_currency} = ₹{rate.rate.toFixed(2)}
                       </TableCell>
-                      <TableCell>
-                        {format(new Date(rate.updated_at), 'PPp')}
+                      <TableCell className="text-gray-500 text-sm">
+                        {format(new Date(rate.updated_at), 'MMM d, yyyy h:mm a')}
                       </TableCell>
                     </TableRow>
                   ))

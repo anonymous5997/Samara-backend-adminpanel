@@ -1,17 +1,22 @@
+// lib/currency-utils.ts
+
 import { supabase } from './supabase/client';
+
+export type SupportedCurrency = 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD';
 
 interface CurrencyRate {
   base_currency: string;
   target_currency: string;
-  rate: number;
+  rate: number; // 1 INR → target currency
 }
-
-export type SupportedCurrency = 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD';
 
 let cachedRates: Map<string, number> | null = null;
 let lastFetch = 0;
 const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
+/* -----------------------------------------------------
+   FETCH RATES (1 INR → Target Currency)
+----------------------------------------------------- */
 export async function getCurrencyRates(): Promise<Map<string, number>> {
   const now = Date.now();
 
@@ -28,71 +33,52 @@ export async function getCurrencyRates(): Promise<Map<string, number>> {
     if (error) throw error;
 
     const rates = new Map<string, number>();
-    data?.forEach((rate: CurrencyRate) => {
-      rates.set(rate.target_currency, rate.rate);
+    data?.forEach((row: CurrencyRate) => {
+      rates.set(row.target_currency, row.rate);
     });
 
     cachedRates = rates;
     lastFetch = now;
 
     return rates;
-  } catch (error) {
-    console.error('Error fetching currency rates:', error);
+  } catch (err) {
+    console.error('Currency rate fetch failed:', err);
     return getDefaultRates();
   }
 }
 
+/* -----------------------------------------------------
+   FALLBACK RATES (1 INR → Target)
+----------------------------------------------------- */
 function getDefaultRates(): Map<string, number> {
-  const defaults = new Map<string, number>();
-
-  defaults.set('USD', 83.5);
-  defaults.set('AED', 22.75);
-  defaults.set('GBP', 105); // example fallback
-  defaults.set('CAD', 62); // example fallback
-
-  return defaults;
+  return new Map<string, number>([
+    ['USD', 0.012],
+    ['AED', 0.044],
+    ['GBP', 0.0095],
+    ['CAD', 0.016],
+  ]);
 }
 
-// ---------------------- Convert (Async) ----------------------
-
-export async function convertPrice(
-  amountInr: number,
-  targetCurrency: SupportedCurrency
-): Promise<number> {
-  if (targetCurrency === 'INR') return amountInr;
-
-  const rates = await getCurrencyRates();
-  const rate = rates.get(targetCurrency);
-
-  if (!rate) return amountInr;
-
-  return amountInr / rate;
-}
-
-export async function formatPrice(
-  amountInr: number,
-  currency: SupportedCurrency
-): Promise<string> {
-  const converted = await convertPrice(amountInr, currency);
-  return formatPriceSync(converted, currency);
-}
-
-// ---------------------- Convert (Sync for UI) ----------------------
-
+/* -----------------------------------------------------
+   CONVERT LANDED INR → TARGET CURRENCY
+----------------------------------------------------- */
 export function convertPriceSync(
   amountInr: number,
   currency: SupportedCurrency,
-  rates?: Map<string, number> | null
+  rates: Map<string, number>
 ): number {
   if (currency === 'INR') return amountInr;
-  if (!rates) return amountInr;
 
   const rate = rates.get(currency);
-  if (!rate || rate <= 0) return amountInr;
+  if (!rate) return amountInr;
 
-  return amountInr / rate;
+  // ✅ INR → Currency = MULTIPLY
+  return amountInr * rate;
 }
 
+/* -----------------------------------------------------
+   FORMAT ONLY (NO CONVERSION)
+----------------------------------------------------- */
 export function formatPriceSync(
   amount: number,
   currency: SupportedCurrency
@@ -113,7 +99,7 @@ export function getCurrencySymbol(currency: SupportedCurrency): string {
   switch (currency) {
     case 'INR': return '₹';
     case 'USD': return '$';
-    case 'AED': return 'AED';
+    case 'AED': return 'AED ';
     case 'GBP': return '£';
     case 'CAD': return 'C$';
     default: return '₹';

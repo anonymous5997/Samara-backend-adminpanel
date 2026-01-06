@@ -5,16 +5,10 @@ import {
   useContext,
   useEffect,
   useState,
-  useCallback,
-  useRef,
+  ReactNode,
 } from 'react';
-import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-
-/* ======================================================
-   TYPES
-====================================================== */
 
 type Profile = {
   id: string;
@@ -22,8 +16,6 @@ type Profile = {
   name: string | null;
   phone: string | null;
   role: 'customer' | 'admin';
-  created_at: string;
-  updated_at: string;
 };
 
 type AuthContextType = {
@@ -32,201 +24,65 @@ type AuthContextType = {
   loading: boolean;
   isAdmin: boolean;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  ensureProfile: () => Promise<void>;
 };
 
-/* ======================================================
-   CONTEXT
-====================================================== */
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  loading: true,
-  isAdmin: false,
-  signOut: async () => {},
-  refreshProfile: async () => {},
-  ensureProfile: async () => {},
-});
-
-/* ======================================================
-   PROVIDER
-====================================================== */
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔐 Guards
-  const isFetchingProfile = useRef(false);
-  const profileEnsuredRef = useRef(false);
-  const hasInitializedSession = useRef(false);
-
-  const isAuthRoute = pathname?.startsWith('/auth');
-
-  /* ======================================================
-     FETCH PROFILE
-  ===================================================== */
-
-  const fetchProfile = useCallback(
-    async (userId: string, skipIfAuthRoute = true) => {
-      if (skipIfAuthRoute && isAuthRoute) return false;
-      if (isFetchingProfile.current) return false;
-
-      isFetchingProfile.current = true;
-
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (error) {
-          setProfile(null);
-          return false;
-        }
-
-        setProfile(data);
-        return !!data;
-      } finally {
-        isFetchingProfile.current = false;
-      }
-    },
-    [isAuthRoute]
-  );
-
-  /* ======================================================
-     ENSURE PROFILE
-  ===================================================== */
-
-  const ensureProfile = useCallback(async () => {
-    if (!user || isAuthRoute) return;
-    if (profileEnsuredRef.current) return;
-
-    profileEnsuredRef.current = true;
-
-    try {
-      const res = await fetch('/api/profile/ensure', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: user.id,
-          email: user.email,
-          phone: user.phone,
-          name: user.user_metadata?.name || '',
-        }),
-      });
-
-      if (res.ok) {
-        await fetchProfile(user.id, false);
-      } else {
-        profileEnsuredRef.current = false;
-      }
-    } catch {
-      profileEnsuredRef.current = false;
-    }
-  }, [user, fetchProfile, isAuthRoute]);
-
-  /* ======================================================
-     REFRESH PROFILE
-  ===================================================== */
-
-  const refreshProfile = useCallback(async () => {
-    if (user && !isAuthRoute) {
-      await fetchProfile(user.id, false);
-    }
-  }, [user, fetchProfile, isAuthRoute]);
-
-  /* ======================================================
-     SESSION INIT + LISTENER
-  ===================================================== */
-
+  // 🔹 Load session once on mount
   useEffect(() => {
-    if (isAuthRoute) {
-      setLoading(false);
-      return;
-    }
+    const init = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    // 🔹 Initial session (RUNS ONCE)
-    supabase.auth
-      .getSession()
-      .then(async ({ data }) => {
-        if (hasInitializedSession.current) return;
-        hasInitializedSession.current = true;
-
-        if (!data.session?.user) {
-          setLoading(false);
-          return;
-        }
-
-        setUser(data.session.user);
-        await fetchProfile(data.session.user.id, false);
-        setLoading(false);
-      });
-
-    // 🔹 Auth state listener
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(prev =>
-            prev?.id === session.user.id ? prev : session.user
-          );
-
-          if (!isAuthRoute) {
-            const ok = await fetchProfile(session.user.id, false);
-            if (!ok && !profileEnsuredRef.current) {
-              setTimeout(() => ensureProfile(), 100);
-            }
-          }
-
-          setLoading(false);
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          profileEnsuredRef.current = false;
-          hasInitializedSession.current = false;
-          setLoading(false);
-        }
-
-        if (event === 'USER_UPDATED' && session?.user) {
-          setUser(session.user);
-          if (!isAuthRoute) {
-            await fetchProfile(session.user.id, false);
-          }
-          setLoading(false);
-        }
+      if (session?.user) {
+        setUser(session.user);
+        await loadProfile(session.user.id);
       }
-    );
 
-    return () => {
-      listener.subscription.unsubscribe();
+      setLoading(false);
     };
-  }, [isAuthRoute, fetchProfile, ensureProfile]);
 
-  /* ======================================================
-     SIGN OUT
-  ===================================================== */
+    init();
+
+    // 🔹 Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        await loadProfile(session.user.id);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 🔹 Fetch profile safely
+  const loadProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, email, name, phone, role')
+      .eq('id', userId)
+      .single();
+
+    if (data) setProfile(data);
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    setLoading(false);
     window.location.href = '/';
   };
-
-  const isAdmin = profile?.role === 'admin';
-
-  /* ======================================================
-     PROVIDER VALUE
-  ===================================================== */
 
   return (
     <AuthContext.Provider
@@ -234,10 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         profile,
         loading,
-        isAdmin,
+        isAdmin: profile?.role === 'admin',
         signOut,
-        refreshProfile,
-        ensureProfile,
       }}
     >
       {children}
@@ -245,14 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ======================================================
-   HOOK
-====================================================== */
-
-export const useAuth = () => {
+export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error('useAuth must be used inside AuthProvider');
   }
   return ctx;
-};
+}

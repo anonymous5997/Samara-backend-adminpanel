@@ -7,6 +7,12 @@ import { getCollectionBySlug, getCollectionProducts } from '@/lib/content';
 import type { Collection, ProductWithImages } from '@/lib/content';
 import { Star, Sparkles } from 'lucide-react';
 
+/* ✅ STEP 2: IMPORT PRICING UTILS */
+import { useCart } from '@/lib/cart-context';
+import { resolveFinalPrice } from '@/lib/resolve-product-price';
+import { formatPriceSync } from '@/lib/currency-utils';
+import { getUserRegion } from '@/lib/get-user-region';
+
 export default function CollectionDetailPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -14,6 +20,13 @@ export default function CollectionDetailPage() {
   const [collection, setCollection] = useState<Collection | null>(null);
   const [products, setProducts] = useState<ProductWithImages[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* ✅ STEP 3: ADD STATE FOR RESOLVED PRICES */
+  const { currency } = useCart();
+  const region = getUserRegion();
+  const [priceMap, setPriceMap] = useState<
+    Record<string, { price: number; currency: string }>
+  >({});
 
   useEffect(() => {
     loadCollectionData();
@@ -34,6 +47,34 @@ export default function CollectionDetailPage() {
       setLoading(false);
     }
   };
+
+  /* ✅ STEP 4: RESOLVE PRICES AFTER PRODUCTS LOAD */
+  useEffect(() => {
+    if (!products.length) return;
+
+    const loadPrices = async () => {
+      const map: Record<string, { price: number; currency: string }> = {};
+
+      for (const product of products) {
+        const resolved = await resolveFinalPrice(
+          product,
+          region,
+          currency
+        );
+
+        if (resolved?.displayPrice) {
+          map[product.id] = {
+            price: resolved.displayPrice,
+            currency: resolved.currency,
+          };
+        }
+      }
+
+      setPriceMap(map);
+    };
+
+    loadPrices();
+  }, [products, region, currency]);
 
   if (loading) {
     return (
@@ -132,9 +173,18 @@ export default function CollectionDetailPage() {
                       {product.brand && (
                         <p className="text-sm text-gray-500 mb-2">{product.brand}</p>
                       )}
-                      <p className="text-xl font-bold text-gold">
-                        ₹{product.base_price_inr.toLocaleString('en-IN')}
-                      </p>
+                      
+                      {/* ✅ STEP 5: RENDER CORRECT PRICE */}
+                      {(() => {
+                        const resolved = priceMap[product.id];
+                        if (!resolved) return null;
+
+                        return (
+                          <p className="text-xl font-bold text-gold">
+                            {formatPriceSync(resolved.price, resolved.currency)}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
                 </Link>

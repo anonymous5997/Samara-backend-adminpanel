@@ -1,34 +1,57 @@
-import { SupportedCurrency } from "./currency-utils";
+// lib/currency.ts
+
+/* -----------------------------------------------------
+   Supported Currencies
+----------------------------------------------------- */
+
+export type SupportedCurrency =
+  | 'INR'
+  | 'USD'
+  | 'AED'
+  | 'EUR'
+  | 'GBP'
+  | 'CAD';
+
+/* -----------------------------------------------------
+   Currency Symbols
+----------------------------------------------------- */
 
 export const CURRENCY_SYMBOLS: Record<SupportedCurrency, string> = {
-  INR: "₹",
-  USD: "$",
-  AED: "AED",
-  GBP: "£",
-  CAD: "C$",
+  INR: '₹',
+  USD: '$',
+  AED: 'AED ',
+  EUR: '€',
+  GBP: '£',
+  CAD: 'C$',
 };
 
-export function formatPrice(
-  amountInr: number,
-  currency: SupportedCurrency,
-  rate: number = 1
-): string {
-  let converted = amountInr;
+/* -----------------------------------------------------
+   FORMAT PRICE (FORMAT ONLY — NO CONVERSION)
+   RULES:
+   - amount MUST already be final
+   - NEVER convert currency here
+   - NEVER crash UI
+----------------------------------------------------- */
 
-  if (currency !== "INR" && rate > 0) {
-    converted = amountInr / rate;
+export function formatPrice(
+  amount: number | null | undefined,
+  currency: SupportedCurrency
+): string {
+  // 🛡️ Absolute safety guard
+  if (typeof amount !== 'number' || Number.isNaN(amount)) {
+    return CURRENCY_SYMBOLS[currency] + '0';
   }
+
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+
+  // INR has no decimals, others use 2
+  const fractionDigits = currency === 'INR' ? 0 : 2;
 
   return (
     CURRENCY_SYMBOLS[currency] +
-    converted.toLocaleString(currency === "INR" ? "en-IN" : "en-US", {
-      minimumFractionDigits: currency === "INR" ? 0 : 2,
-      maximumFractionDigits: currency === "INR" ? 0 : 2,
+    amount.toLocaleString(locale, {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
     })
   );
-}
-
-export function convertPrice(amountInr: number, rate: number): number {
-  if (!rate || rate <= 0) return amountInr;
-  return amountInr / rate;
 }

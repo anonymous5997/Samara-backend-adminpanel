@@ -14,7 +14,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { CurrencySelector } from '@/components/currency-selector';
+import CurrencySelector from '@/components/currency-selector';
+
+// ✅ STEP 1: Import setUserRegion
+import { setUserRegion } from '@/lib/region/client';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -32,8 +35,41 @@ export function Header() {
 
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
+  // ✅ STEP 3: Create the Handler
+  // This ensures that when Currency changes, the REGION also changes,
+  // allowing the Pricing Resolver to find the correct "Admin Price".
+  const handleCurrencyChange = (nextCurrency: string) => {
+    const currency = nextCurrency.toUpperCase();
+    // 1. Update visual currency state
+    setCurrency(nextCurrency);
+
+    // 2. Map Currency -> Region
+    switch (nextCurrency) {
+      case 'USD':
+        setUserRegion('US');
+        break;
+      case 'EUR':
+        setUserRegion('EU');
+        break;
+      case 'AED':
+        setUserRegion('AE');
+        break;
+      case 'CAD':
+        setUserRegion('CA');
+        break;
+      case 'GBP':
+        setUserRegion('GB'); // Assuming 'UK' or 'GB' is your region code for GBP
+        break;
+      default:
+        setUserRegion('IN'); // Default to India for INR
+    }
+
+    // 3. Force reload so resolveFinalPrice() re-runs with the new region
+    window.location.reload();
+  };
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#050505] border-b border-[#D4AF37]/20">
+    <header className="sticky top-0 z-100 w-full bg-[#050505] border-b border-[#D4AF37]/20">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex h-[72px] items-center justify-between">
           {/* LEFT: Logo */}
@@ -68,7 +104,11 @@ export function Header() {
           {/* RIGHT: actions */}
           <div className="flex items-center gap-4">
             <div className="hidden md:block">
-              <CurrencySelector currency={currency} onChange={setCurrency} />
+              {/* ✅ STEP 4: Wire CurrencySelector Correctly */}
+              <CurrencySelector 
+                currency={currency} 
+                onChange={handleCurrencyChange} 
+              />
             </div>
 
             <Button

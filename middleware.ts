@@ -1,127 +1,146 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 /**
- * Production Middleware for Route Protection
+ * Production Middleware for Route Protection + Region Detection
  *
- * CRITICAL RULES:
+ * RULES:
  * 1. /admin/* routes require admin role
- * 2. /profile, /orders, /wishlist require authentication
- * 3. Server-side role checks are mandatory
- * 4. Never trust client-side role values
+ * 2. /profile, /orders, /wishlist, /checkout require authentication
+ * 3. Region is detected server-side
+ * 4. Never trust client-side role or region values
  */
 
-const PROTECTED_ROUTES = ['/profile', '/orders', '/wishlist', '/checkout'];
-const ADMIN_ROUTES = ['/admin'];
-const PUBLIC_AUTH_ROUTES = ['/auth/login', '/auth/signup'];
+const PROTECTED_ROUTES = ['/profile', '/orders', '/wishlist', '/checkout']
+const ADMIN_ROUTES = ['/admin']
+const PUBLIC_AUTH_ROUTES = ['/auth/login', '/auth/signup']
+
+// 🌍 Country → Region mapping
+const REGION_MAP: Record<string, string> = {
+  IN: 'IN',
+  US: 'US',
+  CA: 'CA',
+  AE: 'AE',
+  GB: 'GB',
+}
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
-  });
+  })
 
+  // ─────────────────────────────────────────────
+  // 🌍 REGION DETECTION (SAFE + NON-DESTRUCTIVE)
+  // ─────────────────────────────────────────────
+  const existingRegion = request.cookies.get('region')?.value
+
+  if (!existingRegion) {
+    const country =
+      request.headers.get('x-vercel-ip-country') || 'IN'
+
+    const region = REGION_MAP[country] || 'US'
+
+    supabaseResponse.cookies.set('region', region, {
+      path: '/',
+      sameSite: 'lax',
+    })
+  }
+
+  // ─────────────────────────────────────────────
+  // 🔐 SUPABASE AUTH CLIENT
+  // ─────────────────────────────────────────────
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
-          return request.cookies.getAll();
+          return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options);
-            request.cookies.set(name, value);
-          });
+            supabaseResponse.cookies.set(name, value, options)
+            request.cookies.set(name, value)
+          })
         },
       },
     }
-  );
+  )
 
-  // Get user session - use getSession() for better performance
   const {
     data: { session },
     error,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getSession()
 
-  const user = session?.user ?? null;
+  const user = session?.user ?? null
 
-  // Debug logging
   if (error) {
-    console.log('[Middleware] Auth error:', error.message);
-  }
-  console.log('[Middleware] Path:', request.nextUrl.pathname, 'User:', user?.email || 'none');
-
-  const path = request.nextUrl.pathname;
-
-  // Allow public auth routes
-  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some((route) => path.startsWith(route));
-  if (isPublicAuthRoute) {
-    return supabaseResponse;
+    console.log('[Middleware] Auth error:', error.message)
   }
 
-  // Check if route is admin route
-  const isAdminRoute = ADMIN_ROUTES.some((route) => path.startsWith(route));
+  const path = request.nextUrl.pathname
 
-  // Check if route is protected
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
+  // ─────────────────────────────────────────────
+  // PUBLIC AUTH ROUTES
+  // ─────────────────────────────────────────────
+  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some(route =>
     path.startsWith(route)
-  );
+  )
 
-  // Admin route protection
+  if (isPublicAuthRoute) {
+    return supabaseResponse
+  }
+
+  // ─────────────────────────────────────────────
+  // ADMIN ROUTES
+  // ─────────────────────────────────────────────
+  const isAdminRoute = ADMIN_ROUTES.some(route =>
+    path.startsWith(route)
+  )
+
   if (isAdminRoute) {
     if (!user) {
-      // Not authenticated - redirect to login
-      const redirectUrl = new URL('/auth/login', request.url);
-      redirectUrl.searchParams.set('redirect', path);
-      return NextResponse.redirect(redirectUrl);
+      const redirectUrl = new URL('/auth/login', request.url)
+      redirectUrl.searchParams.set('redirect', path)
+      return NextResponse.redirect(redirectUrl)
     }
 
-    // Fetch user profile to check role
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .maybeSingle();
+      .maybeSingle()
 
     if (!profile || profile.role !== 'admin') {
-      // Not admin - redirect to home with error
-      const redirectUrl = new URL('/', request.url);
-      redirectUrl.searchParams.set('error', 'unauthorized');
-      return NextResponse.redirect(redirectUrl);
+      const redirectUrl = new URL('/', request.url)
+      redirectUrl.searchParams.set('error', 'unauthorized')
+      return NextResponse.redirect(redirectUrl)
     }
 
-    // Admin verified - allow access
-    return supabaseResponse;
+    return supabaseResponse
   }
 
-  // Protected route (non-admin)
-  if (isProtectedRoute) {
-    if (!user) {
-      // Not authenticated - redirect to login
-      const redirectUrl = new URL('/auth/login', request.url);
-      redirectUrl.searchParams.set('redirect', path);
-      return NextResponse.redirect(redirectUrl);
-    }
+  // ─────────────────────────────────────────────
+  // PROTECTED ROUTES (NON-ADMIN)
+  // ─────────────────────────────────────────────
+  const isProtectedRoute = PROTECTED_ROUTES.some(route =>
+    path.startsWith(route)
+  )
 
-    // Authenticated - allow access
-    return supabaseResponse;
+  if (isProtectedRoute && !user) {
+    const redirectUrl = new URL('/auth/login', request.url)
+    redirectUrl.searchParams.set('redirect', path)
+    return NextResponse.redirect(redirectUrl)
   }
 
-  // Public route - allow access
-  return supabaseResponse;
+  // ─────────────────────────────────────────────
+  // PUBLIC ROUTES
+  // ─────────────────────────────────────────────
+  return supabaseResponse
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     * - api routes
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
-};
+}

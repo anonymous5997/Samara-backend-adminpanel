@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,6 +29,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedDate, setSelectedDate] = useState('')
 
   const [trackingInput, setTrackingInput] = useState<{
     [key: string]: { tracking_number: string; carrier: string }
@@ -36,7 +37,7 @@ export default function AdminOrdersPage() {
 
   useEffect(() => {
     fetchOrders()
-  }, [statusFilter])
+  }, [statusFilter, selectedDate])
 
   const fetchOrders = async () => {
     try {
@@ -49,6 +50,18 @@ export default function AdminOrdersPage() {
         query = query.eq('status', statusFilter)
       }
 
+      if (selectedDate) {
+        const start = new Date(selectedDate)
+        start.setHours(0, 0, 0, 0)
+
+        const end = new Date(selectedDate)
+        end.setHours(23, 59, 59, 999)
+
+        query = query
+          .gte('created_at', start.toISOString())
+          .lte('created_at', end.toISOString())
+      }
+
       const { data, error } = await query
       if (error) throw error
 
@@ -59,6 +72,19 @@ export default function AdminOrdersPage() {
       setLoading(false)
     }
   }
+
+  /* ---------- STATUS COUNTS ---------- */
+  const stats = useMemo(() => {
+    const pending = orders.filter(o => o.status === 'pending').length
+    const inTransit = orders.filter(o =>
+      ['packed', 'shipped'].includes(o.status)
+    ).length
+    const delivered = orders.filter(o => o.status === 'delivered').length
+    const cancelled = orders.filter(o => o.status === 'cancelled').length
+    const returned = orders.filter(o => o.status === 'returned').length
+
+    return { pending, inTransit, delivered, cancelled, returned }
+  }, [orders])
 
   const handleStatusChange = async (
     orderId: string,
@@ -106,6 +132,39 @@ export default function AdminOrdersPage() {
       <Toaster />
       <div>
         <h1 className="text-3xl font-bold mb-6">Orders</h1>
+
+        {/* ---------- FILTER BAR ---------- */}
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div>
+            <label className="text-xs text-gray-500">Search by Date</label>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="w-48"
+            />
+          </div>
+
+          {selectedDate && (
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedDate('')}
+              >
+                Clear Date
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* ---------- STATUS SUMMARY ---------- */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <StatBox label="Pending" count={stats.pending} />
+          <StatBox label="In Transit" count={stats.inTransit} />
+          <StatBox label="Delivered" count={stats.delivered} />
+          <StatBox label="Cancelled" count={stats.cancelled} />
+          <StatBox label="Returned" count={stats.returned} />
+        </div>
 
         {loading ? (
           <div>Loading...</div>
@@ -231,5 +290,21 @@ export default function AdminOrdersPage() {
         )}
       </div>
     </>
+  )
+}
+
+/* ---------- SMALL STAT COMPONENT ---------- */
+function StatBox({
+  label,
+  count,
+}: {
+  label: string
+  count: number
+}) {
+  return (
+    <div className="border rounded-lg p-4 bg-white">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-2xl font-bold">{count}</p>
+    </div>
   )
 }

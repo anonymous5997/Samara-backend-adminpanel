@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
+import { getAdminProduct, updateAdminProduct, savePrices } from './actions';
+
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,70 +30,49 @@ export default function AdminEditProductPage() {
   const [priceInr, setPriceInr] = useState('');
   const [mrpInr, setMrpInr] = useState('');
   const [status, setStatus] = useState<Status>('active');
-  const [imageUrl, setImageUrl] = useState('');
 
   // flags
   const [isBestseller, setIsBestseller] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(false);
   const [isHandcrafted, setIsHandcrafted] = useState(false);
   const [isPremiumMaterial, setIsPremiumMaterial] = useState(false);
-  const [
-    isPerfectForSpecialOccasions,
-    setIsPerfectForSpecialOccasions,
-  ] = useState(false);
+  const [isPerfectForSpecialOccasions, setIsPerfectForSpecialOccasions] =
+    useState(false);
 
-  // filter attributes
+  // attributes
   const [fabric, setFabric] = useState('');
   const [work, setWork] = useState('');
   const [occasion, setOccasion] = useState('');
-  const [color, setColor] = useState(''); // NEW
+  const [color, setColor] = useState('');
 
   const [careInstructions, setCareInstructions] = useState('');
   const [shippingTime, setShippingTime] = useState('');
   const [whyWomenLove, setWhyWomenLove] = useState('');
 
   // placement flags
-  const [showInSarees, setShowInSarees] = useState(true); // NEW
-  const [showInFestiveEdit, setShowInFestiveEdit] = useState(false); // NEW
+  const [showInSarees, setShowInSarees] = useState(true);
+  const [showInFestiveEdit, setShowInFestiveEdit] = useState(false);
+  
+  // 🌍 Regional Prices (FINAL landed price per country)
+  const [regionalPrices, setRegionalPrices] = useState<Record<string, string>>({
+    IN: '',
+    US: '',
+    CA: '',
+    AE: '',
+    EU: '',
+    GB: '',
+  });
 
-  // 1) Load product on mount
+  /* ------------------------------------------------------------------ */
+  /* LOAD PRODUCT (FIXED)                                                */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
-    const loadProduct = async () => {
+    async function loadProduct() {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('products')
-        .select(
-          `
-          name,
-          brand,
-          description,
-          price_inr,
-          mrp_inr,
-          base_price_inr,
-          is_active,
-          image_url,
-          is_bestseller,
-          is_new_arrival,
-          fabric,
-          work,
-          occasion,
-          color,
-          care_instructions,
-          shipping_time,
-          why_women_love,
-          is_handcrafted,
-          is_premium_material,
-          is_perfect_for_special_occasions,
-          show_in_sarees,
-          show_in_festive_edit
-        `,
-        )
-        .eq('id', productId)
-        .single();
+      const data = await getAdminProduct(productId);
 
-      if (error || !data) {
-        console.error(error);
+      if (!data) {
         toast.error('Failed to load product');
         router.push('/admin/products');
         return;
@@ -101,22 +82,19 @@ export default function AdminEditProductPage() {
       setBrand(data.brand ?? '');
       setDescription(data.description ?? '');
 
-      const price =
-        (data.price_inr as number | null) ??
-        (data.base_price_inr as number | null) ??
-        0;
-      setPriceInr(price.toString());
+      const price =data.base_price_inr ?? 0;
+      setPriceInr(String(price));
 
-      setMrpInr(
-        data.mrp_inr !== null && data.mrp_inr !== undefined
-          ? String(data.mrp_inr)
-          : '',
-      );
-
+      setMrpInr(data.mrp_inr ? String(data.mrp_inr) : '');
       setStatus(data.is_active ? 'active' : 'draft');
-      setImageUrl(data.image_url ?? '');
+
       setIsBestseller(!!data.is_bestseller);
       setIsNewArrival(!!data.is_new_arrival);
+      setIsHandcrafted(!!data.is_handcrafted);
+      setIsPremiumMaterial(!!data.is_premium_material);
+      setIsPerfectForSpecialOccasions(
+        !!data.is_perfect_for_special_occasions
+      );
 
       setFabric(data.fabric ?? '');
       setWork(data.work ?? '');
@@ -126,27 +104,41 @@ export default function AdminEditProductPage() {
       setCareInstructions(data.care_instructions ?? '');
       setShippingTime(data.shipping_time ?? '');
       setWhyWomenLove(data.why_women_love ?? '');
-      setIsHandcrafted(!!data.is_handcrafted);
-      setIsPremiumMaterial(!!data.is_premium_material);
-      setIsPerfectForSpecialOccasions(
-        !!data.is_perfect_for_special_occasions,
-      );
 
       setShowInSarees(
-        data.show_in_sarees === null || data.show_in_sarees === undefined
-          ? true
-          : !!data.show_in_sarees,
+        data.show_in_sarees ?? true
       );
       setShowInFestiveEdit(!!data.show_in_festive_edit);
+      // 🌍 Load regional prices
+      if (data.product_prices && Array.isArray(data.product_prices)) {
+        const map: Record<string, string> = {
+          IN: '',
+          US: '',
+          CA: '',
+          AE: '',
+          EU: '',
+          GB: '',
+        };
+
+  data.product_prices.forEach((p: any) => {
+    if (p.region && p.price) {
+      map[p.region] = String(p.price);
+    }
+  });
+
+  setRegionalPrices(map);
+}
 
       setLoading(false);
-    };
+    }
 
     loadProduct();
   }, [productId, router]);
 
-  // 2) Handle update
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ------------------------------------------------------------------ */
+  /* SAVE PRODUCT                                                        */
+  /* ------------------------------------------------------------------ */
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!name || !priceInr) {
@@ -156,47 +148,41 @@ export default function AdminEditProductPage() {
 
     setSaving(true);
 
-    const { error } = await supabase
-      .from('products')
-      .update({
-        name,
-        brand: brand || null,
-        description: description || null,
-        price_inr: Number(priceInr),
-        base_price_inr: Number(priceInr),
-        mrp_inr: mrpInr ? Number(mrpInr) : null,
-        is_active: status === 'active',
-        image_url: imageUrl || null,
+    const result = await updateAdminProduct({
+      id: productId,
+      name,
+      brand,
+      description,
+      base_price_inr: Number(priceInr),
+      mrp_inr: mrpInr ? Number(mrpInr) : null,
+      is_active: status === 'active',
+      is_bestseller: isBestseller,
+      is_new_arrival: isNewArrival,
+      is_handcrafted: isHandcrafted,
+      is_premium_material: isPremiumMaterial,
+      is_perfect_for_special_occasions: isPerfectForSpecialOccasions,
+      fabric: fabric || null,
+      work: work || null,
+      occasion: occasion || null,
+      color: color || null,
+      care_instructions: careInstructions || null,
+      shipping_time: shippingTime || null,
+      why_women_love: whyWomenLove || null,
+      show_in_sarees: showInSarees,
+      show_in_festive_edit: showInFestiveEdit,
+    });
 
-        is_bestseller: isBestseller,
-        is_new_arrival: isNewArrival,
-        is_handcrafted: isHandcrafted,
-        is_premium_material: isPremiumMaterial,
-        is_perfect_for_special_occasions: isPerfectForSpecialOccasions,
-
-        fabric: fabric || null,
-        work: work || null,
-        occasion: occasion || null,
-        color: color || null,
-        care_instructions: careInstructions || null,
-        shipping_time: shippingTime || null,
-        why_women_love: whyWomenLove || null,
-
-        show_in_sarees: showInSarees,
-        show_in_festive_edit: showInFestiveEdit,
-      })
-      .eq('id', productId);
-
-    if (error) {
-      console.error(error);
-      toast.error('Failed to update product');
-    } else {
-      toast.success('Product updated');
-      router.push('/admin/products');
+    if (!result.success) {
+      toast.error(result.error ?? 'Failed to update product');
+      setSaving(false);
+      return;
     }
+    // 🌍 Save regional final prices
+    await savePrices(productId, regionalPrices);
 
-    setSaving(false);
-  };
+    toast.success('Product updated');
+    router.push('/admin/products');
+  }
 
   if (loading) {
     return (
@@ -352,15 +338,80 @@ export default function AdminEditProductPage() {
             </div>
           </div>
 
-          {/* Image URL */}
-          <div>
-            <Label htmlFor="imageUrl">Main Image URL</Label>
-            <Input
-              id="imageUrl"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-            />
+          {/* 🌍 Regional Final Prices */}
+          <div className="border rounded-md p-4 space-y-4">
+            <h3 className="text-lg font-semibold">
+              Regional Final Prices (Including Tax & Shipping)
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>India (₹)</Label>
+                <Input
+                  type="number"
+                  value={regionalPrices.IN}
+                  onChange={(e) =>
+                    setRegionalPrices({ ...regionalPrices, IN: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>USA ($)</Label>
+                <Input
+                  type="number"
+                  value={regionalPrices.US}
+                  onChange={(e) =>
+                    setRegionalPrices({ ...regionalPrices, US: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Canada (CAD)</Label>
+                <Input
+                  type="number"
+                  value={regionalPrices.CA}
+                  onChange={(e) =>
+                    setRegionalPrices({ ...regionalPrices, CA: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Dubai (AED)</Label>
+                <Input
+                  type="number"
+                  value={regionalPrices.AE}
+                  onChange={(e) =>
+                    setRegionalPrices({ ...regionalPrices, AE: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>United Kingdom (£)</Label>
+                <Input
+                  type="number"
+                  value={regionalPrices.GB}
+                  onChange={(e) =>
+                    setRegionalPrices({ ...regionalPrices, GB: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Europe (€)</Label>
+                <Input
+                  type="number"
+                  value={regionalPrices.EU}
+                  onChange={(e) =>
+                    setRegionalPrices({ ...regionalPrices, EU: e.target.value })
+                  }
+                />
+              </div>
+            </div>
           </div>
+
 
           {/* Why women love */}
           <div>

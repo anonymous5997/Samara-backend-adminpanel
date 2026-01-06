@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
-import { formatPrice } from '@/lib/currency';
-import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
+import { formatPriceSync } from '@/lib/currency-utils'; // ✅ NEW IMPORT
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Coupon } from '@/lib/types';
 import { toast } from 'sonner';
@@ -17,46 +17,81 @@ import { Toaster } from '@/components/ui/sonner';
 export default function CartPage() {
   const { user } = useAuth();
 
+  // ✅ STEP 1: Fix Destructuring
+  // Removed: rate, getCartTotalInINR, getCartTotalInSelectedCurrency
   const {
     items,
     currency,
-    rate,
     updateQuantity,
     removeFromCart,
-    getCartTotalInINR,
-    getCartTotalInSelectedCurrency,
   } = useCart();
 
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Calculate totals
-  const subtotalINR = getCartTotalInINR();
-  const subtotalConverted = getCartTotalInSelectedCurrency();
+  /* -------------------------------------------------------------------------- */
+  /* ✅ STEP 3: NEW TOTAL CALCULATIONS (Dual Currency)                          */
+  /* -------------------------------------------------------------------------- */
 
-  const calculateDiscount = () => {
+  // 1. DISPLAY SUBTOTAL (What the user sees in USD, AED, etc.)
+  // We use the 'unit_price' stored on the cart item which is already in the user's currency
+  const subtotalDisplay = items.reduce(
+    (sum, item) => sum + (item.unit_price * item.quantity),
+    0
+  );
+
+  // 2. PAYMENT SUBTOTAL (What gets charged in INR)
+  // We use 'unit_price_inr' which serves as the financial source of truth
+  const subtotalINR = items.reduce(
+    (sum, item) => sum + (item.unit_price_inr * item.quantity),
+    0
+  );
+
+  /* -------------------------------------------------------------------------- */
+  /* COUPON LOGIC (Based on INR)                                                */
+  /* -------------------------------------------------------------------------- */
+
+  const calculateDiscountINR = () => {
     if (!appliedCoupon) return 0;
 
     let discount = 0;
 
+    // Coupons are always calculated against the INR value (Base Price)
     if (appliedCoupon.type === 'PERCENTAGE') {
       discount = (subtotalINR * appliedCoupon.value) / 100;
     } else {
-      discount = appliedCoupon.value;
+      discount = appliedCoupon.value; // Flat INR amount
     }
 
+    // Apply Max Discount Cap if exists
     if (appliedCoupon.max_discount_inr && discount > appliedCoupon.max_discount_inr) {
       discount = appliedCoupon.max_discount_inr;
     }
 
-    return discount;
+    // Discount cannot exceed subtotal
+    return Math.min(discount, subtotalINR);
   };
 
-  const discountINR = calculateDiscount();
+  const discountINR = calculateDiscountINR();
+  
+  // Final Payment Amount in INR
   const totalINR = subtotalINR - discountINR;
 
-  const totalConverted = subtotalConverted - (discountINR / rate);
+  /* -------------------------------------------------------------------------- */
+  /* ✅ STEP 5: CALCULATE DISPLAY DISCOUNT (Proportional)                       */
+  /* -------------------------------------------------------------------------- */
+
+  // We determine what percentage of the INR total was discounted, 
+  // and apply that same ratio to the Display total.
+  const discountRatio = subtotalINR > 0 ? (discountINR / subtotalINR) : 0;
+  
+  const discountDisplay = subtotalDisplay * discountRatio;
+  const totalDisplay = subtotalDisplay - discountDisplay;
+
+  /* -------------------------------------------------------------------------- */
+  /* HANDLERS                                                                   */
+  /* -------------------------------------------------------------------------- */
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -73,6 +108,7 @@ export default function CartPage() {
 
       if (error || !coupon) {
         toast.error('Invalid coupon code');
+        setAppliedCoupon(null);
         return;
       }
 
@@ -82,32 +118,49 @@ export default function CartPage() {
 
       if (now < validFrom || (validTo && now > validTo)) {
         toast.error('Coupon is expired');
+        setAppliedCoupon(null);
         return;
       }
 
+      // Check Minimum Order Value (Strictly against INR)
       if (subtotalINR < coupon.min_cart_value_inr) {
         toast.error(`Minimum cart value of ₹${coupon.min_cart_value_inr} required`);
+        setAppliedCoupon(null);
         return;
       }
 
       setAppliedCoupon(coupon);
       toast.success('Coupon applied successfully');
     } catch (err) {
+      console.error(err);
       toast.error('Failed to apply coupon');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    toast.info('Coupon removed');
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /* RENDER: EMPTY / AUTH STATES                                                */
+  /* -------------------------------------------------------------------------- */
+
   // If user not logged in
   if (!user) {
     return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <ShoppingBag className="h-16 w-16 mx-auto text-gray-500 mb-4" />
-          <h1 className="text-2xl font-bold mb-4">Please Sign In</h1>
-          <Button asChild className="bg-[#D4AF37] text-black hover:bg-[#f2d675]">
-            <Link href="/auth/login">Sign In</Link>
+      <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
+        <div className="text-center max-w-md p-8 border border-gray-800 rounded-2xl bg-[#0a0a0a]">
+          <ShoppingBag className="h-16 w-16 mx-auto text-[#D4AF37] mb-6 opacity-80" />
+          <h1 className="text-2xl font-serif font-bold mb-4 text-[#D4AF37]">Sign In to View Cart</h1>
+          <p className="text-gray-400 mb-8">
+            Please sign in to your account to view your shopping bag and proceed to checkout.
+          </p>
+          <Button asChild className="w-full bg-[#D4AF37] text-black hover:bg-[#F4D03F] font-bold py-6">
+            <Link href="/auth/login">Sign In Now</Link>
           </Button>
         </div>
       </div>
@@ -117,50 +170,65 @@ export default function CartPage() {
   // If cart empty
   if (items.length === 0) {
     return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center">
+      <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
         <Toaster />
-        <div className="text-center">
-          <ShoppingBag className="h-16 w-16 mx-auto text-gray-500 mb-4" />
-          <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
-          <Button asChild className="bg-[#D4AF37] text-black hover:bg-[#f2d675]">
-            <Link href="/shop">Continue Shopping</Link>
+        <div className="text-center max-w-md">
+          <div className="w-24 h-24 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6">
+            <ShoppingBag className="h-10 w-10 text-gray-500" />
+          </div>
+          <h1 className="text-3xl font-serif font-bold mb-2 text-white">Your cart is empty</h1>
+          <p className="text-gray-400 mb-8">
+            Looks like you haven't added anything to your bag yet.
+          </p>
+          <Button asChild className="bg-white text-black hover:bg-gray-200 px-8 py-6 rounded-full font-bold">
+            <Link href="/sarees">Start Shopping</Link>
           </Button>
         </div>
       </div>
     );
   }
 
+  /* -------------------------------------------------------------------------- */
+  /* RENDER: MAIN CART                                                          */
+  /* -------------------------------------------------------------------------- */
   return (
     <>
       <Toaster />
 
-      <div className="bg-black text-white min-h-screen pt-8 pb-16">
+      <div className="bg-black text-white min-h-screen pt-12 pb-24">
         <div className="container mx-auto px-4">
-          <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
+          <div className="flex items-center justify-between mb-8 border-b border-gray-800 pb-6">
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#D4AF37]">
+              Shopping Bag <span className="text-gray-500 text-lg font-sans font-normal ml-2">({items.length} Items)</span>
+            </h1>
+            <Link href="/sarees" className="hidden md:block text-gray-400 hover:text-white transition-colors text-sm underline underline-offset-4">
+              Continue Shopping
+            </Link>
+          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            {/* LEFT SIDE (Products) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            
+            {/* -------------------------------------------------------
+               LEFT SIDE: PRODUCT LIST
+               ------------------------------------------------------- */}
             <div className="lg:col-span-2 space-y-6">
               {items.map((item) => {
-                const priceINR =
-                  (item.product.base_price_inr || 0) +
-                  (item.variant?.additional_price_inr || 0);
-
-                const priceConverted = priceINR / rate;
-
+                // ✅ STEP 6: Use stored Display Price (item.unit_price)
+                // We do NOT recalculate from INR base here.
+                
                 return (
                   <div
                     key={item.id}
-                    className="flex gap-4 p-4 border border-[#D4AF37]/20 bg-[#111] rounded-lg"
+                    className="flex flex-col sm:flex-row gap-6 p-6 border border-[#2a2a2a] bg-[#0b0b0b] rounded-xl hover:border-[#D4AF37]/30 transition-colors group"
                   >
                     {/* IMAGE */}
-                    <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0">
+                    <div className="relative w-full sm:w-32 h-40 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0 border border-gray-800">
                       {item.image_url ? (
                         <Image
                           src={item.image_url}
                           alt={item.product.name}
                           fill
-                          className="object-cover"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
                         <div className="flex items-center justify-center h-full text-gray-600 text-xs">
@@ -170,124 +238,192 @@ export default function CartPage() {
                     </div>
 
                     {/* DETAILS */}
-                    <div className="flex-1">
-                      <Link
-                        href={`/products/${item.product.slug}`}
-                        className="font-semibold hover:underline text-[#D4AF37]"
-                      >
-                        {item.product.name}
-                      </Link>
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start">
+                            <Link
+                                href={`/products/${item.product.slug}`}
+                                className="font-serif text-lg font-medium hover:text-[#D4AF37] transition-colors line-clamp-1"
+                            >
+                                {item.product.name}
+                            </Link>
+                            {/* Mobile Trash Icon */}
+                            <button 
+                                onClick={() => removeFromCart(item.id)}
+                                className="sm:hidden text-gray-500 hover:text-red-500"
+                            >
+                                <Trash2 className="h-5 w-5" />
+                            </button>
+                        </div>
 
-                      {item.variant && (
-                        <p className="text-sm text-gray-400">
-                          {item.variant.size || item.variant.color}
+                        {/* Variant Info */}
+                        {(item.variant?.size || item.variant?.color) && (
+                          <div className="flex gap-3 mt-2 text-sm text-gray-400">
+                             {item.variant.size && <span className="bg-[#1a1a1a] px-2 py-0.5 rounded text-xs border border-gray-800">Size: {item.variant.size}</span>}
+                             {item.variant.color && <span className="bg-[#1a1a1a] px-2 py-0.5 rounded text-xs border border-gray-800">Color: {item.variant.color}</span>}
+                          </div>
+                        )}
+                        
+                        {/* Price per unit */}
+                        <p className="text-gray-500 text-sm mt-2">
+                           {formatPriceSync(item.unit_price, currency)} / unit
                         </p>
-                      )}
+                      </div>
 
-                      <p className="text-md font-bold mt-2 text-[#D4AF37]">
-                        {formatPrice(priceINR, currency, rate)}
-                      </p>
+                      <div className="flex items-end justify-between mt-4">
+                        {/* QUANTITY CONTROLS */}
+                        <div className="flex items-center gap-3 bg-[#1a1a1a] rounded-full p-1 border border-gray-800">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+
+                          <span className="w-4 text-center text-sm font-medium">{item.quantity}</span>
+
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+
+                        {/* ROW TOTAL PRICE */}
+                        <div className="text-right">
+                            <p className="text-lg font-bold text-[#D4AF37]">
+                                {/* Show Total for this line item */}
+                                {formatPriceSync(item.unit_price * item.quantity, currency)}
+                            </p>
+                        </div>
+                      </div>
                     </div>
-
-                    {/* QUANTITY */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="border-[#D4AF37] text-[#D4AF37]"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-
-                      <span className="w-10 text-center">{item.quantity}</span>
-
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="border-[#D4AF37] text-[#D4AF37]"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-red-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    
+                    {/* Desktop Trash Icon */}
+                    <div className="hidden sm:block">
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-full"
+                        >
+                            <Trash2 className="h-5 w-5" />
+                        </Button>
                     </div>
                   </div>
                 );
               })}
+              
+              <div className="flex items-center gap-2 text-gray-500 text-sm bg-[#111] p-4 rounded-lg border border-gray-800">
+                <ShieldCheck className="h-5 w-5 text-green-500" />
+                <p>Safe and secure checkout. 100% Authentic products.</p>
+              </div>
             </div>
 
-            {/* RIGHT SIDE (Order Summary) */}
-            <div className="border border-[#D4AF37]/20 bg-[#111] rounded-lg p-6 h-fit sticky top-24">
-              <h2 className="text-xl font-bold mb-4 text-[#D4AF37]">
-                Order Summary
-              </h2>
+            {/* -------------------------------------------------------
+               RIGHT SIDE: ORDER SUMMARY
+               ------------------------------------------------------- */}
+            <div className="h-fit sticky top-24">
+                <div className="border border-[#D4AF37]/30 bg-[#0b0b0b] rounded-xl p-6 shadow-2xl shadow-black/50">
+                <h2 className="text-xl font-serif font-bold mb-6 text-[#D4AF37] border-b border-gray-800 pb-4">
+                    Order Summary
+                </h2>
 
-              {/* Coupon */}
-              <div className="flex gap-2 mb-6">
-                <Input
-                  placeholder="Coupon code"
-                  value={couponCode}
-                  onChange={(e) =>
-                    setCouponCode(e.target.value.toUpperCase())
-                  }
-                  className="bg-[#1a1a1a] text-white placeholder-gray-400 border-gray-700"
-                />
-                <Button
-                  onClick={handleApplyCoupon}
-                  disabled={loading}
-                  className="bg-[#D4AF37] text-black hover:bg-[#f2d675]"
-                >
-                  Apply
-                </Button>
-              </div>
-
-              {/* Subtotal */}
-              <div className="flex justify-between text-gray-300 mb-2">
-                <span>Subtotal</span>
-                <span className="text-[#D4AF37] font-semibold">
-                  {formatPrice(subtotalINR, currency, rate)}
-                </span>
-              </div>
-
-              {/* Discount */}
-              {discountINR > 0 && (
-                <div className="flex justify-between text-green-500 mb-2">
-                  <span>Discount</span>
-                  <span>-{formatPrice(discountINR, currency, rate)}</span>
+                {/* Subtotal */}
+                <div className="flex justify-between text-gray-300 mb-3 text-sm">
+                    <span>Subtotal</span>
+                    {/* ✅ STEP 7: Show Display Subtotal */}
+                    <span className="font-medium text-white">
+                        {formatPriceSync(subtotalDisplay, currency)}
+                    </span>
                 </div>
-              )}
 
-              <hr className="my-4 border-gray-700" />
+                {/* Shipping */}
+                <div className="flex justify-between text-gray-300 mb-3 text-sm">
+                    <span>Shipping</span>
+                    <span className="text-green-400">Calculated at Checkout</span>
+                </div>
 
-              {/* TOTAL */}
-              <div className="flex justify-between text-xl font-bold mb-6 text-[#D4AF37]">
-                <span>Total</span>
-                <span>{formatPrice(totalINR, currency, rate)}</span>
-              </div>
+                {/* Discount */}
+                {appliedCoupon && (
+                    <div className="flex justify-between text-green-400 mb-3 text-sm">
+                        <span>Coupon ({appliedCoupon.code})</span>
+                        {/* ✅ STEP 7: Show Display Discount */}
+                        <span>-{formatPriceSync(discountDisplay, currency)}</span>
+                    </div>
+                )}
 
-              {/* Checkout */}
-              <Button
-                className="w-full bg-[#D4AF37] text-black hover:bg-[#f2d675]"
-                size="lg"
-                asChild
-              >
-                <Link
-                  href={`/checkout${
-                    appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''
-                  }`}
+                {/* COUPON INPUT */}
+                <div className="mt-6 mb-6">
+                    {appliedCoupon ? (
+                        <div className="flex justify-between items-center bg-green-900/20 border border-green-500/30 p-3 rounded">
+                            <span className="text-green-400 text-sm font-medium">Code <b>{appliedCoupon.code}</b> applied</span>
+                            <button onClick={handleRemoveCoupon} className="text-xs text-red-400 hover:text-red-300 underline">
+                                Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <Input
+                            placeholder="Coupon code"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            className="bg-[#1a1a1a] text-white placeholder-gray-500 border-gray-700 focus:border-[#D4AF37]"
+                            />
+                            <Button
+                            onClick={handleApplyCoupon}
+                            disabled={loading || !couponCode}
+                            className="bg-white text-black hover:bg-gray-200"
+                            >
+                            Apply
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-t border-dashed border-gray-700 my-4"></div>
+
+                {/* TOTAL */}
+                <div className="flex justify-between items-end mb-8">
+                    <span className="text-lg font-bold text-white">Total Amount</span>
+                    <div className="text-right">
+                        {/* ✅ STEP 7: Show Display Total */}
+                        <span className="text-2xl font-serif font-bold text-[#D4AF37]">
+                            {formatPriceSync(totalDisplay, currency)}
+                        </span>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                            (Inclusive of all taxes)
+                        </p>
+                    </div>
+                </div>
+
+                {/* CHECKOUT BUTTON */}
+                <Button
+                    className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black hover:shadow-lg hover:shadow-[#D4AF37]/20 font-bold py-6 text-lg transition-all"
+                    asChild
                 >
-                  Proceed to Checkout
-                </Link>
-              </Button>
+                    <Link
+                    href={`/checkout${
+                        appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''
+                    }`}
+                    className="flex items-center justify-center gap-2"
+                    >
+                    Checkout <ArrowRight className="h-5 w-5" />
+                    </Link>
+                </Button>
+                
+                <div className="mt-4 text-center">
+                    <Link href="/sarees" className="text-xs text-gray-500 hover:text-[#D4AF37] underline">
+                        Continue Shopping
+                    </Link>
+                </div>
+                </div>
             </div>
           </div>
         </div>
