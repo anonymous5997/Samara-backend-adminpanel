@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation'; // ✅ Added useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabase/client';
 import { Product, ProductImage, Category } from '@/lib/types';
@@ -17,14 +17,24 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 
-// ✅ IMPORT PRICING ENGINE
+// IMPORT PRICING ENGINE
 import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
 import { getUserRegion } from '@/lib/region/client';
 
+// ✅ STEP 1: DEFINE SIMPLE EXCHANGE RATES (You can replace this with DB fetch later)
+const exchangeRates: Record<string, number> = {
+  INR: 1,
+  USD: 0.012,
+  AED: 0.044,
+  EUR: 0.011,
+  GBP: 0.0095,
+  SGD: 0.016,
+};
+
 export default function ShopPage() {
-  const router = useRouter(); // ✅ Initialize Router
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const { currency } = useCart();
+  const { currency } = useCart(); // ✅ Get selected currency
   const region = getUserRegion();
 
   const [products, setProducts] = useState<
@@ -33,7 +43,7 @@ export default function ShopPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ PRICING STATE
+  // PRICING STATE
   const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
 
   // Filters
@@ -44,7 +54,13 @@ export default function ShopPage() {
     'newest'
   );
   
+  // ✅ FILTER LOGIC REMAINS IN INR
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
+
+  // ✅ STEP 2: CALCULATE DISPLAY VALUES
+  const rate = exchangeRates[currency] || 1;
+  const displayMin = Math.round(priceRange[0] * rate);
+  const displayMax = Math.round(priceRange[1] * rate);
 
   // Initial Load
   useEffect(() => {
@@ -52,13 +68,12 @@ export default function ShopPage() {
   }, []);
 
   // Fetch Products on Filter Change
-  // ✅ STEP 2: Added priceRange to dependency array for auto-update
   useEffect(() => {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, sortBy, priceRange]);
 
-  // ✅ RESOLVE PRICES (New Logic)
+  // RESOLVE PRICES
   useEffect(() => {
     if (!products.length) return;
 
@@ -114,23 +129,37 @@ export default function ShopPage() {
         .gte('base_price_inr', priceRange[0])
         .lte('base_price_inr', priceRange[1]);
 
-      // ✅ STEP 1: FIX CATEGORY FILTER (Fetch ID directly from DB)
+      // ✅ STEP 4: FIX CATEGORY FILTER LOGIC (Parent + Child support)
       if (selectedCategory && selectedCategory !== 'all') {
-        const { data: category, error } = await supabase
+        // 1. Get the selected category ID
+        const { data: category } = await supabase
           .from('categories')
           .select('id')
           .eq('slug', selectedCategory)
-          .eq('is_active', true)
           .single();
 
-        if (error || !category) {
-          console.warn('Category not found:', selectedCategory);
-          setProducts([]);
-          setLoading(false);
-          return;
-        }
+        if (category) {
+          // 2. Get any child categories
+          const { data: childCategories } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('parent_id', category.id);
 
-        query = query.eq('category_id', category.id);
+          // 3. Create list of all valid IDs
+          const categoryIds = [
+            category.id,
+            ...(childCategories?.map((c) => c.id) || []),
+          ];
+
+          // 4. Filter products
+          query = query.in('category_id', categoryIds);
+        } else {
+           // Handle invalid category slug gracefully
+           console.warn('Category not found:', selectedCategory);
+           setProducts([]);
+           setLoading(false);
+           return;
+        }
       }
 
       if (sortBy === 'price-asc') {
@@ -174,7 +203,7 @@ export default function ShopPage() {
   return (
     <div className="bg-black min-h-screen text-white pb-20 pt-8">
       <div className="container mx-auto px-4">
-        {/* ✅ Header - GOLD COLOR & BOLD */}
+        {/* Header */}
         <h1 className="text-4xl font-bold mb-10 text-[#D4AF37] font-serif tracking-wide">
           Shop All Products
         </h1>
@@ -193,7 +222,6 @@ export default function ShopPage() {
               </Label>
               <Select
                 value={selectedCategory}
-                // ✅ STEP 4: SYNC WITH URL
                 onValueChange={(val) => {
                   setSelectedCategory(val);
                   router.push(val === 'all' ? '/shop' : `/shop?category=${val}`);
@@ -216,16 +244,19 @@ export default function ShopPage() {
             {/* Price Range Filter */}
             <div className="space-y-4 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
               <div className="flex justify-between items-center">
+                {/* ✅ STEP 5: Label with Currency */}
                 <Label className="text-lg font-serif font-medium text-[#D4AF37]">
-                  Price
+                  Price ({currency})
                 </Label>
               </div>
               
+              {/* ✅ STEP 3: Slider Labels using Display Values */}
               <div className="flex justify-between text-xs text-gray-400 mb-2 font-mono">
-                <span>₹{priceRange[0].toLocaleString('en-IN')}</span>
-                <span>₹{priceRange[1].toLocaleString('en-IN')}</span>
+                <span>{currency} {displayMin.toLocaleString()}</span>
+                <span>{currency} {displayMax.toLocaleString()}</span>
               </div>
 
+              {/* ✅ STEP 4: Slider Logic keeps using INR (priceRange) */}
               <Slider
                 min={0}
                 max={50000}
@@ -291,7 +322,6 @@ export default function ShopPage() {
               <div className="text-center py-24 rounded-lg border border-dashed border-gray-800 bg-[#0a0a0a]">
                 <h3 className="text-xl font-medium text-[#D4AF37] mb-2">No products found</h3>
                 <p className="text-gray-500">Try adjusting your filters.</p>
-                {/* ✅ STEP 3: IMPROVED RESET LOGIC */}
                 <Button 
                   variant="link" 
                   onClick={() => {
@@ -309,7 +339,6 @@ export default function ShopPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {products.map(({ product, image }) => {
                   
-                  // ✅ PASS RESOLVED PRICE
                   const resolvedPrice = priceMap[product.id];
 
                   return (
@@ -317,7 +346,6 @@ export default function ShopPage() {
                       key={product.id}
                       product={product}
                       image={image}
-                      // Correctly passing the resolved object to update UI
                       price={resolvedPrice}
                     />
                   );
