@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation'; // ✅ Added useRouter
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabase/client';
 import { Product, ProductImage, Category } from '@/lib/types';
@@ -22,6 +22,7 @@ import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
 import { getUserRegion } from '@/lib/region/client';
 
 export default function ShopPage() {
+  const router = useRouter(); // ✅ Initialize Router
   const searchParams = useSearchParams();
   const { currency } = useCart();
   const region = getUserRegion();
@@ -51,10 +52,11 @@ export default function ShopPage() {
   }, []);
 
   // Fetch Products on Filter Change
+  // ✅ STEP 2: Added priceRange to dependency array for auto-update
   useEffect(() => {
     fetchProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, sortBy]);
+  }, [selectedCategory, sortBy, priceRange]);
 
   // ✅ RESOLVE PRICES (New Logic)
   useEffect(() => {
@@ -112,11 +114,23 @@ export default function ShopPage() {
         .gte('base_price_inr', priceRange[0])
         .lte('base_price_inr', priceRange[1]);
 
+      // ✅ STEP 1: FIX CATEGORY FILTER (Fetch ID directly from DB)
       if (selectedCategory && selectedCategory !== 'all') {
-        const category = categories.find((c) => c.slug === selectedCategory);
-        if (category) {
-          query = query.eq('category_id', category.id);
+        const { data: category, error } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('slug', selectedCategory)
+          .eq('is_active', true)
+          .single();
+
+        if (error || !category) {
+          console.warn('Category not found:', selectedCategory);
+          setProducts([]);
+          setLoading(false);
+          return;
         }
+
+        query = query.eq('category_id', category.id);
       }
 
       if (sortBy === 'price-asc') {
@@ -179,7 +193,11 @@ export default function ShopPage() {
               </Label>
               <Select
                 value={selectedCategory}
-                onValueChange={setSelectedCategory}
+                // ✅ STEP 4: SYNC WITH URL
+                onValueChange={(val) => {
+                  setSelectedCategory(val);
+                  router.push(val === 'all' ? '/shop' : `/shop?category=${val}`);
+                }}
               >
                 <SelectTrigger className="w-full bg-[#111] text-white border-gray-700 h-10 mt-2">
                   <SelectValue placeholder="All Categories" />
@@ -217,8 +235,6 @@ export default function ShopPage() {
                   setPriceRange(value as [number, number])
                 }
                 className="py-2"
-                // Note: To force slider color, you often need global CSS or a specialized component.
-                // Standard shade defaults to generic colors, but 'accent' might work depending on setup.
               />
               
               <Button 
@@ -275,12 +291,18 @@ export default function ShopPage() {
               <div className="text-center py-24 rounded-lg border border-dashed border-gray-800 bg-[#0a0a0a]">
                 <h3 className="text-xl font-medium text-[#D4AF37] mb-2">No products found</h3>
                 <p className="text-gray-500">Try adjusting your filters.</p>
+                {/* ✅ STEP 3: IMPROVED RESET LOGIC */}
                 <Button 
                   variant="link" 
-                  onClick={() => setPriceRange([0, 50000])}
+                  onClick={() => {
+                    setPriceRange([0, 50000]);
+                    setSelectedCategory('all');
+                    router.push('/shop');
+                    fetchProducts();
+                  }}
                   className="text-white underline mt-2"
                 >
-                  Reset Price
+                  Reset Filters
                 </Button>
               </div>
             ) : (

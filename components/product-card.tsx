@@ -50,14 +50,18 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
   };
 
   return (
-    <Link href={`/products/${product.slug}`} className="group">
-      <div className="relative aspect-square overflow-hidden rounded-lg bg-[#111]">
+    <Link 
+      href={`/products/${product.slug}`} 
+      className="group block border border-[#D4AF37]/30 hover:border-[#D4AF37] rounded-xl p-3 transition bg-black"
+    >
+      {/* IMAGE CONTAINER */}
+      <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-[#111]">
         {image ? (
           <Image
             src={image.image_url}
             alt={product.name}
             fill
-            className="object-cover transition-transform group-hover:scale-105"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -65,16 +69,17 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
           </div>
         )}
 
+        {/* Wishlist Button */}
         {user && (
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 backdrop-blur-md"
+            className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full h-8 w-8"
             onClick={toggleWishlist}
             disabled={loading}
           >
             <Heart
-              className={`h-5 w-5 ${
+              className={`h-4 w-4 ${
                 isWishlisted
                   ? 'fill-red-500 text-red-500'
                   : 'text-white'
@@ -84,34 +89,38 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
         )}
       </div>
 
-      <div className="mt-3">
-        <h3 className="text-sm font-medium text-white line-clamp-2">
+      {/* DETAILS SECTION */}
+      <div className="mt-3 space-y-1">
+        {/* Title: Gold Serif */}
+        <h3 className="text-base font-serif font-semibold text-[#D4AF37] line-clamp-2 leading-tight group-hover:text-[#F4CF57] transition-colors">
           {product.name}
         </h3>
 
-        {product.brand && (
-          <p className="text-xs text-gray-300 mt-1">
-            {product.brand}
-          </p>
-        )}
+        {/* Brand */}
+        <p className="text-xs text-gray-400 font-medium">
+          {product.brand || 'Samara Heritage'}
+        </p>
 
         {/* PRICE */}
         {!price ? (
-          <p className="mt-1 text-sm text-gray-500">—</p>
+          <div className="mt-2 h-5 w-24 bg-gray-800 animate-pulse rounded" />
         ) : (
-          <div className="mt-1 flex items-center gap-2">
-            <span className="text-sm font-semibold text-[#D4AF37]">
+          <div className="mt-2 flex items-center gap-2">
+            {/* Display Price (Gold) */}
+            <span className="text-base font-semibold text-[#D4AF37]">
               {formatPrice(price.displayPrice, price.currency)}
             </span>
 
+            {/* MRP (Crossed Out) */}
             {price.mrp && price.mrp > price.displayPrice && (
-              <span className="text-xs text-gray-500 line-through">
+              <span className="text-xs text-gray-500 line-through decoration-gray-600">
                 {formatPrice(price.mrp, price.currency)}
               </span>
             )}
 
+            {/* ✅ DISCOUNT BADGE (GREEN) */}
             {price.discountPct && price.discountPct > 0 && (
-              <span className="text-xs font-bold text-green-400">
+              <span className="text-[10px] font-bold text-green-400 border border-green-400/30 px-1.5 py-0.5 rounded bg-green-400/10">
                 {price.discountPct}% OFF
               </span>
             )}
