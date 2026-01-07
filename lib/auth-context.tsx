@@ -10,12 +10,22 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 
+/* ---------------- TYPES ---------------- */
+
 type Profile = {
   id: string;
   email: string;
   name: string | null;
   phone: string | null;
   role: 'customer' | 'admin';
+  house?: string;
+  building?: string;
+  locality?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+  pin?: string;
 };
 
 type AuthContextType = {
@@ -23,58 +33,104 @@ type AuthContextType = {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
+/* ---------------- CONTEXT ---------------- */
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/* ---------------- PROVIDER ---------------- */
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Load session once on mount
+  /* ---------------- PROFILE LOADER ---------------- */
+  const loadProfile = async (authUser: User) => {
+    // 1️⃣ Try fetching existing profile
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (existingProfile) {
+      setProfile(existingProfile);
+      return;
+    }
+
+    // 2️⃣ Create profile if missing
+    const { data: newProfile, error } = await supabase
+      .from('profiles')
+      .insert({
+        id: authUser.id,
+        email: authUser.email!,
+        name: authUser.user_metadata?.name ?? null,
+        role: 'customer',
+      })
+      .select()
+      .single();
+
+    if (!error && newProfile) {
+      setProfile(newProfile);
+    }
+  };
+
+  /* ---------------- AUTH HYDRATION ---------------- */
   useEffect(() => {
-    const init = async () => {
+    let mounted = true;
+
+    const hydrate = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
+      if (!mounted) return;
+
       if (session?.user) {
         setUser(session.user);
-        await loadProfile(session.user.id);
+        await loadProfile(session.user);
+      } else {
+        setUser(null);
+        setProfile(null);
       }
 
       setLoading(false);
     };
 
-    init();
+    hydrate();
 
-    // 🔹 Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+
       if (session?.user) {
         setUser(session.user);
-        await loadProfile(session.user.id);
+        await loadProfile(session.user);
       } else {
         setUser(null);
         setProfile(null);
       }
+
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // 🔹 Fetch profile safely
-  const loadProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, email, name, phone, role')
-      .eq('id', userId)
-      .single();
+  /* ---------------- HELPERS ---------------- */
 
-    if (data) setProfile(data);
+  const refreshProfile = async () => {
+    if (user) {
+      await loadProfile(user);
+    }
   };
 
   const signOut = async () => {
@@ -84,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/';
   };
 
+  /* ---------------- PROVIDER ---------------- */
+
   return (
     <AuthContext.Provider
       value={{
@@ -91,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAdmin: profile?.role === 'admin',
+        refreshProfile,
         signOut,
       }}
     >
@@ -98,6 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+/* ---------------- HOOK ---------------- */
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

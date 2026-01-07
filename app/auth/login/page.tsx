@@ -22,6 +22,9 @@ export default function LoginPage() {
   const [tab, setTab] = useState<'password' | 'email' | 'phone'>('password');
   const [mode, setMode] = useState<AuthMode>('login');
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Cooldown state for Resend OTP
+  const [cooldown, setCooldown] = useState(0);
 
   const [form, setForm] = useState({
     name: '',
@@ -37,7 +40,21 @@ export default function LoginPage() {
   const update = (k: string, v: string) =>
     setForm(prev => ({ ...prev, [k]: v }));
 
-  /* ---------------- LOGIN ---------------- */
+  // Cooldown Timer Helper
+  const startCooldown = () => {
+    setCooldown(30);
+    const timer = setInterval(() => {
+      setCooldown(c => {
+        if (c <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+  };
+
+  /* ---------------- LOGIN (PASSWORD) ---------------- */
   const loginPassword = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
@@ -47,44 +64,73 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) toast.error(error.message);
-    else router.push('/');
+    else window.location.href = '/'; // Redirect to home
   };
 
-  /* ---------------- SEND OTP ---------------- */
+  /* ---------------- SEND OTP (EMAIL ONLY) ---------------- */
   const sendOtp = async () => {
+    if (loading || cooldown > 0) return;
+
+    if (!form.email) {
+      toast.error('Email is required');
+      return;
+    }
+
     setLoading(true);
 
-    const payload =
-      tab === 'phone'
-        ? { phone: form.phone }
-        : { email: form.email };
-
-    const { error } = await supabase.auth.signInWithOtp(payload);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: form.email.trim(),
+      options: {
+        shouldCreateUser: true,
+      },
+    });
 
     setLoading(false);
 
-    if (error) toast.error(error.message);
-    else {
-      toast.success('OTP sent');
-      setMode('verify-otp');
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+
+    toast.success('OTP sent to your email');
+    setMode('verify-otp');
+    startCooldown();
   };
 
-  /* ---------------- VERIFY OTP ---------------- */
+  /* ---------------- VERIFY OTP (EMAIL ONLY) ---------------- */
   const verifyOtp = async () => {
+    if (loading) return;
+
+    if (!form.otp || form.otp.length !== 6) {
+      toast.error('Enter the 6-digit OTP');
+      return;
+    }
+
     setLoading(true);
 
-    const payload =
-      tab === 'phone'
-        ? { phone: form.phone, token: form.otp, type: 'sms' }
-        : { email: form.email, token: form.otp, type: 'email' };
-
-    const { error } = await supabase.auth.verifyOtp(payload as any);
+    const { error } = await supabase.auth.verifyOtp({
+      email: form.email.trim(),
+      token: form.otp.trim(),
+      type: 'email',
+    });
 
     setLoading(false);
 
-    if (error) toast.error(error.message);
-    else setMode('set-password');
+    if (error) {
+      toast.error('Invalid or expired OTP. Please resend.');
+      return;
+    }
+
+    const pendingName = localStorage.getItem('pending_name');
+    if (pendingName) {
+      await supabase.auth.updateUser({
+        data: { name: pendingName },
+      });
+      localStorage.removeItem('pending_name');
+    }
+
+    toast.success('Logged in successfully');
+    window.location.href = '/';
   };
 
   /* ---------------- SET PASSWORD ---------------- */
@@ -105,7 +151,7 @@ export default function LoginPage() {
     if (error) toast.error(error.message);
     else {
       toast.success('Password reset successfully');
-      router.push('/');
+      router.replace('/');
     }
   };
 
@@ -115,6 +161,9 @@ export default function LoginPage() {
       toast.error('Name is required');
       return;
     }
+    // Store name to update profile after OTP verification
+    localStorage.setItem('pending_name', form.name);
+
     await sendOtp();
   };
 
@@ -127,7 +176,13 @@ export default function LoginPage() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 1. Password Login
     if (mode === 'login' && tab === 'password') return loginPassword();
+    
+    // 2. OTP Login (Email or Phone tab triggers Email OTP now)
+    if (mode === 'login' && (tab === 'email' || tab === 'phone')) return sendOtp();
+
+    // 3. Other Flows
     if (mode === 'signup') return signupStart();
     if (mode === 'forgot') return forgotStart();
     if (mode === 'verify-otp') return verifyOtp();
@@ -239,24 +294,31 @@ export default function LoginPage() {
           />
         )}
 
+        {/* SUBMIT BUTTON */}
         <Button
           type="submit"
           disabled={loading}
           className="w-full mt-2 bg-[#1a1a1a] text-white"
         >
-          {loading ? 'Please wait...' : 'Sign In'}
+          {loading
+            ? 'Please wait...'
+            : mode === 'verify-otp'
+            ? 'Verify OTP'
+            : 'Sign In'}
         </Button>
 
         {/* LINKS */}
         {mode === 'login' && (
           <div className="text-center mt-5 text-sm">
-            <button
-              type="button"
-              className="text-[#D4AF37]"
-              onClick={() => setMode('forgot')}
-            >
-              Forgot password?
-            </button>
+            {tab === 'password' && (
+              <button
+                type="button"
+                className="text-[#D4AF37]"
+                onClick={() => setMode('forgot')}
+              >
+                Forgot password?
+              </button>
+            )}
             <div className="mt-3 text-gray-400">
               Don&apos;t have an account?{' '}
               <button
@@ -270,13 +332,15 @@ export default function LoginPage() {
           </div>
         )}
 
+        {/* RESEND OTP BUTTON */}
         {mode === 'verify-otp' && (
           <button
             type="button"
-            className="text-xs text-[#D4AF37] mt-4 block mx-auto"
+            disabled={cooldown > 0 || loading}
+            className="text-xs text-[#D4AF37] mt-4 block mx-auto disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             onClick={sendOtp}
           >
-            Resend OTP
+            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend OTP'}
           </button>
         )}
       </form>

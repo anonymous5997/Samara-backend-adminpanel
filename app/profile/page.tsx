@@ -12,9 +12,11 @@ import { Toaster } from '@/components/ui/sonner';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, profile, refreshProfile } = useAuth();
+  
+  // ✅ Get auth state
+  const { user, profile, refreshProfile, loading } = useAuth();
 
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false); 
 
   const [formData, setFormData] = useState({
     name: '',
@@ -31,11 +33,15 @@ export default function ProfilePage() {
 
   /* ---------------- AUTH GUARD ---------------- */
   useEffect(() => {
+    // Wait for auth hydration
+    if (loading) return;
+
     if (!user) {
-      router.push('/auth/login');
+      window.location.href = '/auth/login';
       return;
     }
 
+    // Populate form when profile data is available
     if (profile) {
       setFormData({
         name: profile.name || '',
@@ -50,14 +56,16 @@ export default function ProfilePage() {
         pin: profile.pin || '',
       });
     }
-  }, [user, profile, router]);
+  }, [user, profile, loading]);
 
   /* ---------------- SAVE PROFILE ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
 
     try {
+      if (!user) return;
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -72,135 +80,177 @@ export default function ProfilePage() {
           country: formData.country,
           pin: formData.pin,
         })
-        .eq('id', user!.id);
+        .eq('id', user.id);
 
       if (error) throw error;
 
       await refreshProfile();
       toast.success('Profile updated successfully');
     } catch (err) {
+      console.error(err);
       toast.error('Failed to update profile');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (!user || !profile) return null;
+  /* ---------------- RENDER GUARDS ---------------- */
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
+        Loading session...
+      </div>
+    );
+  }
 
-  /* ---------------- UI ---------------- */
+  if (!user) return null;
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
+        Creating profile...
+      </div>
+    );
+  }
+
+  /* ---------------- IMPROVED UI ---------------- */
   return (
     <>
       <Toaster />
+      
+      <div className="min-h-screen bg-black flex justify-center px-4 py-20">
+        <div className="w-full max-w-4xl">
 
-      <div className="min-h-screen bg-black flex justify-center px-4 py-16">
-        <div className="w-full max-w-3xl">
+          {/* HEADER */}
+          <div className="mb-12 text-center md:text-left">
+            <h1 className="text-4xl font-serif text-[#D4AF37] mb-3">
+              My Profile
+            </h1>
+            <p className="text-gray-400">
+              Manage your personal information and delivery address
+            </p>
+          </div>
 
-          <h1 className="text-3xl font-serif text-[#D4AF37] mb-10">
-            My Profile
-          </h1>
-
-          {/* ✅ POINTER EVENTS FIX IS HERE */}
           <form
             onSubmit={handleSubmit}
-            className="relative z-10 pointer-events-auto bg-[#0b0b0b] border border-[#D4AF37]/30 rounded-2xl p-10 space-y-8 shadow-2xl"
+            className="bg-[#0b0b0b] border border-[#D4AF37]/30 rounded-3xl p-8 md:p-12 space-y-12 shadow-[0_0_80px_rgba(212,175,55,0.08)]"
           >
-            {/* EMAIL */}
-            <div>
-              <Label>Email</Label>
-              <Input
-                value={profile.email}
-                disabled
-                className="bg-[#1a1a1a] text-gray-400 cursor-not-allowed"
-              />
-            </div>
-
-            {/* NAME */}
-            <div>
-              <Label>Full Name</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Your full name"
-              />
-            </div>
-
-            {/* PHONE */}
-            <div>
-              <Label>Phone</Label>
-              <Input
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                placeholder="+91XXXXXXXXXX"
-              />
-            </div>
-
-            {/* ADDRESS */}
-            <div className="space-y-4">
-              <h2 className="text-xl font-serif text-[#D4AF37]">
-                Address
+            {/* BASIC INFO */}
+            <section className="space-y-6">
+              <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
+                Personal Information
               </h2>
 
-              <Input
-                placeholder="House / Flat Number"
-                value={formData.house}
-                onChange={(e) =>
-                  setFormData({ ...formData, house: e.target.value })
-                }
-              />
+              <div className="space-y-2">
+                <Label className="text-gray-300">Email</Label>
+                <Input
+                  value={profile.email}
+                  disabled
+                  // Keeps disabled input gray to differentiate it
+                  className="bg-[#111] text-gray-500 cursor-not-allowed border-gray-800 focus-visible:ring-0"
+                />
+              </div>
 
-              <Input
-                placeholder="Building / Apartment Name"
-                value={formData.building}
-                onChange={(e) =>
-                  setFormData({ ...formData, building: e.target.value })
-                }
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Full Name</Label>
+                  {/* ✅ Added text-white */}
+                  <Input
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="Your full name"
+                    className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
+                  />
+                </div>
 
-              <Input
-                placeholder="Locality / Area"
-                value={formData.locality}
-                onChange={(e) =>
-                  setFormData({ ...formData, locality: e.target.value })
-                }
-              />
+                <div className="space-y-2">
+                  <Label className="text-gray-300">Phone</Label>
+                  {/* ✅ Added text-white */}
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                    placeholder="+91XXXXXXXXXX"
+                    className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
+                  />
+                </div>
+              </div>
+            </section>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* ADDRESS */}
+            <section className="space-y-6">
+              <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
+                Delivery Address
+              </h2>
+
+              <div className="grid grid-cols-1 gap-6">
+                {/* ✅ Added text-white to all address inputs */}
+                <Input
+                  placeholder="House / Flat Number"
+                  value={formData.house}
+                  onChange={(e) =>
+                    setFormData({ ...formData, house: e.target.value })
+                  }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                />
+
+                <Input
+                  placeholder="Building / Apartment Name"
+                  value={formData.building}
+                  onChange={(e) =>
+                    setFormData({ ...formData, building: e.target.value })
+                  }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                />
+
+                <Input
+                  placeholder="Locality / Area"
+                  value={formData.locality}
+                  onChange={(e) =>
+                    setFormData({ ...formData, locality: e.target.value })
+                  }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   placeholder="City"
                   value={formData.city}
                   onChange={(e) =>
                     setFormData({ ...formData, city: e.target.value })
                   }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
-
                 <Input
                   placeholder="District"
                   value={formData.district}
                   onChange={(e) =>
                     setFormData({ ...formData, district: e.target.value })
                   }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   placeholder="State"
                   value={formData.state}
                   onChange={(e) =>
                     setFormData({ ...formData, state: e.target.value })
                   }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
-
                 <Input
                   placeholder="Country"
                   value={formData.country}
                   onChange={(e) =>
                     setFormData({ ...formData, country: e.target.value })
                   }
+                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
               </div>
 
@@ -210,17 +260,18 @@ export default function ProfilePage() {
                 onChange={(e) =>
                   setFormData({ ...formData, pin: e.target.value })
                 }
+                className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] md:w-1/2"
               />
-            </div>
+            </section>
 
-            {/* SAVE */}
-            <div className="pt-6">
+            {/* ACTION */}
+            <div className="pt-6 flex justify-end">
               <Button
                 type="submit"
-                disabled={loading}
-                className="bg-[#D4AF37] text-black font-semibold hover:bg-[#E6C75A]"
+                disabled={saving}
+                className="bg-[#D4AF37] text-black font-bold px-10 py-6 rounded-xl hover:bg-[#E6C75A] transition shadow-lg shadow-[#D4AF37]/20 w-full md:w-auto text-lg"
               >
-                {loading ? 'Saving...' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </form>
