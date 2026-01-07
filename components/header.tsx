@@ -16,7 +16,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import CurrencySelector from '@/components/currency-selector';
 
-// ✅ STEP 1: Import setUserRegion
+// Import setUserRegion logic
 import { setUserRegion } from '@/lib/region/client';
 
 const navLinks = [
@@ -35,9 +35,7 @@ export function Header() {
 
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // ✅ STEP 3: Create the Handler
-  // This ensures that when Currency changes, the REGION also changes,
-  // allowing the Pricing Resolver to find the correct "Admin Price".
+  // Currency Handler
   const handleCurrencyChange = (nextCurrency: string) => {
     const currency = nextCurrency.toUpperCase();
     // 1. Update visual currency state
@@ -58,7 +56,7 @@ export function Header() {
         setUserRegion('CA');
         break;
       case 'GBP':
-        setUserRegion('GB'); // Assuming 'UK' or 'GB' is your region code for GBP
+        setUserRegion('GB');
         break;
       default:
         setUserRegion('IN'); // Default to India for INR
@@ -69,13 +67,13 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-100 w-full bg-[#050505] border-b border-[#D4AF37]/20">
+    // Header Z-Index fix applied here
+    <header className="sticky top-0 z-[999] relative w-full bg-[#050505] border-b border-[#D4AF37]/20">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex h-[72px] items-center justify-between">
           {/* LEFT: Logo */}
           <div className="flex items-center gap-4 h-full">
             <Link href="/" className="flex items-center group">
-              {/* parent must be relative for Image fill */}
               <div className="relative h-14 w-44 flex items-center">
                 <Image
                   src="/samara-logo.png"
@@ -103,8 +101,9 @@ export function Header() {
 
           {/* RIGHT: actions */}
           <div className="flex items-center gap-4">
+            
+            {/* DESKTOP CURRENCY SELECTOR (Hidden on mobile) */}
             <div className="hidden md:block">
-              {/* ✅ STEP 4: Wire CurrencySelector Correctly */}
               <CurrencySelector 
                 currency={currency} 
                 onChange={handleCurrencyChange} 
@@ -162,7 +161,7 @@ export function Header() {
                     <User className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-[#111111] border-[#D4AF37]/20">
+                <DropdownMenuContent align="end" className="z-[1000] bg-[#111111] border-[#D4AF37]/20">
                   <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
                     <Link href="/profile">Profile</Link>
                   </DropdownMenuItem>
@@ -185,6 +184,7 @@ export function Header() {
               </Button>
             )}
 
+            {/* MOBILE MENU SHEET */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
@@ -192,6 +192,8 @@ export function Header() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="bg-[#000000] border-[#D4AF37]/20">
+                
+                {/* Mobile Navigation Links */}
                 <nav className="flex flex-col gap-4 mt-8">
                   {navLinks.map((link) => (
                     <Link
@@ -204,6 +206,18 @@ export function Header() {
                     </Link>
                   ))}
                 </nav>
+
+                {/* ✅ MOBILE CURRENCY SELECTOR */}
+                <div className="mt-8 pt-6 border-t border-[#D4AF37]/20">
+                  <p className="text-sm font-medium text-[#D4AF37] mb-3">Currency</p>
+                  <div className="w-full">
+                    <CurrencySelector
+                      currency={currency}
+                      onChange={handleCurrencyChange}
+                    />
+                  </div>
+                </div>
+
               </SheetContent>
             </Sheet>
           </div>

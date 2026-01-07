@@ -59,7 +59,7 @@ export function BuyNowModal({
 
         // PAYMENT DATA (Critical for Razorpay)
         unit_price_inr: productPriceInr,
-        currency , 
+ 
 
         image: productImage || null,
         quantity: 1,
