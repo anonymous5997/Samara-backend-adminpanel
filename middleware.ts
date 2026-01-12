@@ -1,54 +1,48 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
 
 /**
- * Production Middleware for Route Protection + Region Detection
- *
- * RULES:
- * 1. /admin/* routes require admin role
- * 2. /profile, /orders, /wishlist, /checkout require authentication
- * 3. Region is detected server-side
- * 4. Never trust client-side role or region values
+ * Samara Production Middleware
+ * - Handles Supabase session cookies
+ * - Protects routes
+ * - Applies region detection
  */
 
-const PROTECTED_ROUTES = ['/profile', '/orders', '/wishlist', '/checkout']
-const ADMIN_ROUTES = ['/admin']
-const PUBLIC_AUTH_ROUTES = ['/auth/login', '/auth/signup']
+const PROTECTED_ROUTES = ["/profile", "/orders", "/wishlist", "/checkout"]
+const ADMIN_ROUTES = ["/admin"]
+const PUBLIC_AUTH_ROUTES = ["/auth/login", "/auth/signup", "/auth/callback"]
 
-// 🌍 Country → Region mapping
 const REGION_MAP: Record<string, string> = {
-  IN: 'IN',
-  US: 'US',
-  CA: 'CA',
-  AE: 'AE',
-  GB: 'GB',
+  IN: "IN",
+  US: "US",
+  CA: "CA",
+  AE: "AE",
+  GB: "GB",
 }
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  let response = NextResponse.next()
 
-  // ─────────────────────────────────────────────
-  // 🌍 REGION DETECTION (SAFE + NON-DESTRUCTIVE)
-  // ─────────────────────────────────────────────
-  const existingRegion = request.cookies.get('region')?.value
+  /* ─────────────────────────────────────────────
+     🌍 REGION COOKIE
+  ───────────────────────────────────────────── */
+  const regionCookie = request.cookies.get("region")?.value
 
-  if (!existingRegion) {
+  if (!regionCookie) {
     const country =
-      request.headers.get('x-vercel-ip-country') || 'IN'
+      request.headers.get("x-vercel-ip-country") || "IN"
 
-    const region = REGION_MAP[country] || 'US'
+    const region = REGION_MAP[country] || "IN"
 
-    supabaseResponse.cookies.set('region', region, {
-      path: '/',
-      sameSite: 'lax',
+    response.cookies.set("region", region, {
+      path: "/",
+      sameSite: "lax",
     })
   }
 
-  // ─────────────────────────────────────────────
-  // 🔐 SUPABASE AUTH CLIENT
-  // ─────────────────────────────────────────────
+  /* ─────────────────────────────────────────────
+     🔐 SUPABASE COOKIE BRIDGE (THIS IS THE FIX)
+  ───────────────────────────────────────────── */
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -57,10 +51,9 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options)
-            request.cookies.set(name, value)
+        setAll(cookies) {
+          cookies.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options)
           })
         },
       },
@@ -69,78 +62,51 @@ export async function middleware(request: NextRequest) {
 
   const {
     data: { session },
-    error,
   } = await supabase.auth.getSession()
 
   const user = session?.user ?? null
-
-  if (error) {
-    console.log('[Middleware] Auth error:', error.message)
-  }
-
   const path = request.nextUrl.pathname
 
-  // ─────────────────────────────────────────────
-  // PUBLIC AUTH ROUTES
-  // ─────────────────────────────────────────────
-  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.some(route =>
-    path.startsWith(route)
-  )
-
-  if (isPublicAuthRoute) {
-    return supabaseResponse
+  /* ─────────────────────────────────────────────
+     PUBLIC AUTH ROUTES
+  ───────────────────────────────────────────── */
+  if (PUBLIC_AUTH_ROUTES.some(p => path.startsWith(p))) {
+    return response
   }
 
-  // ─────────────────────────────────────────────
-  // ADMIN ROUTES
-  // ─────────────────────────────────────────────
-  const isAdminRoute = ADMIN_ROUTES.some(route =>
-    path.startsWith(route)
-  )
-
-  if (isAdminRoute) {
+  /* ─────────────────────────────────────────────
+     ADMIN ROUTES
+  ───────────────────────────────────────────── */
+  if (ADMIN_ROUTES.some(p => path.startsWith(p))) {
     if (!user) {
-      const redirectUrl = new URL('/auth/login', request.url)
-      redirectUrl.searchParams.set('redirect', path)
-      return NextResponse.redirect(redirectUrl)
+      return NextResponse.redirect(new URL("/auth/login", request.url))
     }
 
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
-    if (!profile || profile.role !== 'admin') {
-      const redirectUrl = new URL('/', request.url)
-      redirectUrl.searchParams.set('error', 'unauthorized')
-      return NextResponse.redirect(redirectUrl)
+    if (!profile || profile.role !== "admin") {
+      return NextResponse.redirect(new URL("/", request.url))
     }
 
-    return supabaseResponse
+    return response
   }
 
-  // ─────────────────────────────────────────────
-  // PROTECTED ROUTES (NON-ADMIN)
-  // ─────────────────────────────────────────────
-  const isProtectedRoute = PROTECTED_ROUTES.some(route =>
-    path.startsWith(route)
-  )
-
-  if (isProtectedRoute && !user) {
-    const redirectUrl = new URL('/auth/login', request.url)
-    redirectUrl.searchParams.set('redirect', path)
-    return NextResponse.redirect(redirectUrl)
+  /* ─────────────────────────────────────────────
+     PROTECTED ROUTES
+  ───────────────────────────────────────────── */
+  if (PROTECTED_ROUTES.some(p => path.startsWith(p)) && !user) {
+    return NextResponse.redirect(new URL("/auth/login", request.url))
   }
 
-  // ─────────────────────────────────────────────
-  // PUBLIC ROUTES
-  // ─────────────────────────────────────────────
-  return supabaseResponse
+  return response
 }
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }

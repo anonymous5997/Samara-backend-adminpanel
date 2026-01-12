@@ -84,6 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const hydrate = async () => {
+      // 🔥 THIS IS THE FIX FOR OTP / MAGIC LINKS
+      // This forces Supabase to parse the URL hash for tokens immediately
+      await supabase.auth.exchangeCodeForSession(window.location.href);
+
       const {
         data: { session },
       } = await supabase.auth.getSession();

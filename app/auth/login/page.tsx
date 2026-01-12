@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/auth-context'; // 1️⃣ Import useAuth
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ type AuthMode =
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth(); // 2️⃣ Get user state
 
   /* ---------------- STATE ---------------- */
   const [tab, setTab] = useState<'password' | 'email' | 'phone'>('password');
@@ -35,6 +37,14 @@ export default function LoginPage() {
   });
 
   const [loading, setLoading] = useState(false);
+
+  /* ---------------- AUTO-REDIRECT EFFECT ---------------- */
+  // 3️⃣ Automatically redirect when session is active
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/'); 
+    }
+  }, [user, authLoading, router]);
 
   /* ---------------- HELPERS ---------------- */
   const update = (k: string, v: string) =>
@@ -64,10 +74,10 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) toast.error(error.message);
-    else window.location.href = '/'; // Redirect to home
+    // Redirect handled by useEffect
   };
 
-  /* ---------------- SEND OTP (EMAIL ONLY) ---------------- */
+  /* ---------------- SEND OTP (DIRECT SUPABASE) ---------------- */
   const sendOtp = async () => {
     if (loading || cooldown > 0) return;
 
@@ -97,7 +107,7 @@ export default function LoginPage() {
     startCooldown();
   };
 
-  /* ---------------- VERIFY OTP (EMAIL ONLY) ---------------- */
+  /* ---------------- VERIFY OTP (DIRECT SUPABASE) ---------------- */
   const verifyOtp = async () => {
     if (loading) return;
 
@@ -117,10 +127,11 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) {
-      toast.error('Invalid or expired OTP. Please resend.');
+      toast.error(error.message || 'Invalid or expired OTP');
       return;
     }
 
+    // Handle pending name update from signup if needed
     const pendingName = localStorage.getItem('pending_name');
     if (pendingName) {
       await supabase.auth.updateUser({
@@ -130,7 +141,7 @@ export default function LoginPage() {
     }
 
     toast.success('Logged in successfully');
-    window.location.href = '/';
+    // 4️⃣ Redirect removed here (handled by useEffect)
   };
 
   /* ---------------- SET PASSWORD ---------------- */
@@ -179,7 +190,7 @@ export default function LoginPage() {
     // 1. Password Login
     if (mode === 'login' && tab === 'password') return loginPassword();
     
-    // 2. OTP Login (Email or Phone tab triggers Email OTP now)
+    // 2. OTP Login (Email or Phone tab triggers Email OTP)
     if (mode === 'login' && (tab === 'email' || tab === 'phone')) return sendOtp();
 
     // 3. Other Flows
