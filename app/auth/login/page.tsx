@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { useAuth } from '@/lib/auth-context'; // 1️⃣ Import useAuth
+import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ type AuthMode =
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth(); // 2️⃣ Get user state
+  const { user, loading: authLoading } = useAuth();
 
   /* ---------------- STATE ---------------- */
   const [tab, setTab] = useState<'password' | 'email' | 'phone'>('password');
@@ -39,7 +39,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   /* ---------------- AUTO-REDIRECT EFFECT ---------------- */
-  // 3️⃣ Automatically redirect when session is active
+  // Automatically redirect when session is active
   useEffect(() => {
     if (!authLoading && user) {
       router.replace('/'); 
@@ -77,7 +77,7 @@ export default function LoginPage() {
     // Redirect handled by useEffect
   };
 
-  /* ---------------- SEND OTP (DIRECT SUPABASE) ---------------- */
+  /* ---------------- SEND OTP ---------------- */
   const sendOtp = async () => {
     if (loading || cooldown > 0) return;
 
@@ -107,7 +107,7 @@ export default function LoginPage() {
     startCooldown();
   };
 
-  /* ---------------- VERIFY OTP (DIRECT SUPABASE) ---------------- */
+  /* ---------------- VERIFY OTP ---------------- */
   const verifyOtp = async () => {
     if (loading) return;
 
@@ -137,11 +137,24 @@ export default function LoginPage() {
       await supabase.auth.updateUser({
         data: { name: pendingName },
       });
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        // Update profile name
+        await supabase
+          .from('profiles')
+          .update({ name: pendingName })
+          .eq('id', user.id);
+      }
+
       localStorage.removeItem('pending_name');
     }
 
     toast.success('Logged in successfully');
-    // 4️⃣ Redirect removed here (handled by useEffect)
+    // Redirect handled by useEffect
   };
 
   /* ---------------- SET PASSWORD ---------------- */
@@ -238,6 +251,7 @@ export default function LoginPage() {
               onClick={() => {
                 setTab(t as any);
                 setMode('login');
+                localStorage.removeItem('pending_name'); // 🔥 STEP 2 FIX: clear signup data
               }}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -245,7 +259,7 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* NAME */}
+        {/* NAME - Only for Signup */}
         {mode === 'signup' && (
           <Input
             placeholder="Name"
@@ -295,7 +309,7 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {/* OTP */}
+        {/* OTP - STEP 3 FIX: Confirmed UI presence */}
         {mode === 'verify-otp' && (
           <Input
             placeholder="Enter OTP"
@@ -305,7 +319,7 @@ export default function LoginPage() {
           />
         )}
 
-        {/* SUBMIT BUTTON */}
+        {/* SUBMIT BUTTON - STEP 1 FIX: Updated Logic */}
         <Button
           type="submit"
           disabled={loading}
@@ -315,6 +329,10 @@ export default function LoginPage() {
             ? 'Please wait...'
             : mode === 'verify-otp'
             ? 'Verify OTP'
+            : mode === 'signup'
+            ? 'Create Account'
+            : tab === 'email' || tab === 'phone'
+            ? 'Send OTP'
             : 'Sign In'}
         </Button>
 

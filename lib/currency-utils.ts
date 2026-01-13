@@ -77,21 +77,29 @@ export function convertPriceSync(
 }
 
 /* -----------------------------------------------------
-   FORMAT ONLY (NO CONVERSION)
+   FORMAT ONLY (NO CONVERSION) - ROBUST VERSION
 ----------------------------------------------------- */
 export function formatPriceSync(
-  amount: number,
+  amount: number | null | undefined,
   currency: SupportedCurrency
 ): string {
-  const symbol = getCurrencySymbol(currency);
-  const fraction = currency === 'INR' ? 0 : 2;
+  const safeAmount =
+    typeof amount === 'number' && !isNaN(amount) ? amount : 0;
+
+  const safeCurrency: SupportedCurrency = currency || 'INR';
+
+  const symbol = getCurrencySymbol(safeCurrency);
+  const fraction = safeCurrency === 'INR' ? 0 : 2;
 
   return (
     symbol +
-    amount.toLocaleString(currency === 'INR' ? 'en-IN' : 'en-US', {
-      minimumFractionDigits: fraction,
-      maximumFractionDigits: fraction,
-    })
+    safeAmount.toLocaleString(
+      safeCurrency === 'INR' ? 'en-IN' : 'en-US',
+      {
+        minimumFractionDigits: fraction,
+        maximumFractionDigits: fraction,
+      }
+    )
   );
 }
 

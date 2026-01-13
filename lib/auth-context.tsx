@@ -63,20 +63,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // 2️⃣ Create profile if missing
-    const { data: newProfile, error } = await supabase
+    // We strictly use insert here (not upsert) to avoid overwriting name
+    await supabase.from('profiles').insert({
+      id: authUser.id,
+      email: authUser.email!,
+      role: 'customer',
+    });
+
+    // 3️⃣ Fetch the newly created profile
+    const { data } = await supabase
       .from('profiles')
-      .insert({
-        id: authUser.id,
-        email: authUser.email!,
-        name: authUser.user_metadata?.name ?? null,
-        role: 'customer',
-      })
-      .select()
+      .select('*')
+      .eq('id', authUser.id)
       .single();
 
-    if (!error && newProfile) {
-      setProfile(newProfile);
-    }
+    setProfile(data);
   };
 
   /* ---------------- AUTH HYDRATION ---------------- */

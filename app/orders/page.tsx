@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase/client'
+import { formatPriceSync } from '@/lib/currency-utils';
+
 
 type OrderRow = {
   order_id: string
   created_at: string
   order_status: string
   payment_status: string
-  total_amount_inr: number
+  total_amount: number
+  currency: 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD'
   product_name: string
   image_url: string | null
 }
@@ -34,10 +37,11 @@ export default function OrdersPage() {
         created_at,
         status,
         payment_status,
-        total_amount_inr,
+        total_amount,
+        currency,
         order_items (
           product_name,
-          product_image_url
+          image_url
         )
       `)
       .order('created_at', { ascending: false })
@@ -60,9 +64,10 @@ export default function OrdersPage() {
               ? 'confirmed'
               : o.status,
           payment_status: o.payment_status,
-          total_amount_inr: o.total_amount_inr,
+          total_amount: o.total_amount,
+          currency: o.currency,
           product_name: item?.product_name ?? 'Product',
-          image_url: item?.product_image_url ?? null,
+          image_url: item?.image_url ?? null,
         }
       }) ?? []
 
@@ -147,7 +152,7 @@ export default function OrdersPage() {
               </div>
 
               <div className="text-lg font-semibold">
-                ₹{order.total_amount_inr}
+                {formatPriceSync(order.total_amount, order.currency)}
               </div>
             </div>
           </Link>

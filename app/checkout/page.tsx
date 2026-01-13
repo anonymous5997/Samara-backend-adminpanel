@@ -262,6 +262,8 @@ export default function CheckoutPage() {
         .from('orders')
         .insert({
           user_id: auth.user.id,
+          total_amount: total,            // e.g. 200
+          currency: displayCurrency,  
           subtotal_inr: Math.max(1, subtotalINR),
           discount_inr: discountINR,
           shipping_inr: shippingINR,
