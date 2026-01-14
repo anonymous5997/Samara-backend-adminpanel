@@ -63,17 +63,19 @@ export async function getSareeSalesStats(): Promise<SareeSalesStats> {
 
     const categoryIds = sareeCategories.map(c => c.id);
 
-    const { data: thisMonthData, error: thisMonthError } = await supabase
+    // Fetch This Month Sales Count
+    const { data: thisMonthData } = await supabase
       .from('order_items')
-      .select('quantity, orders!inner(id, payment_status)')
-      .in('products!inner.category_id', categoryIds)
+      .select('quantity, orders!inner(id, payment_status), products!inner(category_id)')
+      .in('products.category_id', categoryIds)
       .gte('orders.created_at', thisMonthStart.toISOString())
       .eq('orders.payment_status', 'paid');
 
-    const { data: lastMonthData, error: lastMonthError } = await supabase
+    // Fetch Last Month Sales Count
+    const { data: lastMonthData } = await supabase
       .from('order_items')
-      .select('quantity, orders!inner(id, payment_status)')
-      .in('products!inner.category_id', categoryIds)
+      .select('quantity, orders!inner(id, payment_status), products!inner(category_id)')
+      .in('products.category_id', categoryIds)
       .gte('orders.created_at', lastMonthStart.toISOString())
       .lte('orders.created_at', lastMonthEnd.toISOString())
       .eq('orders.payment_status', 'paid');
@@ -88,18 +90,19 @@ export async function getSareeSalesStats(): Promise<SareeSalesStats> {
       0
     );
 
+    // Calculate Revenue
     const orderIds = (thisMonthData || []).map((d: any) => d.orders?.id).filter(Boolean);
 
     let thisMonthRevenue = 0;
     if (orderIds.length > 0) {
       const { data: revenueData } = await supabase
         .from('orders')
-        .select('total_amount_inr')
+        .select('total_amount')
         .in('id', orderIds)
         .eq('payment_status', 'paid');
 
       thisMonthRevenue = (revenueData || []).reduce(
-        (sum: number, order: any) => sum + Number(order.total_amount_inr || 0),
+        (sum: number, order: any) => sum + Number(order.total_amount || 0),
         0
       );
     }
@@ -125,64 +128,43 @@ export async function getSareeSalesStats(): Promise<SareeSalesStats> {
   }
 }
 
+// ✅ FIXED: Explicit YYYY-MM-DD date matching
 export async function getSareeSalesLast30Days(): Promise<DailySalesStat[]> {
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const sareeCategories = await getSareeCategories();
-    if (!sareeCategories || sareeCategories.length === 0) {
-      return [];
-    }
+  const fromDate = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    const categoryIds = sareeCategories.map(c => c.id);
+  const { data, error } = await supabase
+    .from('saree_sales_daily')
+    .select('*')
+    .gte('sale_date', fromDate);
 
-    const { data, error } = await supabase
-      .from('order_items')
-      .select(`
-        quantity,
-        orders!inner(
-          id,
-          created_at,
-          payment_status
-        )
-      `)
-      .in('products!inner.category_id', categoryIds)
-      .gte('orders.created_at', thirtyDaysAgo.toISOString())
-      .eq('orders.payment_status', 'paid');
-
-    if (error || !data) {
-      console.error('Error fetching sales data:', error);
-      return [];
-    }
-
-    const dailyStats = new Map<string, number>();
-
-    data.forEach((item: any) => {
-      const date = new Date(item.orders.created_at);
-      const dateStr = date.toISOString().split('T')[0];
-
-      const current = dailyStats.get(dateStr) || 0;
-      dailyStats.set(dateStr, current + (item.quantity || 0));
-    });
-
-    const result: DailySalesStat[] = [];
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-
-      result.push({
-        date: new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        sales: dailyStats.get(dateStr) || 0,
-      });
-    }
-
-    return result;
-  } catch (error) {
-    console.error('Error getting 30-day sales:', error);
+  if (error) {
+    console.error('Error fetching daily sales:', error);
     return [];
   }
+
+  const map = new Map<string, number>();
+
+  data.forEach((row: any) => {
+    map.set(row.sale_date, Number(row.units_sold));
+  });
+
+  const result: DailySalesStat[] = [];
+
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+
+    result.push({
+      date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      sales: map.get(key) || 0,
+    });
+  }
+
+  return result;
 }
 
 export async function getCartVsOrderStatsLast30Days(): Promise<ConversionStat> {

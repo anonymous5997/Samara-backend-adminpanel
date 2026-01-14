@@ -94,6 +94,7 @@ export default function AdminDashboard() {
     <div>
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
 
+      {/* OVERVIEW CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -143,6 +144,7 @@ export default function AdminDashboard() {
 
       <div className="text-2xl font-bold mb-6">Saree Sales Analytics</div>
 
+      {/* SAREE ANALYTICS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -193,70 +195,89 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
+      {/* CHARTS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card>
+        
+        {/* FIX 1: SAREE SALES CHART WITH FORCED DOTS & SCALE */}
+        <Card className="h-[420px]">
           <CardHeader>
             <CardTitle>Saree Sales - Last 30 Days</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="h-[340px]">
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="date" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" />
+                  
+                  {/* ✅ Y-AXIS FIX: Force min domain to 3 so small numbers don't look flat */}
+                  <YAxis 
+                    domain={[0, Math.max(3, ...chartData.map(d => d.sales))]}
+                    allowDecimals={false}
+                    stroke="#6b7280"
+                  />
+                  
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
                   />
                   <Legend />
+                  
+                  {/* ✅ LINE FIX: Linear type + Forced Dot Props + No Animation */}
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey="sales"
                     stroke="#2563eb"
-                    strokeWidth={2}
-                    dot={{ fill: '#2563eb', r: 4 }}
-                    activeDot={{ r: 6 }}
+                    strokeWidth={3}
+                    dot={{ r: 6, stroke: '#2563eb', fill: '#2563eb' }}
+                    connectNulls={true}
+                    isAnimationActive={false}
                     name="Units Sold"
                   />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-80 flex items-center justify-center text-gray-500">
+              <div className="h-full flex items-center justify-center text-gray-500">
                 No data available yet
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* FIX 2: BAR CHART */}
+        <Card className="h-[420px]">
           <CardHeader>
             <CardTitle>Add to Cart vs Orders - Last 30 Days</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={[
-                { name: 'Add to Cart', value: conversionData.addToCart },
-                { name: 'Orders', value: conversionData.orderPlaced },
-              ]}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
-                />
-                <Bar dataKey="value" fill="#2563eb" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm font-semibold text-gray-700">
-                Cart → Purchase Conversion:
-              </p>
-              <p className="text-2xl font-bold text-blue-600 mt-2">
-                {conversionData.conversionPercent.toFixed(1)}%
-              </p>
-              <p className="text-xs text-gray-600 mt-2">
-                {conversionData.orderPlaced} of {conversionData.addToCart} cart sessions converted to orders
-              </p>
+          <CardContent className="h-[340px] flex flex-col">
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[
+                  { name: 'Add to Cart', value: conversionData.addToCart },
+                  { name: 'Orders', value: conversionData.orderPlaced },
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="name" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
+                  />
+                  <Bar dataKey="value" fill="#2563eb" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 shrink-0">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">Conversion Rate</p>
+                  <p className="text-xs text-gray-600">
+                    {conversionData.orderPlaced} orders from {conversionData.addToCart} carts
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-blue-600">
+                  {conversionData.conversionPercent.toFixed(1)}%
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
