@@ -4,6 +4,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { Suspense } from "react";
 
 export default function Providers({
   children,
@@ -14,8 +15,14 @@ export default function Providers({
     <AuthProvider>
       <CartProvider>
         <div className="flex min-h-screen flex-col bg-black">
-          <Header />
+          
+          {/* ✅ Header must be wrapped in Suspense because it uses useSearchParams */}
+          <Suspense fallback={null}>
+            <Header />
+          </Suspense>
+
           <main className="flex-1">{children}</main>
+
           <Footer />
         </div>
       </CartProvider>

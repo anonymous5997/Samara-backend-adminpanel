@@ -1,14 +1,11 @@
-// lib/resolve-product-price.ts
-
 import { supabase } from '@/lib/supabase/client';
 import type { SupportedCurrency } from '@/lib/currency-utils';
 
-
 export interface ResolvedPrice {
-  displayPrice: number;      // Price shown to user (USD / AED / GBP / INR)
-  currency: SupportedCurrency;        // Display currency
-  inrBase: number;           // Final INR charged (Razorpay)
-  mrp: number | null;        // Display MRP (optional)
+  displayPrice: number;       // Price shown to user (USD / AED / GBP / INR)
+  currency: SupportedCurrency; // Display currency
+  inrBase: number;            // Final INR charged (Razorpay)
+  mrp: number | null;         // Display MRP (optional)
   discountPct: number | null;
   source: 'inr' | 'international';
 }
@@ -16,7 +13,7 @@ export interface ResolvedPrice {
 export async function resolveFinalPrice(
   product: any,
   region: string,
-  currency: SupportedCurrency
+  currency?: string // Optional: allow override or auto-detection
 ): Promise<ResolvedPrice> {
 
   /* -----------------------------------------------------------
@@ -27,7 +24,15 @@ export async function resolveFinalPrice(
 
   if (!inrSelling || inrSelling <= 0) {
     console.error(`Invalid base INR price for product ${product?.id}`);
-    throw new Error('Invalid base INR price');
+    // Safety fallback
+    return {
+      displayPrice: 0,
+      currency: 'INR',
+      inrBase: 0,
+      mrp: null,
+      discountPct: 0,
+      source: 'inr'
+    };
   }
 
   const discountPct =
@@ -36,12 +41,38 @@ export async function resolveFinalPrice(
       : null;
 
   /* -----------------------------------------------------------
-     2️⃣ INDIA CUSTOMER (NO CONVERSION)
+     2️⃣ RESOLVE CURRENCY FROM REGION
      ----------------------------------------------------------- */
-  if (currency === 'INR') {
+  const REGION_TO_CURRENCY: Record<string, SupportedCurrency> = {
+    IN: 'INR',
+    US: 'USD',
+    AE: 'AED',
+    GB: 'GBP',
+    CA: 'CAD',
+    // EU: 'EUR', // Assuming EUR is supported in your types
+    // AU: 'AUD', // Add others as needed
+  };
+
+  // Priority: Explicit currency -> Region map -> Default to INR
+  const resolvedCurrency =
+    (currency as SupportedCurrency) ||
+    REGION_TO_CURRENCY[region] ||
+    'INR';
+
+  /* -----------------------------------------------------------
+     3️⃣ FETCH MANUAL ADMIN PRICE
+     ----------------------------------------------------------- */
+  const manual = product.product_prices?.find(
+    (p: any) => p.currency === resolvedCurrency && Number(p.price) > 0
+  );
+
+  /* -----------------------------------------------------------
+     4️⃣ INDIA LOGIC (ALWAYS INR)
+     ----------------------------------------------------------- */
+  if (resolvedCurrency === 'INR') {
     return {
       displayPrice: inrSelling,
-      currency: 'INR'as SupportedCurrency,
+      currency: 'INR',
       inrBase: inrSelling,
       mrp: inrMrp || null,
       discountPct,
@@ -50,68 +81,70 @@ export async function resolveFinalPrice(
   }
 
   /* -----------------------------------------------------------
-     3️⃣ INTERNATIONAL CUSTOMER
+     5️⃣ INTERNATIONAL FALLBACK (STRICT)
      ----------------------------------------------------------- */
-
-  // A. Manual price entered in Admin (USD / AED / GBP / CAD)
-  const manual = product.product_prices?.find(
-    (p: any) => p.currency === currency && Number(p.price) > 0
-  );
-
+  // If we are International (USD/GBP etc) but NO Admin price exists,
+  // strictly fallback to INR. We do NOT auto-convert for display.
   if (!manual) {
-    console.warn(`No manual price for ${currency} on product ${product?.id}`);
-    throw new Error(`Price not available in ${currency}`);
+    console.error(`Missing price for ${resolvedCurrency} on product ${product.id}`);
+    return {
+      displayPrice: inrSelling,
+      currency: 'INR',
+      inrBase: inrSelling,
+      mrp: inrMrp || null,
+      discountPct,
+      source: 'inr',
+    };
   }
 
+  /* -----------------------------------------------------------
+     6️⃣ SET DISPLAY PRICE (ADMIN DEFINED)
+     ----------------------------------------------------------- */
+  // USA sees $150, UK sees £135, etc. exactly as typed in Admin.
   const displayPrice = Number(manual.price);
 
   /* -----------------------------------------------------------
-     4️⃣ FETCH EXCHANGE RATE (FOREIGN → INR)
+     7️⃣ CALCULATE RAZORPAY INR (CONVERSION)
      ----------------------------------------------------------- */
-  // Admin stores: 1 USD = ₹90.13 (example)
+  // We need to charge the equivalent INR. 
+  // Formula: Display Price (USD) * Rate (USD->INR) = Final INR
+  
+  let finalInr = inrSelling;
 
-  const { data: rateRow, error } = await supabase
+  const { data: rateRow } = await supabase
     .from('currency_rates')
     .select('rate')
-    .eq('base_currency', currency)   // USD / AED / GBP / CAD
-    .eq('target_currency', 'INR')    // Always INR
+    .eq('base_currency', resolvedCurrency)
+    .eq('target_currency', 'INR')
     .eq('enabled', true)
     .single();
 
-  if (error || !rateRow?.rate) {
-    console.error(`Missing exchange rate for ${currency}`);
-    throw new Error(`Exchange rate missing for ${currency}`);
-  }
-
-  const foreignToInrRate = Number(rateRow.rate);
-
-  if (!foreignToInrRate || foreignToInrRate <= 0) {
-    throw new Error(`Invalid exchange rate for ${currency}`);
+  if (rateRow?.rate) {
+    finalInr = Math.round(displayPrice * Number(rateRow.rate));
+  } else {
+    // Critical error: Admin set a USD price but didn't set an exchange rate.
+    // Fallback to base INR to ensure payment can still proceed, 
+    // or you could throw an error if you prefer strictness.
+    console.warn(`Missing exchange rate for ${resolvedCurrency} -> INR. Using Base INR.`);
+    finalInr = inrSelling;
   }
 
   /* -----------------------------------------------------------
-     5️⃣ CONVERT FOREIGN → INR (FINAL & CORRECT)
+     8️⃣ MRP REBUILD (VISUAL ONLY)
      ----------------------------------------------------------- */
-  // Example:
-  // $150 × 90.13 = ₹13,520
-
-  const finalInr = Math.round(displayPrice * foreignToInrRate);
-
-  /* -----------------------------------------------------------
-     6️⃣ MRP REBUILD (VISUAL ONLY — KEEP DISCOUNT SAME)
-     ----------------------------------------------------------- */
+  // Recalculate MRP to keep the Discount % consistent visually
   const mrp =
     discountPct && discountPct > 0
       ? Math.round(displayPrice / (1 - discountPct / 100))
       : null;
 
   /* -----------------------------------------------------------
-     7️⃣ FINAL RETURN
+     9️⃣ RETURN FINAL RESOLVED PRICE
      ----------------------------------------------------------- */
   return {
     displayPrice,          // e.g. 150
-    currency,              // USD
-    inrBase: finalInr,     // e.g. 13520 (Razorpay)
+    currency: resolvedCurrency, // USD
+    inrBase: finalInr,     // e.g. 13500 (For Razorpay)
     mrp,                   // Optional strikethrough
     discountPct,
     source: 'international',

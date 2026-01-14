@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShoppingCart, User, Heart, Search, Menu } from 'lucide-react';
@@ -16,10 +17,6 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import CurrencySelector from '@/components/currency-selector';
 import type { SupportedCurrency } from '@/lib/currency-utils';
-
-
-
-// Import setUserRegion logic
 import { setUserRegion } from '@/lib/region/client';
 
 const navLinks = [
@@ -32,19 +29,22 @@ const navLinks = [
 ];
 
 export function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const { user, profile, signOut } = useAuth();
   const { items, currency, setCurrency } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Currency Handler
+  // ✅ UPDATED CURRENCY HANDLER
   const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
-    // const currency = nextCurrency.toUpperCase();
-    // 1. Update visual currency state
+    // 1. Keep cart context in sync (immediate visual update)
     setCurrency(nextCurrency);
 
-    // 2. Map Currency -> Region
+    // 2. Keep region cookie in sync (for shipping, tax, etc)
     switch (nextCurrency) {
       case 'USD':
         setUserRegion('US');
@@ -59,11 +59,20 @@ export function Header() {
         setUserRegion('GB');
         break;
       default:
-        setUserRegion('IN'); // Default to India for INR
+        setUserRegion('IN');
     }
 
-    // 3. Force reload so resolveFinalPrice() re-runs with the new region
-    window.location.reload();
+    // 3. Update URL Query Param to notify Server Components
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("currency", nextCurrency);
+
+    // Replace URL without scrolling to top
+    router.replace(`${pathname}?${params.toString()}`, {
+      scroll: false,
+    });
+    
+    // Optional: Trigger a router refresh to ensure server components re-fetch data
+    router.refresh(); 
   };
 
   return (
