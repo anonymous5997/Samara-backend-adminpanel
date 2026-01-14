@@ -1,17 +1,16 @@
-// app/layout.tsx (SERVER COMPONENT)
+// app/layout.tsx
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter, Playfair_Display, Cormorant_Garamond } from "next/font/google";
 import ClientProviders from "./providers";
 import Script from "next/script";
+import { Playfair_Display } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
-const cormorant = Cormorant_Garamond({
+const playfair = Playfair_Display({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-cormorant",
+  weight: ["600", "700", "800", "900"],
+  variable: "--font-playfair",
 });
+
 
 export const metadata: Metadata = {
   title: "Samara - Best Handcrafted Sambalpuri Sarees | Traditional Indian Sarees",
@@ -30,18 +29,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={playfair.variable}>
       <head>
-        {/* ✅ Razorpay SDK – MUST be beforeInteractive */}
+        {/* Razorpay SDK */}
         <Script
           src="https://checkout.razorpay.com/v1/checkout.js"
           strategy="beforeInteractive"
         />
       </head>
 
-      <body
-        className={`${inter.variable} ${playfair.variable} ${cormorant.variable} font-sans antialiased`}
-      >
+      <body className="antialiased">
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

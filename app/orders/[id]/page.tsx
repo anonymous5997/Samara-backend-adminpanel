@@ -38,7 +38,7 @@ type Order = {
   order_number: string
   status: string
   payment_status: string
-  total_amount: number // ✅ Changed from total_amount_inr
+  total_amount: number
   currency: SupportedCurrency
   created_at: string
   tracking_number: string | null
@@ -89,7 +89,6 @@ export default function OrderDetailsPage() {
         .single()
 
       if (!error && data) {
-        // ✅ No conversion needed, simply set the order data
         setOrder({ ...data, currency: data.currency as SupportedCurrency })
       } else {
         setOrder(null)
@@ -106,7 +105,6 @@ export default function OrderDetailsPage() {
     if (!order) return
 
     const currency = order.currency || 'INR'
-    // ✅ Use direct total_amount without conversion
     const formatted = formatPriceSync(order.total_amount, currency)
 
     const doc = new jsPDF()
@@ -135,10 +133,13 @@ export default function OrderDetailsPage() {
       const sellerY = 55
       doc.setFontSize(10)
       doc.text('Sold By:', margin, sellerY)
-      doc.setFont(undefined, 'bold')
+      
+      // ✅ FIX: Explicit font family
+      doc.setFont('helvetica', 'bold')
       doc.text('SAMARA', margin, sellerY + 5)
-      doc.setFont(undefined, 'normal')
-
+      
+      // ✅ FIX: Explicit font family
+      doc.setFont('helvetica', 'normal')
       doc.text(COMPANY.address, margin, sellerY + 11)
       doc.text(`GSTIN: ${COMPANY.gstin}`, margin, sellerY + 17)
       doc.text(`Email: ${COMPANY.email}`, margin, sellerY + 23)
@@ -157,9 +158,13 @@ export default function OrderDetailsPage() {
       doc.setTextColor(100) 
       doc.text(`Invoice #`, boxX + 4, boxY + 8)
       doc.setTextColor(0) 
-      doc.setFont(undefined, 'bold')
+      
+      // ✅ FIX: Explicit font family
+      doc.setFont('helvetica', 'bold')
       doc.text(order.order_number, boxX + 4, boxY + 14)
-      doc.setFont(undefined, 'normal')
+      
+      // ✅ FIX: Explicit font family
+      doc.setFont('helvetica', 'normal')
 
       // Row 2
       doc.setTextColor(100)
@@ -236,11 +241,14 @@ export default function OrderDetailsPage() {
       )
 
       doc.setFontSize(11)
-      doc.setFont(undefined, 'bold')
+      
+      // ✅ FIX: Explicit font family
+      doc.setFont('helvetica', 'bold')
       doc.text(`Grand Total: ${formatted}`, totalTextX, y + 25)
 
       // Footer Note below totals
-      doc.setFont(undefined, 'normal')
+      // ✅ FIX: Explicit font family
+      doc.setFont('helvetica', 'normal')
       doc.setFontSize(9)
       doc.text('Price includes 18% GST and shipping charges.', totalTextX, y + 36)
 
@@ -332,7 +340,6 @@ export default function OrderDetailsPage() {
             </div>
 
             <div className="text-right">
-              {/* ✅ Direct format using total_amount */}
               <p className="text-lg font-semibold text-white">
                 {formatPriceSync(order.total_amount, order.currency)}
               </p>

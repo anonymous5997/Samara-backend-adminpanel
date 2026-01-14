@@ -11,7 +11,12 @@ const REGIONS = [
   { code: 'GB', label: 'UK (GBP)' },
 ]
 
-export default function PricingForm({ productId }) {
+/* ✅ PROPS TYPE (this fixes the Vercel build error) */
+type PricingFormProps = {
+  productId: string
+}
+
+export default function PricingForm({ productId }: PricingFormProps) {
   const [prices, setPrices] = useState<Record<string, string>>({})
 
   function update(region: string, value: string) {

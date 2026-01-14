@@ -165,13 +165,13 @@ export default function FestiveEditPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             {/* Display Price */}
                             <p className="text-xl font-bold text-gold">
-                              {formatPriceSync(price.displayPrice, price.currency)}
+                              {formatPriceSync(price.displayPrice, price.currency as import('@/lib/currency-utils').SupportedCurrency)}
                             </p>
 
                             {/* MRP (Only if higher) */}
                             {price.mrp && price.mrp > price.displayPrice && (
                               <p className="text-sm text-gray-500 line-through">
-                                {formatPriceSync(price.mrp, price.currency)}
+                                {formatPriceSync(price.mrp, price.currency as import('@/lib/currency-utils').SupportedCurrency)}
                               </p>
                             )}
 

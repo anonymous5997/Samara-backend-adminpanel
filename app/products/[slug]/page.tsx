@@ -23,13 +23,12 @@ import { ProductTryOnModal } from '@/components/ProductTryOnModal';
 import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
 import { getSimilarProducts } from '@/lib/content';
-import {
-  formatPriceSync,
-} from '@/lib/currency-utils';
+
 
 // PRICING UTILITIES
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
 import { getUserRegion } from '@/lib/region/client';
+import { formatPriceSync, type SupportedCurrency } from '@/lib/currency-utils';
 
 // INTERFACES
 interface Product {
@@ -236,7 +235,8 @@ export default function ProductDetailPage() {
   // 1. Get the Selling Price (Manual or Auto)
   // If resolver isn't ready yet, fallback to base INR
   const price = resolvedPrice?.displayPrice ?? product.base_price_inr;
-  const currencyCode = resolvedPrice?.currency ?? 'INR';
+  const currencyCode: SupportedCurrency =
+    (resolvedPrice?.currency as SupportedCurrency) ?? 'INR';
 
   // 2. Get MRP and Discount directly from the resolver
   // The resolver now correctly handles strict Database MRP for INR

@@ -12,6 +12,7 @@ import { useCart } from '@/lib/cart-context';
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
 import { formatPriceSync } from '@/lib/currency-utils';
 import { getUserRegion } from '@/lib/get-user-region';
+import type { SupportedCurrency } from '@/lib/currency';
 
 export default function CollectionDetailPage() {
   const params = useParams();
@@ -21,16 +22,30 @@ export default function CollectionDetailPage() {
   const [products, setProducts] = useState<ProductWithImages[]>([]);
   const [loading, setLoading] = useState(true);
 
-  /* ✅ STEP 3: ADD STATE FOR RESOLVED PRICES */
+  /* ✅ STEP 3: ADD STATE FOR RESOLVED PRICES & REGION */
   const { currency } = useCart();
-  const region = getUserRegion();
+  const [region, setRegion] = useState<string>('IN'); // Default to IN, update async
   const [priceMap, setPriceMap] = useState<
-    Record<string, { price: number; currency: string }>
+    Record<string, { price: number; currency: SupportedCurrency }>
   >({});
 
+  // 1. Load Collection Data
   useEffect(() => {
     loadCollectionData();
   }, [slug]);
+
+  // 2. Load User Region Asynchronously
+  useEffect(() => {
+    const loadRegion = async () => {
+      try {
+        const r = await getUserRegion();
+        setRegion(r);
+      } catch (error) {
+        console.error('Failed to load region:', error);
+      }
+    };
+    loadRegion();
+  }, []);
 
   const loadCollectionData = async () => {
     try {
@@ -48,14 +63,15 @@ export default function CollectionDetailPage() {
     }
   };
 
-  /* ✅ STEP 4: RESOLVE PRICES AFTER PRODUCTS LOAD */
+  /* ✅ STEP 4: RESOLVE PRICES AFTER PRODUCTS & REGION LOAD */
   useEffect(() => {
-    if (!products.length) return;
+    if (!products.length || !region) return;
 
     const loadPrices = async () => {
-      const map: Record<string, { price: number; currency: string }> = {};
+      const map: Record<string, { price: number; currency: SupportedCurrency }> = {};
 
       for (const product of products) {
+        // Now passing a string region, not a Promise
         const resolved = await resolveFinalPrice(
           product,
           region,
@@ -65,7 +81,7 @@ export default function CollectionDetailPage() {
         if (resolved?.displayPrice) {
           map[product.id] = {
             price: resolved.displayPrice,
-            currency: resolved.currency,
+            currency: resolved.currency as SupportedCurrency,
           };
         }
       }

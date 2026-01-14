@@ -1,6 +1,7 @@
 // lib/currency-utils.ts
 
 import { supabase } from './supabase/client';
+import type { SupportedCurrency } from './currency';
 
 export type SupportedCurrency = 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD';
 
@@ -56,6 +57,7 @@ function getDefaultRates(): Map<string, number> {
     ['AED', 0.044],
     ['GBP', 0.0095],
     ['CAD', 0.016],
+    ['EUR', 0.011],
   ]);
 }
 

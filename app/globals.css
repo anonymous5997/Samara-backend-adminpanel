@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =====================================================
+   1. CUSTOM COLOR PALETTE
+===================================================== */
+:root {
+  --color-bg: #000000;
+  --color-dark: #050505;
+  --color-darker: #111111;
+  --color-gold: #D4AF37;
+  --color-gold-light: #F4D03F;
+  --color-text-heading: #E6C35C;
+  --color-text-body: #F5F5F5;
+  --color-text-body-secondary: #CFCFCF;
+}
+
+/* =====================================================
+   2. UTILITIES LAYER (Animations & Custom Classes)
+===================================================== */
 @layer utilities {
   .animate-fade-in {
     animation: fadeIn 1.2s ease-out;
@@ -17,6 +34,12 @@
       transform: translateY(0);
     }
   }
+  .luxury-heading {
+    text-shadow:
+      0 1px 0 rgba(212,175,55,0.25),
+      0 6px 20px rgba(212,175,55,0.35);
+  }
+
 
   .text-body {
     @apply text-[#F5F5F5];
@@ -39,19 +62,46 @@
   .gold-glow-hover:hover {
     box-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
   }
+
+  /* --- NEW PREMIUM TYPOGRAPHY UTILITIES --- */
+
+  /* Product Titles */
+  .product-title {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+  }
+
+  /* Prices */
+  .price {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    text-shadow: 0 0 16px rgba(212, 175, 55, 0.25);
+  }
+
+  /* Discount badges */
+  .discount-badge {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  /* Navigation links */
+  .nav-link {
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Luxury heading glow */
+  .luxury-glow {
+    text-shadow: 0 0 25px rgba(212, 175, 55, 0.35);
+  }
 }
 
-:root {
-  --color-bg: #000000;
-  --color-dark: #050505;
-  --color-darker: #111111;
-  --color-gold: #D4AF37;
-  --color-gold-light: #F4D03F;
-  --color-text-heading: #D4AF37;
-  --color-text-body: #F5F5F5;
-  --color-text-body-secondary: #CFCFCF;
-}
-
+/* =====================================================
+   3. BASE LAYER (Shadcn Defaults & Typography Rules)
+===================================================== */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -108,11 +158,37 @@
   }
 }
 
+/* =====================================================
+   4. GLOBAL TYPOGRAPHY RESET
+===================================================== */
 @layer base {
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.01em;
+    font-weight: 400;
+  }
+
+  /* Headings use classic luxury serif stack */
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-playfair), "Playfair Display", serif;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    color: var(--color-text-heading);
+  }
+
+  h1 { font-size: 3.5rem; }
+  h2 { font-size: 2.5rem; }
+  h3 { font-size: 1.5rem; }
+
+  @media (max-width: 768px) {
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; }
   }
 }
