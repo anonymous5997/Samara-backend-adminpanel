@@ -194,8 +194,6 @@ export default function SearchPage() {
               <ProductCard
                 key={product.id}
                 product={product}
-                currency={currency}
-                rate={1}
               />
             ))}
           </div>

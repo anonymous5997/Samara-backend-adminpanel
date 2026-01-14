@@ -1,7 +1,6 @@
 // lib/currency-utils.ts
 
 import { supabase } from './supabase/client';
-import type { SupportedCurrency } from './currency';
 
 export type SupportedCurrency = 'INR' | 'USD' | 'AED' | 'GBP' | 'CAD';
 

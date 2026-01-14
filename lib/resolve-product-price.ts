@@ -1,10 +1,12 @@
 // lib/resolve-product-price.ts
 
 import { supabase } from '@/lib/supabase/client';
+import type { SupportedCurrency } from '@/lib/currency-utils';
+
 
 export interface ResolvedPrice {
   displayPrice: number;      // Price shown to user (USD / AED / GBP / INR)
-  currency: string;          // Display currency
+  currency: SupportedCurrency;        // Display currency
   inrBase: number;           // Final INR charged (Razorpay)
   mrp: number | null;        // Display MRP (optional)
   discountPct: number | null;
@@ -14,7 +16,7 @@ export interface ResolvedPrice {
 export async function resolveFinalPrice(
   product: any,
   region: string,
-  currency: string
+  currency: SupportedCurrency
 ): Promise<ResolvedPrice> {
 
   /* -----------------------------------------------------------
@@ -39,7 +41,7 @@ export async function resolveFinalPrice(
   if (currency === 'INR') {
     return {
       displayPrice: inrSelling,
-      currency: 'INR',
+      currency: 'INR'as SupportedCurrency,
       inrBase: inrSelling,
       mrp: inrMrp || null,
       discountPct,

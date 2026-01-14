@@ -16,6 +16,7 @@ import { getCurrencyRates } from '@/lib/currency/get-currency-rates';
 
 import type { Region } from '@/lib/landed-pricing';
 import type { CurrencyCode } from '@/components/currency-selector';
+import { Currency } from 'lucide-react';
 
 /* ======================================================
    TYPES
@@ -202,7 +203,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     if (!product) return;
 
-    const { price, currency } = resolveFinalPrice(product, region);
+    const resolved = await resolveFinalPrice(product, region, currency);
+    const unitPrice = resolved.inrBase; // Razorpay price (always INR)
+    const displayCurrency = resolved.currency;
 
     await supabase
       .from('cart_items')
@@ -212,7 +215,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           product_id: productId,
           variant_id: variantId,
           quantity,
-          unit_price: price,
+          unit_price: unitPrice,
           currency,
           region,
         },

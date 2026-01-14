@@ -15,6 +15,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import CurrencySelector from '@/components/currency-selector';
+import type { SupportedCurrency } from '@/lib/currency-utils';
+
+
 
 // Import setUserRegion logic
 import { setUserRegion } from '@/lib/region/client';
@@ -36,8 +39,8 @@ export function Header() {
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   // Currency Handler
-  const handleCurrencyChange = (nextCurrency: string) => {
-    const currency = nextCurrency.toUpperCase();
+  const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
+    // const currency = nextCurrency.toUpperCase();
     // 1. Update visual currency state
     setCurrency(nextCurrency);
 
@@ -45,9 +48,6 @@ export function Header() {
     switch (nextCurrency) {
       case 'USD':
         setUserRegion('US');
-        break;
-      case 'EUR':
-        setUserRegion('EU');
         break;
       case 'AED':
         setUserRegion('AE');

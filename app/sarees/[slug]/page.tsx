@@ -1,5 +1,5 @@
-import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 
 export default async function SareePage({
   params,
@@ -8,19 +8,20 @@ export default async function SareePage({
 }) {
   const supabase = await createClient()
 
-  const region =
-    cookies().get('region')?.value || 'IN'
+  // Next 15+ cookies API
+  const cookieStore = await cookies()
+  const region = cookieStore.get("region")?.value || "IN"
 
   const { data: product, error } = await supabase
-    .from('products')
+    .from("products")
     .select(
       `
       *,
       product_prices!inner(price, currency)
     `
     )
-    .eq('slug', params.slug)
-    .eq('product_prices.region', region)
+    .eq("slug", params.slug)
+    .eq("product_prices.region", region)
     .single()
 
   if (error || !product) {

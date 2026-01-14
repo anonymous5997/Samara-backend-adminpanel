@@ -3,10 +3,10 @@ import type { Region } from './landed-pricing'
 
 /**
  * Reads region from middleware-set cookie
- * This runs ONLY on the server (safe)
+ * Server-only
  */
-export function getCurrentRegion(): Region {
-  const cookieStore = cookies()
+export async function getCurrentRegion(): Promise<Region> {
+  const cookieStore = await cookies()
   const region = cookieStore.get('region')?.value
 
   switch (region) {

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatPriceSync } from '@/lib/currency-utils';
+import type { SupportedCurrency } from '@/lib/currency-utils';
 
 interface BuyNowModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ interface BuyNowModalProps {
 
   // ✅ DISPLAY PRICE (What the user sees)
   productPrice: number;
-  currency: string;
+  currency: SupportedCurrency;  
 
   // ✅ PAYMENT PRICE (What Razorpay charges)
   productPriceInr: number; 

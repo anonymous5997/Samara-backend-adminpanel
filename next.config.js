@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
+  turbopack: {
+    root: __dirname, // 🔥 THIS fixes "@/lib/*" resolution
   },
+
   images: {
     remotePatterns: [
       {
@@ -11,7 +12,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'wrsrobuicquzpfgnfnmh.supabase.co', // ✅ FIXED
+        hostname: 'wrsrobuicquzpfgnfnmh.supabase.co',
       },
     ],
   },

@@ -12,7 +12,7 @@ import { useCart } from '@/lib/cart-context';
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
 import { formatPriceSync } from '@/lib/currency-utils';
 import { getUserRegion } from '@/lib/get-user-region';
-import type { SupportedCurrency } from '@/lib/currency';
+import type { SupportedCurrency } from '@/lib/currency-utils';
 
 export default function CollectionDetailPage() {
   const params = useParams();

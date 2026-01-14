@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useCart } from '@/lib/cart-context';
 import { supabase } from '@/lib/supabase/client';
 import { Product, ProductImage } from '@/lib/types';
-import { formatPrice } from '@/lib/currency';
+import { formatPriceSync } from '@/lib/currency-utils';
 import { Heart, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
@@ -20,7 +20,6 @@ export default function WishlistPage() {
   const { currency, addToCart } = useCart();
   const [items, setItems] = useState<{ product: Product; image?: ProductImage }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currencyRate, setCurrencyRate] = useState(1);
 
   useEffect(() => {
     if (!user) {
@@ -29,20 +28,19 @@ export default function WishlistPage() {
     }
 
     fetchWishlist();
-    fetchCurrencyRate();
   }, [user, currency]);
 
-  const fetchCurrencyRate = async () => {
-    const { data } = await supabase
-      .from('currency_rates')
-      .select('rate')
-      .eq('target_currency', currency)
-      .maybeSingle();
+  // const fetchCurrencyRate = async () => {
+  //   const { data } = await supabase
+  //     .from('currency_rates')
+  //     .select('rate')
+  //     .eq('target_currency', currency)
+  //     .maybeSingle();
 
-    if (data) {
-      setCurrencyRate(data.rate);
-    }
-  };
+  //   if (data) {
+  //     setCurrencyRate(data.rate);
+  //   }
+  // };
 
   const fetchWishlist = async () => {
     if (!user) return;
@@ -181,7 +179,7 @@ export default function WishlistPage() {
                 </h3>
               </Link>
               <p className="text-sm font-semibold mb-2">
-                {formatPrice(product.base_price_inr, currency, currencyRate)}
+                {formatPriceSync(product.base_price_inr, currency)}
               </p>
               <Button
                 size="sm"

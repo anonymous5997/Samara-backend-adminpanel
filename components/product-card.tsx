@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Product, ProductImage } from '@/lib/types';
-import { formatPrice } from '@/lib/currency';
+import { formatPriceSync } from '@/lib/currency-utils';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { useState } from 'react';
@@ -50,8 +50,8 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
   };
 
   return (
-    <Link 
-      href={`/products/${product.slug}`} 
+    <Link
+      href={`/products/${product.slug}`}
       className="group block border border-[#D4AF37]/30 hover:border-[#D4AF37] rounded-xl p-3 transition bg-black"
     >
       {/* IMAGE CONTAINER */}
@@ -80,9 +80,7 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
           >
             <Heart
               className={`h-4 w-4 ${
-                isWishlisted
-                  ? 'fill-red-500 text-red-500'
-                  : 'text-white'
+                isWishlisted ? 'fill-red-500 text-red-500' : 'text-white'
               }`}
             />
           </Button>
@@ -91,7 +89,7 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
 
       {/* DETAILS SECTION */}
       <div className="mt-3 space-y-1">
-        {/* Title: Gold Serif */}
+        {/* Title */}
         <h3 className="text-base font-serif font-semibold text-[#D4AF37] line-clamp-2 leading-tight group-hover:text-[#F4CF57] transition-colors">
           {product.name}
         </h3>
@@ -106,19 +104,19 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
           <div className="mt-2 h-5 w-24 bg-gray-800 animate-pulse rounded" />
         ) : (
           <div className="mt-2 flex items-center gap-2">
-            {/* Display Price (Gold) */}
+            {/* Selling Price */}
             <span className="text-base font-semibold text-[#D4AF37]">
-              {formatPrice(price.displayPrice, price.currency)}
+              {formatPriceSync(price.displayPrice, price.currency)}
             </span>
 
-            {/* MRP (Crossed Out) */}
+            {/* MRP */}
             {price.mrp && price.mrp > price.displayPrice && (
               <span className="text-xs text-gray-500 line-through decoration-gray-600">
-                {formatPrice(price.mrp, price.currency)}
+                {formatPriceSync(price.mrp, price.currency)}
               </span>
             )}
 
-            {/* ✅ DISCOUNT BADGE (GREEN) */}
+            {/* Discount */}
             {price.discountPct && price.discountPct > 0 && (
               <span className="text-[10px] font-bold text-green-400 border border-green-400/30 px-1.5 py-0.5 rounded bg-green-400/10">
                 {price.discountPct}% OFF

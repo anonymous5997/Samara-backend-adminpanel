@@ -13,6 +13,7 @@ import {
   getCurrencyRates, 
   formatPriceSync 
 } from '@/lib/currency-utils';
+import type { SupportedCurrency } from '@/lib/currency-utils';
 
 /* -----------------------------------------------------------
    ✅ PRICE RESOLVER & REGION
@@ -54,7 +55,7 @@ export default function SareesPage() {
       string,
       {
         price: number;       // Selling Price (e.g. $150)
-        currency: string;    // Currency Code
+        currency: SupportedCurrency;   // Currency Code
         mrp: number | null;  // Calculated MRP (e.g. $283)
         discountPct: number; // Percentage (e.g. 47)
       }
@@ -109,7 +110,7 @@ export default function SareesPage() {
           // ✅ CORRECTED: Direct Mapping. No manual math.
           map[product.id] = {
             price: resolved.displayPrice,
-            currency: resolved.currency,
+            currency: resolved.currency as SupportedCurrency,
             mrp: resolved.mrp,           // Resolver provides correct MRP
             discountPct: resolved.discountPct ?? 0, // Resolver provides correct %
           };
@@ -151,20 +152,38 @@ export default function SareesPage() {
   }, [allProducts, priceMap, currency]); 
 
   // ------------------------------------------------------------------
-  // 5. MEMOIZE FILTER OPTIONS
+  // 5. MEMOIZE FILTER OPTIONS (Strict Types)
   // ------------------------------------------------------------------
-  const fabricOptions = useMemo(() => 
-    Array.from(new Set(allProducts.map((p) => p.fabric?.trim()).filter(Boolean))).sort(), 
+  const fabricOptions = useMemo<string[]>(() => 
+    Array.from(
+      new Set(
+        allProducts
+          .map(p => p.fabric?.trim())
+          .filter((v): v is string => Boolean(v))
+      )
+    ).sort(),
     [allProducts]
   );
-  
-  const colorOptions = useMemo(() => 
-    Array.from(new Set(allProducts.map((p) => p.color?.trim()).filter(Boolean))).sort(), 
+
+  const colorOptions = useMemo<string[]>(() => 
+    Array.from(
+      new Set(
+        allProducts
+          .map(p => p.color?.trim())
+          .filter((v): v is string => Boolean(v))
+      )
+    ).sort(),
     [allProducts]
   );
-  
-  const occasionOptions = useMemo(() => 
-    Array.from(new Set(allProducts.map((p) => p.occasion?.trim()).filter(Boolean))).sort(), 
+
+  const occasionOptions = useMemo<string[]>(() => 
+    Array.from(
+      new Set(
+        allProducts
+          .map(p => p.occasion?.trim())
+          .filter((v): v is string => Boolean(v))
+      )
+    ).sort(),
     [allProducts]
   );
 
