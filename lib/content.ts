@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { applyLandedPricing, type Region } from './landed-pricing';
+import type { Product } from '@/lib/types';
 
 /* ================================================================== */
 /* TYPES & INTERFACES                                                 */
@@ -32,45 +32,25 @@ export interface Collection {
   sort_order: number;
 }
 
-export interface ProductWithImages {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  brand: string | null;
-  base_price_inr: number;
-
-  /* ✅ ADDED: Explicit Product Prices Support */
+// ✅ FIXED: Extends Product to inherit created_at, id, etc.
+// Only adding the specific relations/computed fields here.
+export interface ProductWithImages extends Product {
+  /* Relations */
   product_prices?: Array<{
+    region: string;
     currency: string;
     price: number;
+    mrp?: number | null;
   }>;
 
-  is_bestseller: boolean;
-  bestseller_badge_label: string;
-  is_new_arrival: boolean;
-  is_active: boolean;
-
-  show_in_sarees: boolean;
-  show_in_festive_edit: boolean;
-  fabric: string | null;
-  color: string | null;
-  occasion: string | null;
-
-  category_id: string | null;
   primary_image_url: string | null;
+  
   images: Array<{
-    id: string;
+    id?: string;
     image_url: string;
     is_primary: boolean;
   }>;
 }
-
-/* ================================================================== */
-/* REGION SUPPORT                                                     */
-/* ================================================================== */
-
-export type PricingRegion = Region;
 
 /* ================================================================== */
 /* SUPABASE CLIENT                                                    */
@@ -96,34 +76,14 @@ function mapProductsWithImages(data: any[] | null): ProductWithImages[] {
   return (data || []).map((product: any) => ({
     ...product,
     images: product.product_images || [],
+    // ✅ Ensure primary image logic is robust
     primary_image_url:
       product.product_images?.find((img: any) => img.is_primary)?.image_url ||
       product.product_images?.[0]?.image_url ||
       null,
+    // ✅ Ensure prices array is always present
+    product_prices: product.product_prices || [],
   }));
-}
-
-function mapProductsWithImagesByRegion(
-  data: any[] | null,
-  region: PricingRegion = 'IN',
-): ProductWithImages[] {
-  return (data || []).map((product: any) => {
-    const basePrice = product.base_price_inr ?? 0;
-
-    return {
-      ...product,
-      base_price_inr:
-        region === 'IN'
-          ? basePrice
-          : applyLandedPricing(basePrice, region),
-
-      images: product.product_images || [],
-      primary_image_url:
-        product.product_images?.find((img: any) => img.is_primary)?.image_url ||
-        product.product_images?.[0]?.image_url ||
-        null,
-    };
-  });
 }
 
 /* ================================================================== */
@@ -164,7 +124,8 @@ export async function getMostLovedProducts(
       *,
       product_prices (
         currency,
-        price
+        price,
+        mrp
       ),
       product_images (
         id,
@@ -199,7 +160,8 @@ export async function getNewArrivals(
       *,
       product_prices (
         currency,
-        price
+        price,
+        mrp
       ),
       product_images (
         id,
@@ -223,29 +185,22 @@ export async function getNewArrivals(
 }
 
 /* ================================================================== */
-/* SAREES PAGE (REGION AWARE)                                         */
+/* SAREES PAGE (CLEAN - NO REGION/PRICING LOGIC)                      */
 /* ================================================================== */
 
-export async function getSareeProducts(
-  filters?: {
-    fabric?: string[];
-    color?: string[];
-    occasion?: string[];
-    minPrice?: number;
-    maxPrice?: number;
-  },
-  region: PricingRegion = 'IN',
-): Promise<ProductWithImages[]> {
+export async function getSareeProducts(): Promise<ProductWithImages[]> {
   const supabase = getSupabaseClient();
 
-  let query = supabase
+  // ✅ Clean Query: Fetch everything, let client/resolver handle pricing
+  const { data, error } = await supabase
     .from('products')
-    .select(
-      `
+    .select(`
       *,
       product_prices (
         currency,
-        price
+        price,
+        mrp,
+        region
       ),
       product_images (
         id,
@@ -253,28 +208,17 @@ export async function getSareeProducts(
         is_primary,
         display_order
       )
-    `,
-    )
+    `)
     .eq('is_active', true)
     .eq('show_in_sarees', true)
     .order('created_at', { ascending: false });
-
-  if (filters?.fabric?.length) query = query.in('fabric', filters.fabric);
-  if (filters?.color?.length) query = query.in('color', filters.color);
-  if (filters?.occasion?.length) query = query.in('occasion', filters.occasion);
-  if (typeof filters?.minPrice === 'number')
-    query = query.gte('product_prices.price', filters.minPrice);
-  if (typeof filters?.maxPrice === 'number')
-    query = query.lte('product_prices.price', filters.maxPrice);
-
-  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching saree products:', error);
     return [];
   }
 
-  return mapProductsWithImagesByRegion(data, region);
+  return mapProductsWithImages(data);
 }
 
 /* ================================================================== */
@@ -345,14 +289,26 @@ export async function getCollectionBySlug(
   return data;
 }
 
+/* ✅ FIXED: Safe getCollectionProducts (Guards against invalid UUID) */
 export async function getCollectionProducts(
   slug: string,
 ): Promise<ProductWithImages[]> {
-  const collection = await getCollectionBySlug(slug);
-  if (!collection) return [];
-
   const supabase = getSupabaseClient();
 
+  // 1️⃣ Fetch collection FIRST
+  const { data: collection, error: collectionError } = await supabase
+    .from('collections')
+    .select('id, name')
+    .eq('slug', slug)
+    .single();
+
+  // ✅ HARD GUARD: Prevent crash if slug invalid or collection missing
+  if (collectionError || !collection?.id) {
+    console.error('Invalid collection slug or fetch error:', slug, collectionError);
+    return [];
+  }
+
+  // 2️⃣ Fetch products ONLY if collection.id exists
   const { data, error } = await supabase
     .from('products')
     .select(
@@ -360,7 +316,8 @@ export async function getCollectionProducts(
       *,
       product_prices (
         currency,
-        price
+        price,
+        mrp
       ),
       product_images (
         id,
@@ -370,7 +327,7 @@ export async function getCollectionProducts(
       )
     `,
     )
-    .eq('category_id', collection.category_id)
+    .eq('collection_id', collection.id)
     .eq('is_active', true);
 
   if (error) {
@@ -391,7 +348,8 @@ export async function getFestiveEditProducts(): Promise<ProductWithImages[]> {
       *,
       product_prices (
         currency,
-        price
+        price,
+        mrp
       ),
       product_images (
         id,
@@ -412,6 +370,10 @@ export async function getFestiveEditProducts(): Promise<ProductWithImages[]> {
   return mapProductsWithImages(data);
 }
 
+/* ================================================================== */
+/* SIMILAR PRODUCTS                                                   */
+/* ================================================================== */
+
 export async function getSimilarProducts(
   productId: string,
   limit: number = 4,
@@ -420,21 +382,22 @@ export async function getSimilarProducts(
 
   const { data, error } = await supabase
     .from('products')
-    .select(
-      `
-      *,
+    .select(`
+      id,
+      name,
+      slug,
+      base_price_inr,
+      mrp_inr,
+      product_images (
+        image_url,
+        is_primary
+      ),
       product_prices (
         currency,
-        price
-      ),
-      product_images (
-        id,
-        image_url,
-        is_primary,
-        display_order
+        price,
+        mrp
       )
-    `,
-    )
+    `)
     .neq('id', productId)
     .eq('is_active', true)
     .limit(limit);

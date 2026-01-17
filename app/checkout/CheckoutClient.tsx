@@ -23,7 +23,7 @@ export default function CheckoutClient() {
   const searchParams = useSearchParams();
   const { user, profile } = useAuth();
   
-  // Get active currency from Cart Context for Display
+  // We still get activeCurrency, but strictly DO NOT use it for rendering prices in checkout
   const { items: cartItems, clearCart, currency: activeCurrency } = useCart();
 
   const mode = searchParams.get('mode');
@@ -51,7 +51,7 @@ export default function CheckoutClient() {
     document.body.appendChild(script);
   }, []);
 
-  /* ---------------- BUY NOW DATA LOAD (STEP 2: VALIDATION) ---------------- */
+  /* ---------------- BUY NOW DATA LOAD ---------------- */
   useEffect(() => {
     if (!isBuyNow) return;
     
@@ -65,7 +65,7 @@ export default function CheckoutClient() {
     try {
       const parsed = JSON.parse(raw);
 
-      // ✅ STEP 2: HARD VALIDATION - Ensure INR price exists before rendering
+      // ✅ GUARD: Ensure INR price exists before rendering
       if (!parsed.unit_price_inr || parsed.unit_price_inr <= 0) {
         console.error("Invalid pricing in session storage:", parsed);
         toast.error('Invalid pricing data. Please try again.');
@@ -112,7 +112,23 @@ export default function CheckoutClient() {
     });
   }, [profile]);
 
+  /* ---------------- DETERMINING DISPLAY CURRENCY (STEP 1) ---------------- */
+  // ✅ STEP 1: FIX CHECKOUT DISPLAY CURRENCY
+  // Uses the locked currency from the items, ignoring the global header currency.
+  const displayCurrency = useMemo(() => {
+    if (isBuyNow && buyNowItem) {
+      return buyNowItem.currency;
+    }
+
+    if (cartItems.length > 0) {
+      return cartItems[0].currency; // 🔒 SINGLE SOURCE OF TRUTH
+    }
+
+    return 'INR'; // Fallback
+  }, [isBuyNow, buyNowItem, cartItems]);
+
   /* ---------------- ITEMS LOGIC ---------------- */
+  // We strictly use the locked values (unit_price & unit_price_inr) from the cart/buynow session.
   const items = useMemo(() => {
     // 1. BUY NOW MODE
     if (isBuyNow && buyNowItem) {
@@ -146,16 +162,18 @@ export default function CheckoutClient() {
         // DISPLAY price (User selected currency)
         final_price: item.unit_price, 
 
-        // PAYMENT price (Base INR calculation stored in cart)
+        // PAYMENT price (Base INR calculation stored in cart DB)
+        // NOTE: Ensure your cart_items table has 'unit_price_inr'
         final_price_inr: item.unit_price_inr, 
 
         currency: item.currency,
       },
-      image_url: item.product.primary_image_url || item.image_url, 
+      // Use logic to prefer item image, fallback to product primary
+      image_url: item.image_url || item.product.primary_image_url, 
     }));
   }, [isBuyNow, buyNowItem, cartItems]);
 
-  /* ---------------- TOTALS (STEP 3: SAFE CALCULATION) ---------------- */
+  /* ---------------- TOTALS (STEP 4: SPLIT MATH) ---------------- */
   
   // A. DISPLAY TOTALS (For UI Rendering - USD/AED/etc)
   const subtotal = items.reduce(
@@ -164,22 +182,17 @@ export default function CheckoutClient() {
   );
 
   // B. PAYMENT TOTALS (For Razorpay/Database - INR)
-  // ✅ STEP 3: DEFENSIVE CALCULATION
   const subtotalINR = items.reduce((sum, item) => {
     const price = Number(item.product.final_price_inr);
-    // If price is NaN or 0, ignore it to avoid pollution, but typically guard blocks this
     if (!price || price <= 0) return sum; 
     return sum + (price * item.quantity);
   }, 0);
 
-  const shippingINR = 0; // Assuming free shipping for now
+  const shippingINR = 0; // Assuming free shipping
 
   // C. FINAL TOTALS
   const total = subtotal - discountDisplay; 
   const totalINR = subtotalINR - discountINR + shippingINR;
-
-  // Determine which currency code to use for display
-  const displayCurrency = isBuyNow && buyNowItem ? buyNowItem.currency : activeCurrency;
 
   /* ---------------- APPLY COUPON ---------------- */
   const applyCoupon = async () => {
@@ -243,10 +256,11 @@ export default function CheckoutClient() {
 
     if (loading) return;
 
-    // ✅ STEP 1: CRITICAL GUARD
-    // Prevent submission if items have no INR price calculated
-    if (items.length === 0 || subtotalINR <= 0) {
-      toast.error('Price not ready or invalid. Please refresh the page.');
+    // ✅ HARD GUARD: Prevent invalid submissions (The "₹497 bug" prevention)
+    const invalidItems = items.some(i => !i.product.final_price_inr || i.product.final_price_inr <= 0);
+    
+    if (invalidItems || subtotalINR <= 0) {
+      toast.error('Pricing initialization failed. Please refresh the page.');
       return;
     }
 
@@ -256,21 +270,25 @@ export default function CheckoutClient() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth?.user) throw new Error('Not authenticated');
 
-      // Create Order (Always stored in INR)
-      // ✅ STEP 4: Math.max(1, ...) ensures DB never receives 0 for subtotal
+      // EXPLICIT ORDER MAPPING
       const { data: order, error } = await supabase
         .from('orders')
         .insert({
           user_id: auth.user.id,
-          total_amount: total,            // e.g. 200
-          currency: displayCurrency,  
+          
+          // DISPLAY VALUES (What user sees)
+          total_amount: total,            
+          currency: displayCurrency,
+          currency_used: displayCurrency,
+
+          // PAYMENT VALUES (What Razorpay charges)
           subtotal_inr: Math.max(1, subtotalINR),
           discount_inr: discountINR,
           shipping_inr: shippingINR,
-          total_amount_inr: Math.max(1, totalINR), // The amount Razorpay will charge
+          total_amount_inr: Math.max(1, totalINR), 
+          
           status: 'pending',
           payment_status: 'pending',
-          currency_used: displayCurrency, // Track what the user saw
 
           shipping_name: formData.name,
           shipping_phone: formData.phone,
@@ -293,7 +311,6 @@ export default function CheckoutClient() {
         
         // Ensure price_inr is never null/0
         price_inr: item.product.final_price_inr || 0,
-        // Optional: unit_price_inr if your schema uses that
         unit_price_inr: item.product.final_price_inr || 0,
         
         image_url: item.image_url,
@@ -302,17 +319,18 @@ export default function CheckoutClient() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
       if (itemsError) throw itemsError;
 
-      // Cleanup
-      if (!isBuyNow) await clearCart();
-      sessionStorage.removeItem('buynow_product');
+      // ❌ REMOVED: Cart clearing from here. 
+      // It is now handled inside Razorpay success handler.
 
-      // Initialize Payment (RAZORPAY ALWAYS TAKES INR)
+      // RAZORPAY INITIALIZATION (Strictly INR)
       const razorpay = new window.Razorpay({
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: Math.round(totalINR * 100), // INR Paise
-        currency: 'INR', // Strictly INR
+        amount: Math.round(totalINR * 100), // Convert to Paise
+        currency: 'INR',                    // ALWAYS INR
         name: 'Samara',
-        description: `Order ${order.id}`,
+        description: `Order #${order.id}`,
+        
+        // ✅ 1. SUCCESS HANDLER (Clear cart HERE)
         handler: async (response: any) => {
           await supabase
             .from('orders')
@@ -322,9 +340,32 @@ export default function CheckoutClient() {
             })
             .eq('id', order.id);
 
-          // Direct redirect to Order Details
+          // ✅ CLEAR CART ONLY AFTER SUCCESSFUL PAYMENT
+          if (!isBuyNow) {
+            await clearCart();
+          }
+          
+          // Clear session for buy now
+          sessionStorage.removeItem('buynow_product');
+
           router.replace(`/orders/${order.id}`);
         },
+
+        // ✅ 2. MODAL DISMISS HANDLER (Handle Cancel)
+        modal: {
+          ondismiss: async () => {
+            // Mark order as cancelled in DB
+            await supabase
+              .from('orders')
+              .update({ payment_status: 'cancelled' })
+              .eq('id', order.id);
+
+            // Do NOT clear cart here.
+            toast.info('Payment cancelled. Your cart is safe.');
+            setLoading(false); // Enable the pay button again
+          },
+        },
+
         prefill: {
             name: formData.name,
             email: formData.email,
@@ -339,7 +380,6 @@ export default function CheckoutClient() {
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Order failed');
-    } finally {
       setLoading(false);
     }
   };
@@ -382,7 +422,7 @@ export default function CheckoutClient() {
               ))}
             </div>
 
-            {/* Pay Button shows Display Price (active currency) */}
+            {/* ✅ STEP 2: PAY BUTTON USES DISPLAY CURRENCY */}
             <Button
               type="submit"
               disabled={loading}
@@ -390,9 +430,12 @@ export default function CheckoutClient() {
             >
               {loading ? 'PROCESSING...' : `PAY ${formatPriceSync(total, displayCurrency)}`}
             </Button>
-            <p className="text-xs text-center text-gray-500 mt-2">
-              *Your card will be charged in INR equivalent (≈ {formatPriceSync(totalINR, 'INR')})
-            </p>
+            {/* Helper Text for International Users */}
+            {displayCurrency !== 'INR' && (
+              <p className="text-xs text-center text-gray-500 mt-2">
+                *Your card will be charged in INR equivalent (≈ {formatPriceSync(totalINR, 'INR')})
+              </p>
+            )}
           </form>
 
           {/* Order Summary */}
@@ -418,7 +461,7 @@ export default function CheckoutClient() {
                     <p className="text-sm font-medium line-clamp-2">{item.product.name}</p>
                     <div className="flex justify-between items-center mt-2">
                       <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
-                      {/* Show item price in Display Currency */}
+                      {/* ✅ STEP 3: ORDER ITEMS USE DISPLAY CURRENCY */}
                       <p className="text-[#D4AF37] font-semibold">
                         {formatPriceSync(item.product.final_price, displayCurrency)}
                       </p>
@@ -447,7 +490,7 @@ export default function CheckoutClient() {
             <div className="border-t border-gray-700 pt-4 space-y-3 text-sm">
               <div className="flex justify-between text-gray-400">
                 <span>Subtotal</span>
-                {/* Show Subtotal in Display Currency */}
+                {/* ✅ STEP 4: TOTALS USE DISPLAY CURRENCY */}
                 <span>{formatPriceSync(subtotal, displayCurrency)}</span>
               </div>
               
@@ -459,14 +502,14 @@ export default function CheckoutClient() {
               {couponApplied && (
                 <div className="flex justify-between text-green-400">
                   <span>Discount</span>
-                  {/* Show Discount in Display Currency */}
+                  {/* ✅ STEP 4: DISCOUNT USE DISPLAY CURRENCY */}
                   <span>-{formatPriceSync(discountDisplay, displayCurrency)}</span>
                 </div>
               )}
 
               <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-700">
                 <span>Total</span>
-                {/* Show Total in Display Currency */}
+                {/* ✅ STEP 4: TOTAL USE DISPLAY CURRENCY */}
                 <span className="text-[#D4AF37]">
                   {formatPriceSync(total, displayCurrency)}
                 </span>

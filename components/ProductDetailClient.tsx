@@ -23,8 +23,16 @@ import {
   formatPriceSync, 
   type SupportedCurrency 
 } from '@/lib/currency-utils';
+import { usePricePreview } from '@/lib/price-preview-context';
 
 // INTERFACES
+
+// Update to match DB response for instant lookup
+interface ProductPriceRow {
+  currency_code: string; // Standard Supabase/SQL naming
+  price: number;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -38,6 +46,8 @@ interface Product {
   care_instructions?: string | null;
   shipping_time?: string | null;
   why_women_love?: string | null;
+  // Available raw prices for client-side preview lookup
+  product_prices?: ProductPriceRow[]; 
 }
 
 interface ProductImage {
@@ -70,6 +80,7 @@ export default function ProductDetailClient({
 }: ProductDetailClientProps) {
   const { user } = useAuth();
   const { addToCart } = useCart();
+  const { preview } = usePricePreview(); 
   
   // STATE MANAGEMENT
   const [selectedIndex, setSelectedIndex] = useState(0); 
@@ -100,12 +111,25 @@ export default function ProductDetailClient({
   };
 
   // =========================================================
-  // ✅ PRICING LOGIC - SERVER AUTHORITATIVE
+  // ✅ PRICING LOGIC - CLIENT SIDE INSTANT LOOKUP
   // =========================================================
-  // We trust the server completely. No client-side conversion.
   
-  const price = priceData.displayPrice;
-  const currencyCode = priceData.currency as SupportedCurrency;
+  const previewCurrency = preview.currency as SupportedCurrency | undefined;
+
+  // Look up admin-defined price for preview immediately from raw data
+  const previewPrice = previewCurrency && product.product_prices
+    ? product.product_prices.find((p: any) => 
+        // Check both common patterns (currency_code or currency)
+        (p.currency_code === previewCurrency || p.currency === previewCurrency)
+      )?.price
+    : null;
+
+  // Final values
+  const currencyCode = previewCurrency || (priceData.currency as SupportedCurrency);
+  
+  // If we found a specific price, use it. Otherwise, fallback to server value.
+  const price = previewPrice ?? priceData.displayPrice;
+  
   const mrp = priceData.mrp;
   const discount = priceData.discountPct || 0;
 

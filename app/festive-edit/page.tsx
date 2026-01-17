@@ -4,13 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getFestiveEditProducts, type ProductWithImages } from '@/lib/content';
 import { Star, Sparkles } from 'lucide-react';
-import { useCart } from '@/lib/cart-context';
-import { formatPriceSync } from '@/lib/currency-utils';
+import { formatPriceSync, type SupportedCurrency } from '@/lib/currency-utils';
 
 /* -----------------------------------------------------
    ✅ PRICING UTILITIES & REGION FIX
 ----------------------------------------------------- */
-import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
+import { resolveFinalPrice } from '@/lib/resolve-product-price';
 // ✅ FIXED: Using the client-side region detector
 import { getUserRegion } from '@/lib/region/client';
 
@@ -18,15 +17,28 @@ export default function FestiveEditPage() {
   const [products, setProducts] = useState<ProductWithImages[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Context & Region
-  const { currency } = useCart();
+  // ---------------------------------------------------------
+  // 1. REGION (Single Source of Truth)
+  // ---------------------------------------------------------
   const region = getUserRegion();
 
-  // Price State
-  const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
+  // ---------------------------------------------------------
+  // 2. PRICE STATE (Simplified for Display)
+  // ---------------------------------------------------------
+  const [priceMap, setPriceMap] = useState<
+    Record<
+      string,
+      {
+        price: number;
+        currency: SupportedCurrency;
+        mrp: number | null;
+        discountPct: number;
+      }
+    >
+  >({});
 
   /* -----------------------------------------------------
-     1. LOAD PRODUCTS
+     3. LOAD PRODUCTS
   ----------------------------------------------------- */
   useEffect(() => {
     const loadProducts = async () => {
@@ -46,29 +58,58 @@ export default function FestiveEditPage() {
   }, []);
 
   /* -----------------------------------------------------
-     2. RESOLVE PRICES (SINGLE SOURCE OF TRUTH)
+     4. RESOLVE PRICES (✅ PARALLEL & INSTANT)
   ----------------------------------------------------- */
-  // This logic correctly delegates all calculation to the library.
-  // We strictly avoid manual calculation in the UI.
-  
   useEffect(() => {
     if (!products.length) return;
 
     const loadPrices = async () => {
-      const map: Record<string, ResolvedPrice> = {};
+      // ✅ Parallel Processing: Map all promises first
+      const promises = products.map(async (product) => {
+        try {
+          // ✅ FIX: Depend only on region. Currency is resolved automatically.
+          const resolved = await resolveFinalPrice(product, region);
 
-      for (const product of products) {
-        // 
-        // The resolver uses the corrected 'region' to decide if Landed Pricing applies.
-        const resolved = await resolveFinalPrice(product, region, currency);
-        map[product.id] = resolved;
-      }
+          if (!resolved || resolved.displayPrice <= 0) return null;
+
+          return [
+            product.id,
+            {
+              price: resolved.displayPrice,
+              currency: resolved.currency as SupportedCurrency,
+              mrp: resolved.mrp,
+              discountPct: resolved.discountPct ?? 0,
+            },
+          ] as const;
+        } catch (error) {
+          console.error(`Failed to resolve price for ${product.id}`, error);
+          return null;
+        }
+      });
+
+      // ✅ Wait for all
+      const results = await Promise.all(promises);
+
+      // ✅ Convert to map
+      const map = Object.fromEntries(
+        results.filter(
+          (item): item is [
+            string,
+            {
+              price: number;
+              currency: SupportedCurrency;
+              mrp: number | null;
+              discountPct: number;
+            }
+          ] => item !== null
+        )
+      );
 
       setPriceMap(map);
     };
 
     loadPrices();
-  }, [products, region, currency]);
+  }, [products, region]); // ✅ Removed `currency` dependency
 
   /* -----------------------------------------------------
      RENDER
@@ -111,7 +152,7 @@ export default function FestiveEditPage() {
             /* PRODUCT GRID */
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {products.map((product) => {
-                const price = priceMap[product.id];
+                const priceData = priceMap[product.id];
 
                 return (
                   <Link key={product.id} href={`/products/${product.slug}`}>
@@ -159,26 +200,26 @@ export default function FestiveEditPage() {
                           </p>
                         )}
 
-                        {!price ? (
+                        {!priceData ? (
                           <div className="h-5 w-24 bg-gray-800 animate-pulse rounded" />
                         ) : (
                           <div className="flex items-center gap-2 flex-wrap">
                             {/* Display Price */}
                             <p className="text-xl font-bold text-gold">
-                              {formatPriceSync(price.displayPrice, price.currency as import('@/lib/currency-utils').SupportedCurrency)}
+                              {formatPriceSync(priceData.price, priceData.currency)}
                             </p>
 
                             {/* MRP (Only if higher) */}
-                            {price.mrp && price.mrp > price.displayPrice && (
+                            {priceData.mrp && priceData.mrp > priceData.price && (
                               <p className="text-sm text-gray-500 line-through">
-                                {formatPriceSync(price.mrp, price.currency as import('@/lib/currency-utils').SupportedCurrency)}
+                                {formatPriceSync(priceData.mrp, priceData.currency)}
                               </p>
                             )}
 
                             {/* Discount Percentage */}
-                            {price.discountPct && price.discountPct > 0 && (
+                            {priceData.discountPct > 0 && (
                               <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded ml-auto">
-                                {price.discountPct}% OFF
+                                {priceData.discountPct}% OFF
                               </span>
                             )}
                           </div>

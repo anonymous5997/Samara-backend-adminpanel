@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabase/client';
-import { Product, ProductImage, Category } from '@/lib/types';
-import { useCart } from '@/lib/cart-context';
+
+// ✅ IMPORTS
+import type { ProductWithImages } from '@/lib/content'; 
+import type { Category } from '@/lib/types'; 
+
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -21,29 +24,25 @@ import { Label } from '@/components/ui/label';
 import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
 import { getUserRegion } from '@/lib/region/client';
 
-// ✅ STEP 1: DEFINE SIMPLE EXCHANGE RATES (You can replace this with DB fetch later)
-const exchangeRates: Record<string, number> = {
-  INR: 1,
-  USD: 0.012,
-  AED: 0.044,
-  EUR: 0.011,
-  GBP: 0.0095,
-  SGD: 0.016,
-};
-
 export default function ShopPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { currency } = useCart(); // ✅ Get selected currency
+  
+  // Region Only
   const region = getUserRegion();
 
+  // ✅ RATES STATE (New)
+  const [rates, setRates] = useState<Record<string, number>>({});
+
+  // ✅ PRODUCTS STATE
   const [products, setProducts] = useState<
-    { product: Product; image?: ProductImage }[]
+    { product: ProductWithImages; image?: any }[]
   >([]);
+  
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // PRICING STATE
+  // ✅ STEP 1: CORRECT PRICE MAP TYPE
   const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
 
   // Filters
@@ -54,17 +53,35 @@ export default function ShopPage() {
     'newest'
   );
   
-  // ✅ FILTER LOGIC REMAINS IN INR
+  // Filter Logic Remains in INR (Base Price)
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
 
-  // ✅ STEP 2: CALCULATE DISPLAY VALUES
-  const rate = exchangeRates[currency] || 1;
-  const displayMin = Math.round(priceRange[0] * rate);
-  const displayMax = Math.round(priceRange[1] * rate);
-
-  // Initial Load
+  // Initial Load (Categories + Rates)
   useEffect(() => {
     fetchCategories();
+
+    // ✅ FETCH RATES (New Logic)
+    const loadRates = async () => {
+      const { data, error } = await supabase
+        .from('currency_rates')
+        .select('*'); // Select all to be safe
+
+      if (error) {
+        console.error('Failed to load currency rates', error);
+        return;
+      }
+
+      const map: Record<string, number> = {};
+      data.forEach((r: any) => {
+        // Handle 'currency' or 'target_currency' depending on DB schema
+        const code = r.currency || r.target_currency;
+        if (code) map[code] = Number(r.rate);
+      });
+
+      setRates(map);
+    };
+
+    loadRates();
   }, []);
 
   // Fetch Products on Filter Change
@@ -73,29 +90,45 @@ export default function ShopPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, sortBy, priceRange]);
 
-  // RESOLVE PRICES
+  // ✅ STEP 2 & 3: OPTIMIZED PRICE RESOLUTION (Updated)
   useEffect(() => {
     if (!products.length) return;
-
+    if (Object.keys(rates).length === 0) return;
     const loadPrices = async () => {
-      const map: Record<string, ResolvedPrice> = {};
+      // Create promises for all products at once
+      const promises = products.map(async ({ product }) => {
+        try {
+          // ✅ PASS RATES INTO RESOLVER (4th Argument)
+          const resolved = await resolveFinalPrice(
+            product, 
+            region, 
+            undefined, // No variants context in grid view
+            rates      // Pass fetched rates here
+          );
+          
+          if (!resolved || resolved.displayPrice <= 0) return null;
 
-      await Promise.all(
-        products.map(async ({ product }) => {
-          try {
-            const resolved = await resolveFinalPrice(product, region, currency);
-            map[product.id] = resolved;
-          } catch (err) {
-            console.error(`Price error for ${product.name}`, err);
-          }
-        })
+          // ✅ RETURN FULL RESOLVED OBJECT
+          return [product.id, resolved] as const;
+        } catch (err) {
+          console.error(`Price error for ${product.name}`, err);
+          return null;
+        }
+      });
+
+      // Wait for all to resolve
+      const results = await Promise.all(promises);
+
+      // Batch update state
+      setPriceMap(
+        Object.fromEntries(
+          results.filter((item): item is [string, ResolvedPrice] => item !== null)
+        )
       );
-
-      setPriceMap(map);
     };
 
     loadPrices();
-  }, [products, currency, region]);
+  }, [products, region, rates]); // ✅ Added 'rates' to dependency array
 
   /* -------------------------------------------------------------------------- */
   /* DATA FETCHING                                                              */
@@ -115,23 +148,29 @@ export default function ShopPage() {
     setLoading(true);
 
     try {
+      // SINGLE OPTIMIZED QUERY
       let query = supabase
         .from('products')
         .select(`
           *,
+          product_images (
+            id,
+            image_url,
+            is_primary
+          ),
           product_prices (
-            region,
+            currency,
             price,
-            currency
+            mrp,
+            region
           )
         `)
         .eq('is_active', true)
         .gte('base_price_inr', priceRange[0])
         .lte('base_price_inr', priceRange[1]);
 
-      // ✅ STEP 4: FIX CATEGORY FILTER LOGIC (Parent + Child support)
+      // Handle Category Logic
       if (selectedCategory && selectedCategory !== 'all') {
-        // 1. Get the selected category ID
         const { data: category } = await supabase
           .from('categories')
           .select('id')
@@ -139,29 +178,25 @@ export default function ShopPage() {
           .single();
 
         if (category) {
-          // 2. Get any child categories
           const { data: childCategories } = await supabase
             .from('categories')
             .select('id')
             .eq('parent_id', category.id);
 
-          // 3. Create list of all valid IDs
           const categoryIds = [
             category.id,
             ...(childCategories?.map((c) => c.id) || []),
           ];
 
-          // 4. Filter products
           query = query.in('category_id', categoryIds);
         } else {
-           // Handle invalid category slug gracefully
-           console.warn('Category not found:', selectedCategory);
            setProducts([]);
            setLoading(false);
            return;
         }
       }
 
+      // Handle Sorting
       if (sortBy === 'price-asc') {
         query = query.order('base_price_inr', { ascending: true });
       } else if (sortBy === 'price-desc') {
@@ -174,19 +209,18 @@ export default function ShopPage() {
 
       if (error) throw error;
 
+      // Map Images in Memory
       if (data) {
-        const productsWithImages = await Promise.all(
-          data.map(async (product) => {
-            const { data: image } = await supabase
-              .from('product_images')
-              .select('*')
-              .eq('product_id', product.id)
-              .eq('is_primary', true)
-              .maybeSingle();
+        const productsWithImages = data.map((product) => ({
+          product: product as unknown as ProductWithImages, 
+          image:
+            // @ts-ignore
+            product.product_images?.find((img: any) => img.is_primary) ||
+            // @ts-ignore
+            product.product_images?.[0] ||
+            null,
+        }));
 
-            return { product, image };
-          })
-        );
         setProducts(productsWithImages);
       }
     } catch (err) {
@@ -210,12 +244,9 @@ export default function ShopPage() {
 
         <div className="flex flex-col md:flex-row gap-12">
           
-          {/* ------------------------------------------------------------------
-              SIDEBAR FILTERS
-             ------------------------------------------------------------------ */}
+          {/* SIDEBAR FILTERS */}
           <aside className="w-full md:w-64 space-y-8 h-fit">
             
-            {/* Category Filter */}
             <div className="space-y-3 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
               <Label className="text-lg font-serif font-medium text-[#D4AF37]">
                 Category
@@ -241,22 +272,18 @@ export default function ShopPage() {
               </Select>
             </div>
 
-            {/* Price Range Filter */}
             <div className="space-y-4 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
               <div className="flex justify-between items-center">
-                {/* ✅ STEP 5: Label with Currency */}
                 <Label className="text-lg font-serif font-medium text-[#D4AF37]">
-                  Price ({currency})
+                  Price Filter
                 </Label>
               </div>
               
-              {/* ✅ STEP 3: Slider Labels using Display Values */}
               <div className="flex justify-between text-xs text-gray-400 mb-2 font-mono">
-                <span>{currency} {displayMin.toLocaleString()}</span>
-                <span>{currency} {displayMax.toLocaleString()}</span>
+                <span>₹{priceRange[0].toLocaleString()}</span>
+                <span>₹{priceRange[1].toLocaleString()}</span>
               </div>
 
-              {/* ✅ STEP 4: Slider Logic keeps using INR (priceRange) */}
               <Slider
                 min={0}
                 max={50000}
@@ -277,11 +304,8 @@ export default function ShopPage() {
             </div>
           </aside>
 
-          {/* ------------------------------------------------------------------
-              PRODUCT GRID
-             ------------------------------------------------------------------ */}
+          {/* PRODUCT GRID */}
           <div className="flex-1">
-            {/* Sort & Count Header */}
             <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
               <p className="text-sm text-gray-400 font-medium">
                 Showing <span className="text-[#D4AF37]">{products.length}</span> products
@@ -307,7 +331,6 @@ export default function ShopPage() {
               </div>
             </div>
 
-            {/* Grid Content */}
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -339,6 +362,8 @@ export default function ShopPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {products.map(({ product, image }) => {
                   
+                  // ✅ STEP 4: PASSING CORRECT SHAPE
+                  // This object is now exactly ResolvedPrice
                   const resolvedPrice = priceMap[product.id];
 
                   return (

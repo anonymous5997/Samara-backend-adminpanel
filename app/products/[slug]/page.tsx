@@ -4,7 +4,8 @@ import { getCurrentRegion } from '@/lib/region/server';
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
 import { getSimilarProducts } from '@/lib/content';
 import ProductDetailClient from '@/components/ProductDetailClient';
-import { SupportedCurrency } from '@/lib/currency-utils';
+// ✅ STEP 1: Import rate fetcher (Ensure path matches where you saved lib/currency-utils.ts)
+import { getCurrencyRates } from '@/lib/currency-utils';
 
 export default async function ProductDetailPage({
   params,
@@ -19,9 +20,11 @@ export default async function ProductDetailPage({
 
   // Await the client creation
   const supabase = await createClient();
+  
+  // Region is awaited (best practice for Next.js 15+ if using cookies)
   const region = await getCurrentRegion();
   
-  // 1️⃣ Fetch product & images
+  // 1️⃣ Fetch product & images & prices
   const { data: product } = await supabase
     .from('products')
     .select(`
@@ -44,29 +47,37 @@ export default async function ProductDetailPage({
     return a.is_primary ? -1 : 1;
   });
 
-  // 2️⃣ Resolve price on server
-  // PRIORITY 1: URL Query Param (e.g. ?currency=USD)
-  // PRIORITY 2: Region auto-detect (handled inside resolveFinalPrice)
-  
+  // ✅ STEP 2: Fetch Currency Rates (Server Side)
+  // This gets the latest "1 Foreign Unit -> INR" rates (e.g. CAD: 65.18)
+  const rates = await getCurrencyRates();
+
+  // 3️⃣ Resolve price on server
   // We pass the raw currency string; resolveFinalPrice validates it.
   const requestedCurrency = currency as string | undefined;
 
+  // ✅ STEP 3: Pass 'rates' explicitly to the resolver
   const resolvedPrice = await resolveFinalPrice(
     product,
     region,
-    requestedCurrency
+    requestedCurrency,
+    rates 
   );
+
+  // Strict check. Do not fallback silently.
+  if (!resolvedPrice) {
+    notFound();
+  }
 
   // Normalize the price object for the client
   const priceData = {
-    displayPrice: resolvedPrice ? resolvedPrice.displayPrice : product.base_price_inr,
-    currency: resolvedPrice ? resolvedPrice.currency : 'INR',
-    inrBase: resolvedPrice ? resolvedPrice.inrBase : product.base_price_inr,
-    mrp: resolvedPrice ? resolvedPrice.mrp : null,
-    discountPct: resolvedPrice ? resolvedPrice.discountPct : 0
+    displayPrice: resolvedPrice.displayPrice,
+    currency: resolvedPrice.currency,
+    inrBase: resolvedPrice.inrBase,
+    mrp: resolvedPrice.mrp,
+    discountPct: resolvedPrice.discountPct,
   };
 
-  // 3️⃣ Similar products
+  // 4️⃣ Similar products
   const similarProducts = await getSimilarProducts(product.id, 4);
 
   return (

@@ -1,10 +1,6 @@
-import type { Region } from '@/lib/landed-pricing'
-import { getCurrentRegion as getCanonicalRegion } from '@/lib/region'
+import { cookies } from "next/headers";
 
-/**
- * SERVER-ONLY
- * Reads region from middleware cookie via the canonical resolver
- */
-export async function getCurrentRegion(): Promise<Region> {
-  return getCanonicalRegion()
+export async function getCurrentRegion(): Promise<'IN' | 'US' | 'CA' | 'AE' | 'GB' | 'EU'> {
+  const store = await cookies();
+  return (store.get("region")?.value as any) || "IN";
 }

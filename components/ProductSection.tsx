@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
 import { formatPriceSync } from '@/lib/currency-utils';
 import { getUserRegion } from '@/lib/region/client';
+// ✅ STEP 3: Import rate loader
+import { getCurrencyRates } from '@/lib/currency/get-currency-rates';
 
 interface ProductSectionProps {
   products: ProductWithImages[];
@@ -25,25 +27,41 @@ export function ProductSection({
   const region = getUserRegion();
 
   const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
+  
+  // ✅ STEP 4: State for rates
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+
+  /* -----------------------------------------------------
+     LOAD RATES ONCE
+  ----------------------------------------------------- */
+  useEffect(() => {
+    getCurrencyRates()
+      .then(setRates)
+      .catch((err) => console.error("Failed to load currency rates:", err));
+  }, []);
 
   /* -----------------------------------------------------
      LOAD PRICES — SINGLE SOURCE OF TRUTH
   ----------------------------------------------------- */
   useEffect(() => {
     if (!products.length) return;
+    
+    // ✅ STEP 5: Guard - Do not resolve prices until rates are ready
+    if (!rates) return;
 
     const loadPrices = async () => {
       const map: Record<string, ResolvedPrice> = {};
 
       for (const product of products) {
-        map[product.id] = await resolveFinalPrice(product, region, currency);
+        // ✅ STEP 6: Pass 'rates' to resolveFinalPrice
+        map[product.id] = await resolveFinalPrice(product, region, currency, rates);
       }
 
       setPriceMap(map);
     };
 
     loadPrices();
-  }, [products, region, currency]);
+  }, [products, region, currency, rates]); // Added 'rates' dependency
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">

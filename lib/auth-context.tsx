@@ -8,7 +8,7 @@ import {
   ReactNode,
 } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 
 /* ---------------- TYPES ---------------- */
 
@@ -30,6 +30,7 @@ type Profile = {
 
 type AuthContextType = {
   user: User | null;
+  session: Session | null; // ✅ Added Session type
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
@@ -45,6 +46,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null); // ✅ Added Session state
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -85,9 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const hydrate = async () => {
-      // 🔥 THIS IS THE FIX FOR OTP / MAGIC LINKS
-      // This forces Supabase to parse the URL hash for tokens immediately
-      await supabase.auth.exchangeCodeForSession(window.location.href);
+      // ✅ STEP 1: Guard exchangeCodeForSession (Performance Fix)
+      // Only parse URL if it actually looks like an auth callback
+      const hasAuthCode =
+        window.location.search.includes('code=') ||
+        window.location.hash.includes('access_token');
+
+      if (hasAuthCode) {
+        await supabase.auth.exchangeCodeForSession(window.location.href);
+      }
 
       const {
         data: { session },
@@ -95,15 +103,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!mounted) return;
 
+      // ✅ Track Session
+      setSession(session);
+
       if (session?.user) {
         setUser(session.user);
-        await loadProfile(session.user);
+        // ✅ STEP 2: Non-blocking profile load (UI renders faster)
+        loadProfile(session.user);
       } else {
         setUser(null);
         setProfile(null);
       }
 
-      setLoading(false);
+      // ✅ FIX: Only update loading if it was true (Prevents extra re-render)
+      setLoading((prev) => (prev ? false : prev));
     };
 
     hydrate();
@@ -113,15 +126,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
 
+      // ✅ Track Session
+      setSession(session);
+
       if (session?.user) {
         setUser(session.user);
-        await loadProfile(session.user);
+        // ✅ STEP 2: Non-blocking profile load
+        loadProfile(session.user);
       } else {
         setUser(null);
         setProfile(null);
       }
 
-      setLoading(false);
+      // ✅ FIX: Only update loading if it was true (Prevents extra re-render)
+      setLoading((prev) => (prev ? false : prev));
     });
 
     return () => {
@@ -141,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setSession(null); // ✅ Clear session
     setProfile(null);
     window.location.href = '/';
   };
@@ -151,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        session, // ✅ Expose session
         profile,
         loading,
         isAdmin: profile?.role === 'admin',

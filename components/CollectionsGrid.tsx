@@ -1,8 +1,5 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 
 interface Category {
   id: string;
@@ -11,36 +8,26 @@ interface Category {
   description?: string | null;
 }
 
-export function CollectionsGrid() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+export async function CollectionsGrid() {
+  const supabase = await createClient();
 
-  useEffect(() => {
-    async function fetchCategories() {
-      setLoading(true);
+  // ✅ Fetch categories server-side
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('id, name, slug, description')
+    .eq('is_active', true)
+    .order('name');
 
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name, slug, description')
-        .eq('is_active', true)
-        .order('name');
-
-      if (!error && data) {
-        setCategories(data);
-      }
-
-      setLoading(false);
-    }
-
-    fetchCategories();
-  }, []);
-
-  if (loading) {
+  // ✅ Handle empty state
+  if (!categories || categories.length === 0) {
     return (
-      <div className="text-center py-10 text-gray-400">Loading collections…</div>
+      <div className="text-center py-10 text-gray-400">
+        No collections found.
+      </div>
     );
   }
 
+  // ✅ Render Grid
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-7xl mx-auto">
       {categories.map((collection) => (

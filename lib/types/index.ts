@@ -19,11 +19,30 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
-  description?: string;
-  brand?: string;
-  category_id?: string;
+
+  description?: string | null;
+  brand?: string | null;
+  category_id?: string | null;
+
   base_price_inr: number;
+  mrp_inr?: number | null;
+
+  /* 🔹 Merchandising flags */
+  is_bestseller?: boolean;
+  bestseller_badge_label?: string | null;
+  is_new_arrival?: boolean;
+
   is_active: boolean;
+
+  /* 🔹 Visibility controls */
+  show_in_sarees?: boolean;
+  show_in_festive_edit?: boolean;
+
+  /* 🔹 Filter attributes */
+  fabric?: string | null;
+  color?: string | null;
+  occasion?: string | null;
+
   created_at: string;
 }
 

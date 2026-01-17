@@ -8,20 +8,31 @@ import { CollectionsGrid } from '@/components/CollectionsGrid';
 import { ProductSection } from '@/components/ProductSection';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 import AutoCurrencyWrapper from '@/components/AutoCurrencyWrapper';
+import { createClient } from '@/lib/supabase/server'; // ✅ Added Import
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// ✅ STEP 1: Speed Fix - Enabled caching with 60s revalidation
+export const revalidate = 60;
 
 export default async function Home() {
+  // Existing data fetching
   const mostLovedProducts = await getMostLovedProducts(4);
   const newArrivals = await getNewArrivals(4);
+
+  // ✅ STEP 3: Fetch Hero Data on Server
+  const supabase = await createClient();
+  const { data: slides } = await supabase
+    .from('hero_slides')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
 
   return (
     <div className="bg-[#000000]">
       {/* ✅ Client-only currency detection */}
       <AutoCurrencyWrapper />
 
-      <HeroSlider />
+      {/* ✅ Pass server-fetched slides to component */}
+      <HeroSlider slides={slides ?? []} />
 
       {mostLovedProducts.length > 0 && (
         <section className="py-20 md:py-24 bg-[#050505]">

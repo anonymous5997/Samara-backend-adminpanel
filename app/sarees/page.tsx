@@ -19,7 +19,6 @@ import type { SupportedCurrency } from '@/lib/currency-utils';
    ✅ PRICE RESOLVER & REGION
 ----------------------------------------------------------- */
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
-// ✅ FIXED: Use the client-side region hook for consistency
 import { getUserRegion } from '@/lib/region/client';
 
 export default function SareesPage() {
@@ -45,9 +44,11 @@ export default function SareesPage() {
   const [priceReady, setPriceReady] = useState(false);
   
   // Region & Rates
-  const { currency } = useCart();
   const region = getUserRegion();
-  const [rates, setRates] = useState<any>(null);
+  const [rates, setRates] = useState<Record<SupportedCurrency, number> | null>(null);
+  
+  // ✅ ADD THIS: Display Currency State (Default INR, updates based on resolved prices)
+  const [displayCurrency, setDisplayCurrency] = useState<SupportedCurrency>('INR');
 
   // Price Map: Stores the calculated pricing for every product
   const [priceMap, setPriceMap] = useState<
@@ -93,35 +94,59 @@ export default function SareesPage() {
   }, []);
 
   // ------------------------------------------------------------------
-  // 3. RESOLVE PRICES (SINGLE SOURCE OF TRUTH)
+  // 3. RESOLVE PRICES (✅ OPTIMIZED & INSTANT)
   // ------------------------------------------------------------------
   useEffect(() => {
     if (!allProducts.length) return;
 
+    // Optimization: If international, wait for rates to avoid "flash" of INR
+    if (region !== 'IN' && !rates) return;
+
     const loadPrices = async () => {
-      const map: Record<string, any> = {};
-
-      for (const product of allProducts) {
-        // The resolver handles all logic: database lookup, currency conversion, 
-        // and region-specific MRP calculations.
-        const resolved = await resolveFinalPrice(product, region, currency);
-
-        if (resolved && resolved.displayPrice > 0) {
-          // ✅ CORRECTED: Direct Mapping. No manual math.
-          map[product.id] = {
-            price: resolved.displayPrice,
-            currency: resolved.currency as SupportedCurrency,
-            mrp: resolved.mrp,           // Resolver provides correct MRP
-            discountPct: resolved.discountPct ?? 0, // Resolver provides correct %
-          };
+      // ✅ Parallel Processing: Map all promises first
+      const promises = allProducts.map(async (product) => {
+        try {
+          // ✅ FIX: Pass undefined for currency. 
+          // The resolver now strictly uses the region to determine currency.
+          const resolved = await resolveFinalPrice(product, region, undefined, rates ?? undefined);
+          
+          if (resolved && resolved.displayPrice > 0) {
+            return [
+              product.id,
+              {
+                price: resolved.displayPrice,
+                currency: resolved.currency as SupportedCurrency,
+                mrp: resolved.mrp,
+                discountPct: resolved.discountPct ?? 0,
+              }
+            ] as const;
+          }
+          return null;
+        } catch (error) {
+          console.error(`Failed to resolve price for ${product.id}`, error);
+          return null;
         }
-      }
+      });
+
+      // ✅ Wait for all to finish concurrently (now instant via calculation)
+      const results = await Promise.all(promises);
+
+      // ✅ Convert array of entries back to object
+      const map = Object.fromEntries(
+        results.filter((item): item is [string, any] => item !== null)
+      );
 
       setPriceMap(map);
+
+      // ✅ ADD THIS: Set display currency from resolved prices
+      const firstResolvedCurrency = Object.values(map)[0]?.currency;
+      if (firstResolvedCurrency) {
+        setDisplayCurrency(firstResolvedCurrency);
+      }
     };
 
     loadPrices();
-  }, [allProducts, region, currency]); 
+  }, [allProducts, region, rates]); // ✅ Removed `currency` dependency
 
   // ------------------------------------------------------------------
   // 4. INITIALIZE SLIDER BOUNDS
@@ -149,7 +174,7 @@ export default function SareesPage() {
     
     setPriceReady(true);
     
-  }, [allProducts, priceMap, currency]); 
+  }, [allProducts, priceMap]); // ✅ Removed `currency` dependency
 
   // ------------------------------------------------------------------
   // 5. MEMOIZE FILTER OPTIONS (Strict Types)
@@ -304,8 +329,8 @@ export default function SareesPage() {
 
                   <div className="space-y-6">
                     <div className="flex justify-between items-center text-sm text-gray-300">
-                      <div>Min: <span className="font-semibold text-[#D4AF37]">{formatPriceSync(priceRangeDraft[0], currency)}</span></div>
-                      <div>Max: <span className="font-semibold text-[#D4AF37]">{formatPriceSync(priceRangeDraft[1], currency)}</span></div>
+                      <div>Min: <span className="font-semibold text-[#D4AF37]">{formatPriceSync(priceRangeDraft[0], displayCurrency)}</span></div>
+                      <div>Max: <span className="font-semibold text-[#D4AF37]">{formatPriceSync(priceRangeDraft[1], displayCurrency)}</span></div>
                     </div>
 
                     <div className="relative h-6 w-full">

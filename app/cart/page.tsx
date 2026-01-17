@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
 import { formatPriceSync } from '@/lib/currency-utils';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Coupon } from '@/lib/types';
 import { toast } from 'sonner';
@@ -27,10 +27,20 @@ export default function CartPage() {
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // ✅ 1. HYDRATION STATE
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   /* -------------------------------------------------------------------------- */
   /* CALCULATION LOGIC                                                          */
   /* -------------------------------------------------------------------------- */
+
+  // Determine the display currency for the summary (fallback to global if empty)
+  const cartCurrency = items[0]?.currency ?? currency;
 
   // 1. SUBTOTAL
   const subtotal = items.reduce(
@@ -38,7 +48,7 @@ export default function CartPage() {
     0
   );
 
-  // 2. COUPON LOGIC (Updated as per instructions)
+  // 2. COUPON LOGIC
   const calculateDiscount = () => {
     if (!appliedCoupon) return 0;
 
@@ -54,7 +64,6 @@ export default function CartPage() {
     }
 
     // Cap discount using INR cap as absolute value
-    // (Because INR was your base, and FX prices are derived from it)
     if (appliedCoupon.max_discount_inr) {
       discount = Math.min(discount, appliedCoupon.max_discount_inr);
     }
@@ -101,9 +110,9 @@ export default function CartPage() {
         return;
       }
 
-      // Check Minimum Order Value (Direct comparison as requested)
+      // Check Minimum Order Value
       if (subtotal < coupon.min_cart_value_inr) {
-        toast.error(`Minimum cart value of ${formatPriceSync(coupon.min_cart_value_inr, currency)} required`);
+        toast.error(`Minimum cart value of ${formatPriceSync(coupon.min_cart_value_inr, cartCurrency)} required`);
         setAppliedCoupon(null);
         return;
       }
@@ -125,26 +134,20 @@ export default function CartPage() {
   };
 
   /* -------------------------------------------------------------------------- */
-  /* RENDER: EMPTY / AUTH STATES                                                */
+  /* RENDER: HYDRATION & EMPTY STATES                                           */
   /* -------------------------------------------------------------------------- */
 
-  if (!user) {
+  // ✅ 2. HYDRATION GUARD: Prevent flashing empty state before JS loads
+  if (!hydrated) {
     return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
-        <div className="text-center max-w-md p-8 border border-gray-800 rounded-2xl bg-[#0a0a0a]">
-          <ShoppingBag className="h-16 w-16 mx-auto text-[#D4AF37] mb-6 opacity-80" />
-          <h1 className="text-2xl font-serif font-bold mb-4 text-[#D4AF37]">Sign In to View Cart</h1>
-          <p className="text-gray-400 mb-8">
-            Please sign in to your account to view your shopping bag and proceed to checkout.
-          </p>
-          <Button asChild className="w-full bg-[#D4AF37] text-black hover:bg-[#F4D03F] font-bold py-6">
-            <Link href="/auth/login">Sign In Now</Link>
-          </Button>
-        </div>
+      <div className="bg-black min-h-screen flex items-center justify-center">
+         {/* Optional: Minimal loader to prevent white flash */}
+         <div className="animate-pulse text-gray-800">Loading bag...</div>
       </div>
     );
   }
 
+  // ✅ 3. SAFE EMPTY CHECK: Only runs after hydration
   if (items.length === 0) {
     return (
       <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
@@ -237,7 +240,8 @@ export default function CartPage() {
                       
                       {/* Price per unit */}
                       <p className="text-gray-500 text-sm mt-2">
-                          {formatPriceSync(item.unit_price, currency)} / unit
+                          {/* ✅ 2.1 Fix per-item price */}
+                          {formatPriceSync(item.unit_price, item.currency)} / unit
                       </p>
                     </div>
 
@@ -269,7 +273,8 @@ export default function CartPage() {
                       {/* ROW TOTAL PRICE */}
                       <div className="text-right">
                           <p className="text-lg font-bold text-[#D4AF37]">
-                              {formatPriceSync(item.unit_price * item.quantity, currency)}
+                              {/* ✅ 2.2 Fix row total price */}
+                              {formatPriceSync(item.unit_price * item.quantity, item.currency)}
                           </p>
                       </div>
                     </div>
@@ -306,7 +311,8 @@ export default function CartPage() {
                 <div className="flex justify-between text-gray-300 mb-3 text-sm">
                     <span>Subtotal</span>
                     <span className="font-medium text-white">
-                        {formatPriceSync(subtotal, currency)}
+                        {/* ✅ 2.3 Fix subtotal display */}
+                        {formatPriceSync(subtotal, cartCurrency)}
                     </span>
                 </div>
 
@@ -320,7 +326,8 @@ export default function CartPage() {
                 {appliedCoupon && (
                     <div className="flex justify-between text-green-400 mb-3 text-sm">
                         <span>Coupon ({appliedCoupon.code})</span>
-                        <span>-{formatPriceSync(discount, currency)}</span>
+                        {/* ✅ 2.4 Fix discount line */}
+                        <span>-{formatPriceSync(discount, cartCurrency)}</span>
                     </div>
                 )}
 
@@ -346,7 +353,7 @@ export default function CartPage() {
                             disabled={loading || !couponCode}
                             className="bg-white text-black hover:bg-gray-200"
                             >
-                            Apply
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
                             </Button>
                         </div>
                     )}
@@ -359,7 +366,8 @@ export default function CartPage() {
                     <span className="text-lg font-bold text-white">Total Amount</span>
                     <div className="text-right">
                         <span className="text-2xl font-serif font-bold text-[#D4AF37]">
-                            {formatPriceSync(total, currency)}
+                            {/* ✅ 2.5 Fix total amount */}
+                            {formatPriceSync(total, cartCurrency)}
                         </span>
                         <p className="text-[10px] text-gray-500 mt-1">
                             (Inclusive of all taxes)
@@ -372,13 +380,19 @@ export default function CartPage() {
                     className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black hover:shadow-lg hover:shadow-[#D4AF37]/20 font-bold py-6 text-lg transition-all"
                     asChild
                 >
+                    {/* LOGIC: Guest -> Login?redirect | User -> Checkout */}
                     <Link
-                    href={`/checkout${
-                        appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''
-                    }`}
+                    href={user 
+                        ? `/checkout${appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''}`
+                        : `/auth/login?redirect=/checkout${appliedCoupon ? `&coupon=${appliedCoupon.code}` : ''}`
+                    }
                     className="flex items-center justify-center gap-2"
                     >
-                    Checkout <ArrowRight className="h-5 w-5" />
+                        {user ? (
+                            <>Checkout <ArrowRight className="h-5 w-5" /></>
+                        ) : (
+                            <>Sign in to Checkout <User className="h-5 w-5" /></>
+                        )}
                     </Link>
                 </Button>
                 

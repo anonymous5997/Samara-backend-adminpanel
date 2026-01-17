@@ -7,7 +7,7 @@ import { ShoppingCart, User, Heart, Search, Menu } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useCart } from '@/lib/cart-context';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,18 +33,20 @@ export function Header() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const { user, profile, signOut } = useAuth();
-  const { items, currency, setCurrency } = useCart();
+  // ✅ Step 1: Get loading state from auth
+  const { user, profile, signOut, loading } = useAuth();
+  
+  const { items } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // ✅ UPDATED CURRENCY HANDLER
-  const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
-    // 1. Keep cart context in sync (immediate visual update)
-    setCurrency(nextCurrency);
+  // Memoize currency to stop re-render loop
+  const urlCurrency = useMemo(() => {
+    return (searchParams.get("currency") || "INR") as SupportedCurrency;
+  }, [searchParams]);
 
-    // 2. Keep region cookie in sync (for shipping, tax, etc)
+  const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
+    // 1. Sync region cookie (for future requests/shipping)
     switch (nextCurrency) {
       case 'USD':
         setUserRegion('US');
@@ -62,22 +64,51 @@ export function Header() {
         setUserRegion('IN');
     }
 
-    // 3. Update URL Query Param to notify Server Components
+    // 2. Update URL (this is the ONLY trigger for pricing updates now)
     const params = new URLSearchParams(searchParams.toString());
     params.set("currency", nextCurrency);
 
-    // Replace URL without scrolling to top
+    // Replace URL without scrolling
     router.replace(`${pathname}?${params.toString()}`, {
       scroll: false,
     });
     
-    // Optional: Trigger a router refresh to ensure server components re-fetch data
-    router.refresh(); 
+    // ✅ ISSUE 4 FIX: Only refresh server data on shop/product pages
+    // This keeps the Home page fast and instant
+    if (pathname.startsWith("/shop") || pathname.startsWith("/products")) {
+      router.refresh(); 
+    }
   };
 
+  // ✅ ISSUE 2 FIX: Prevent header flicker while auth is loading
+  if (loading) {
+    return (
+      <header className="sticky top-0 z-[999] w-full bg-[#050505] border-b border-[#D4AF37]/20">
+        <div className="container mx-auto px-4 md:px-8">
+          <div className="flex h-[72px] items-center justify-between">
+            {/* Logo Placeholder */}
+            <div className="flex items-center gap-4 h-full opacity-50">
+              <div className="relative h-14 w-44 flex items-center">
+                 {/* Keep logo visible but static */}
+                 <Image
+                  src="/samara-logo.png"
+                  alt="Loading..."
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </div>
+            {/* Empty Right Side to prevent layout shift */}
+            <div className="flex items-center gap-4" />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
-    // Header Z-Index fix applied here
-    <header className="sticky top-0 z-[999] relative w-full bg-[#050505] border-b border-[#D4AF37]/20">
+    <header className="sticky top-0 z-[999] w-full bg-[#050505] border-b border-[#D4AF37]/20">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex h-[72px] items-center justify-between">
           {/* LEFT: Logo */}
@@ -111,10 +142,10 @@ export function Header() {
           {/* RIGHT: actions */}
           <div className="flex items-center gap-4">
             
-            {/* DESKTOP CURRENCY SELECTOR (Hidden on mobile) */}
+            {/* DESKTOP CURRENCY SELECTOR */}
             <div className="hidden md:block">
               <CurrencySelector 
-                currency={currency} 
+                currency={urlCurrency} 
                 onChange={handleCurrencyChange} 
               />
             </div>
@@ -200,10 +231,15 @@ export function Header() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="bg-[#000000] border-[#D4AF37]/20">
+              
+              {/* ✅ ISSUE FIX: Added overflow-y-auto for scrolling */}
+              <SheetContent 
+                side="left" 
+                className="fixed inset-y-0 left-0 z-[1000] bg-[#000000] border-[#D4AF37]/20 overflow-y-auto"
+              >
                 
-                {/* Mobile Navigation Links */}
-                <nav className="flex flex-col gap-4 mt-8">
+                {/* ✅ ISSUE FIX: Added pb-24 for safe bottom spacing */}
+                <nav className="flex flex-col gap-4 mt-8 pb-24">
                   {navLinks.map((link) => (
                     <Link
                       key={link.href}
@@ -216,12 +252,12 @@ export function Header() {
                   ))}
                 </nav>
 
-                {/* ✅ MOBILE CURRENCY SELECTOR */}
+                {/* MOBILE CURRENCY SELECTOR */}
                 <div className="mt-8 pt-6 border-t border-[#D4AF37]/20">
                   <p className="text-sm font-medium text-[#D4AF37] mb-3">Currency</p>
                   <div className="w-full">
                     <CurrencySelector
-                      currency={currency}
+                      currency={urlCurrency}
                       onChange={handleCurrencyChange}
                     />
                   </div>
