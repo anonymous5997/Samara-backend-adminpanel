@@ -16,6 +16,8 @@ import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
+// ✅ FIX: Import supabase for database operations
+import { supabase } from '@/lib/supabase/client';
 import { ProductTryOnModal } from '@/components/ProductTryOnModal';
 import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
@@ -27,9 +29,8 @@ import { usePricePreview } from '@/lib/price-preview-context';
 
 // INTERFACES
 
-// Update to match DB response for instant lookup
 interface ProductPriceRow {
-  currency_code: string; // Standard Supabase/SQL naming
+  currency_code: string; 
   price: number;
 }
 
@@ -40,13 +41,11 @@ interface Product {
   description: string | null;
   brand: string | null;
   base_price_inr: number;
-  // Extra fields
   fabric?: string | null;
   occasion?: string | null;
   care_instructions?: string | null;
   shipping_time?: string | null;
   why_women_love?: string | null;
-  // Available raw prices for client-side preview lookup
   product_prices?: ProductPriceRow[]; 
 }
 
@@ -110,36 +109,59 @@ export default function ProductDetailClient({
     toast.success('Link copied to clipboard!');
   };
 
+  // ✅ FIX: Step 6 - Wishlist Toggle Logic
+  const toggleWishlist = async () => {
+    if (!user) {
+      toast.error('Please login to save to wishlist');
+      return;
+    }
+  
+    const { data: existing } = await supabase
+      .from('wishlist_items')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('product_id', product.id)
+      .maybeSingle();
+  
+    if (existing) {
+      await supabase
+        .from('wishlist_items')
+        .delete()
+        .eq('id', existing.id);
+  
+      toast.info('Removed from wishlist');
+    } else {
+      await supabase
+        .from('wishlist_items')
+        .insert({
+          user_id: user.id,
+          product_id: product.id,
+        });
+  
+      toast.success('Added to wishlist');
+    }
+  };
+
   // =========================================================
-  // ✅ PRICING LOGIC - CLIENT SIDE INSTANT LOOKUP
+  // PRICING LOGIC
   // =========================================================
   
   const previewCurrency = preview.currency as SupportedCurrency | undefined;
 
-  // Look up admin-defined price for preview immediately from raw data
   const previewPrice = previewCurrency && product.product_prices
     ? product.product_prices.find((p: any) => 
-        // Check both common patterns (currency_code or currency)
         (p.currency_code === previewCurrency || p.currency === previewCurrency)
       )?.price
     : null;
 
-  // Final values
   const currencyCode = previewCurrency || (priceData.currency as SupportedCurrency);
-  
-  // If we found a specific price, use it. Otherwise, fallback to server value.
   const price = previewPrice ?? priceData.displayPrice;
-  
   const mrp = priceData.mrp;
   const discount = priceData.discountPct || 0;
 
-  // Format Labels
   const priceLabel = formatPriceSync(price, currencyCode);
   const mrpLabel = mrp ? formatPriceSync(mrp, currencyCode) : null;
 
-  // =========================================================
-  // ✅ BUY NOW GUARD
-  // =========================================================
   const canBuyNow = Boolean(
     price > 0 && 
     priceData.inrBase > 0
@@ -165,9 +187,7 @@ export default function ProductDetailClient({
         <div className="container mx-auto px-4 md:px-8">
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
             
-            {/* -----------------------------------------------------------
-                LEFT COLUMN: IMAGES
-               ----------------------------------------------------------- */}
+            {/* LEFT COLUMN: IMAGES */}
             <div>
               <div className="sticky top-24 space-y-4">
                 <div className="relative aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden shadow-2xl shadow-gold/10">
@@ -183,7 +203,6 @@ export default function ProductDetailClient({
                     </div>
                   )}
 
-                  {/* Highlights Overlay (Index 1) */}
                   {finalHighlights.length > 0 && images.length > 1 && selectedIndex === 1 && (
                     <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/80 via-black/50 to-transparent px-4 sm:px-8 py-6 sm:py-10">
                       <div className="max-w-xs space-y-4 text-left">
@@ -205,7 +224,6 @@ export default function ProductDetailClient({
                   )}
                 </div>
 
-                {/* Thumbnails */}
                 {images.length > 1 && (
                   <div className="flex gap-3 overflow-x-auto pb-2">
                     {images.map((image, index) => (
@@ -230,9 +248,7 @@ export default function ProductDetailClient({
               </div>
             </div>
 
-            {/* -----------------------------------------------------------
-                RIGHT COLUMN: DETAILS
-               ----------------------------------------------------------- */}
+            {/* RIGHT COLUMN: DETAILS */}
             <div className="space-y-6">
               <div>
                 <h1 className="font-serif text-4xl md:text-5xl font-bold text-gold mb-3 tracking-tighter">
@@ -248,19 +264,16 @@ export default function ProductDetailClient({
               {/* PRICE DISPLAY */}
               <div className="border-t border-b border-gold/20 py-6">
                 <div className="flex items-baseline gap-4 mb-2">
-                  {/* Selling Price (Resolved) */}
                   <span className="font-serif text-4xl font-bold text-gold">
                     {priceLabel}
                   </span>
                   
-                  {/* MRP */}
                   {mrpLabel && discount > 0 && (
                     <span className="text-xl text-gray-500 line-through">
                       {mrpLabel}
                     </span>
                   )}
                   
-                  {/* Discount Badge */}
                   {discount > 0 && (
                     <span className="bg-gold text-black px-3 py-1 rounded-full text-sm font-bold">
                       {discount}% OFF
@@ -339,18 +352,17 @@ export default function ProductDetailClient({
                     {addingToCart ? 'Adding...' : 'Add to Bag'}
                   </Button>
 
-                  {/* Wishlist */}
-                  {user && (
-                    <Button
-                      variant="outline"
-                      className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
-                      size="icon"
-                    >
-                      <Heart className="h-5 w-5" />
-                    </Button>
-                  )}
+                  {/* ✅ FIX: Step 7 - Wishlist Button Handler */}
+                  {/* Removed {user &&} wrapper so guests can click and get the toast prompt */}
+                  <Button
+                    variant="outline"
+                    className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
+                    size="icon"
+                    onClick={toggleWishlist}
+                  >
+                    <Heart className="h-5 w-5" />
+                  </Button>
 
-                  {/* Share */}
                   <Button
                     variant="outline"
                     className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
@@ -400,14 +412,9 @@ export default function ProductDetailClient({
         onClose={() => setBuyNowModalOpen(false)}
         productId={product.id}
         productName={product.name}
-        
-        // DISPLAY PRICE (what user sees - dynamic)
         productPrice={price}
         currency={currencyCode}
-
-        // PAYMENT PRICE (what Razorpay needs - static INR base)
         productPriceInr={priceData.inrBase || product.base_price_inr}
-
         productImage={selectedImage}
       />
     </div>

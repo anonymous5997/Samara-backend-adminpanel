@@ -17,7 +17,8 @@ import { useRouter } from 'next/navigation';
 export default function WishlistPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { currency, addToCart } = useCart();
+  // ✅ Get 'rate' from context to handle conversions
+  const { currency, rate, addToCart } = useCart();
   const [items, setItems] = useState<{ product: Product; image?: ProductImage }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,26 +29,14 @@ export default function WishlistPage() {
     }
 
     fetchWishlist();
-  }, [user, currency]);
-
-  // const fetchCurrencyRate = async () => {
-  //   const { data } = await supabase
-  //     .from('currency_rates')
-  //     .select('rate')
-  //     .eq('target_currency', currency)
-  //     .maybeSingle();
-
-  //   if (data) {
-  //     setCurrencyRate(data.rate);
-  //   }
-  // };
+  }, [user, currency]); 
 
   const fetchWishlist = async () => {
     if (!user) return;
 
     try {
       const { data: wishlistData } = await supabase
-        .from('wishlists')
+        .from('wishlist_items')
         .select('product_id')
         .eq('user_id', user.id);
 
@@ -91,7 +80,7 @@ export default function WishlistPage() {
 
     try {
       await supabase
-        .from('wishlists')
+        .from('wishlist_items')
         .delete()
         .eq('user_id', user.id)
         .eq('product_id', productId);
@@ -144,22 +133,28 @@ export default function WishlistPage() {
     <>
       <Toaster />
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">My Wishlist</h1>
+        <h1 className="font-serif text-3xl md:text-4xl font-bold mb-8 text-white tracking-wide">
+          My Wishlist
+        </h1>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {items.map(({ product, image }) => (
-            <div key={product.id} className="group">
-              <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100 mb-3">
+            <div
+              key={product.id}
+              className="group bg-[#0b0b0b] rounded-xl p-3 border border-[#D4AF37]/10 hover:border-[#D4AF37]/30 transition duration-300"
+            >
+              {/* Image Container */}
+              <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-900 mb-3">
                 <Link href={`/products/${product.slug}`}>
                   {image ? (
                     <Image
                       src={image.image_url}
                       alt={product.name}
                       fill
-                      className="object-cover transition-transform group-hover:scale-105"
+                      className="object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                   ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="flex items-center justify-center h-full text-gray-500 bg-[#111]">
                       No Image
                     </div>
                   )}
@@ -167,23 +162,29 @@ export default function WishlistPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+                  className="absolute top-2 right-2 bg-white/90 hover:bg-white shadow-md rounded-full h-8 w-8 transition-transform hover:scale-110"
                   onClick={() => removeFromWishlist(product.id)}
                 >
-                  <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+                  <Heart className="h-4 w-4 fill-red-500 text-red-500" />
                 </Button>
               </div>
+
+              {/* Product Info */}
               <Link href={`/products/${product.slug}`}>
-                <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-1">
+                <h3 className="font-serif text-base md:text-lg font-semibold text-white tracking-wide leading-snug line-clamp-2 mb-1 hover:text-[#D4AF37] transition-colors">
                   {product.name}
                 </h3>
               </Link>
-              <p className="text-sm font-semibold mb-2">
-                {formatPriceSync(product.base_price_inr, currency)}
+              
+              {/* Price */}
+              <p className="font-serif text-lg font-bold text-[#D4AF37] tracking-wide mb-3">
+                {formatPriceSync(product.base_price_inr * rate, currency)}
               </p>
+
+              {/* Action Button */}
               <Button
                 size="sm"
-                className="w-full"
+                className="w-full bg-[#111] border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all font-semibold tracking-wide"
                 onClick={() => handleAddToCart(product.id)}
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />

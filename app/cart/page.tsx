@@ -137,30 +137,32 @@ export default function CartPage() {
   /* RENDER: HYDRATION & EMPTY STATES                                           */
   /* -------------------------------------------------------------------------- */
 
-  // ✅ 2. HYDRATION GUARD: Prevent flashing empty state before JS loads
+  // ✅ 2. HYDRATION GUARD
   if (!hydrated) {
     return (
       <div className="bg-black min-h-screen flex items-center justify-center">
-         {/* Optional: Minimal loader to prevent white flash */}
          <div className="animate-pulse text-gray-800">Loading bag...</div>
       </div>
     );
   }
 
-  // ✅ 3. SAFE EMPTY CHECK: Only runs after hydration
+  // ✅ 3. SAFE EMPTY CHECK
   if (items.length === 0) {
     return (
       <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
         <Toaster />
         <div className="text-center max-w-md">
-          <div className="w-24 h-24 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="w-24 h-24 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-800">
             <ShoppingBag className="h-10 w-10 text-gray-500" />
           </div>
           <h1 className="text-3xl font-serif font-bold mb-2 text-white">Your cart is empty</h1>
           <p className="text-gray-400 mb-8">
             Looks like you haven't added anything to your bag yet.
           </p>
-          <Button asChild className="bg-white text-black hover:bg-gray-200 px-8 py-6 rounded-full font-bold">
+          <Button 
+            asChild 
+            className="w-full sm:w-auto px-8 py-6 rounded-md bg-[#111] border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all font-semibold tracking-wide"
+          >
             <Link href="/sarees">Start Shopping</Link>
           </Button>
         </div>
@@ -193,10 +195,13 @@ export default function CartPage() {
               {items.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-col sm:flex-row gap-6 p-6 border border-[#2a2a2a] bg-[#0b0b0b] rounded-xl hover:border-[#D4AF37]/30 transition-colors group"
+                  // ✅ STEP 4: Reduced padding (p-4)
+                  className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-6 border border-[#2a2a2a] bg-[#0b0b0b] rounded-xl hover:border-[#D4AF37]/30 transition-colors"
+
                 >
-                  {/* IMAGE */}
-                  <div className="relative w-full sm:w-32 h-40 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0 border border-gray-800">
+                  {/* IMAGE - ✅ STEP 3: Reduced height (h-28 sm:h-32) */}
+                  <div className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-md overflow-hidden bg-gray-900 flex-shrink-0 border border-gray-800">
+
                     {item.image_url ? (
                       <Image
                         src={item.image_url}
@@ -217,7 +222,9 @@ export default function CartPage() {
                       <div className="flex justify-between items-start">
                           <Link
                               href={`/products/${item.product.slug}`}
-                              className="font-serif text-lg font-medium hover:text-[#D4AF37] transition-colors line-clamp-1"
+                              // ✅ STEP 5: Refined text size
+                              className="font-serif text-sm sm:text-lg font-semibold leading-tight hover:text-[#D4AF37] transition-colors line-clamp-2"
+
                           >
                               {item.product.name}
                           </Link>
@@ -226,32 +233,31 @@ export default function CartPage() {
                               onClick={() => removeFromCart(item.id)}
                               className="sm:hidden text-gray-500 hover:text-red-500"
                           >
-                              <Trash2 className="h-5 w-5" />
+                              <Trash2 className="h-4 w-4" />
                           </button>
                       </div>
 
                       {/* Variant Info */}
                       {(item.variant?.size || item.variant?.color) && (
-                        <div className="flex gap-3 mt-2 text-sm text-gray-400">
+                        <div className="flex gap-3 mt-1.5 text-sm text-gray-400">
                             {item.variant.size && <span className="bg-[#1a1a1a] px-2 py-0.5 rounded text-xs border border-gray-800">Size: {item.variant.size}</span>}
                             {item.variant.color && <span className="bg-[#1a1a1a] px-2 py-0.5 rounded text-xs border border-gray-800">Color: {item.variant.color}</span>}
                         </div>
                       )}
                       
-                      {/* Price per unit */}
-                      <p className="text-gray-500 text-sm mt-2">
-                          {/* ✅ 2.1 Fix per-item price */}
+                      {/* Price per unit - ✅ STEP 6: Reduced spacing/size */}
+                      <p className="text-gray-400 text-xs sm:text-sm mt-1">
                           {formatPriceSync(item.unit_price, item.currency)} / unit
                       </p>
                     </div>
 
-                    <div className="flex items-end justify-between mt-4">
+                    <div className="flex items-end justify-between mt-3 sm:mt-4">
                       {/* QUANTITY CONTROLS */}
                       <div className="flex items-center gap-3 bg-[#1a1a1a] rounded-full p-1 border border-gray-800">
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
+                          className="h-7 w-7 sm:h-8 sm:w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 1}
                         >
@@ -263,7 +269,7 @@ export default function CartPage() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
+                          className="h-7 w-7 sm:h-8 sm:w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                         >
                           <Plus className="h-3 w-3" />
@@ -273,7 +279,6 @@ export default function CartPage() {
                       {/* ROW TOTAL PRICE */}
                       <div className="text-right">
                           <p className="text-lg font-bold text-[#D4AF37]">
-                              {/* ✅ 2.2 Fix row total price */}
                               {formatPriceSync(item.unit_price * item.quantity, item.currency)}
                           </p>
                       </div>
@@ -294,8 +299,8 @@ export default function CartPage() {
                 </div>
               ))}
               
-              <div className="flex items-center gap-2 text-gray-500 text-sm bg-[#111] p-4 rounded-lg border border-gray-800">
-                <ShieldCheck className="h-5 w-5 text-green-500" />
+              <div className="flex items-center gap-2 text-gray-500 text-xs sm:text-sm bg-[#111] p-4 rounded-lg border border-gray-800">
+                <ShieldCheck className="h-5 w-5 text-green-500 flex-shrink-0" />
                 <p>Safe and secure checkout. 100% Authentic products.</p>
               </div>
             </div>
@@ -311,7 +316,6 @@ export default function CartPage() {
                 <div className="flex justify-between text-gray-300 mb-3 text-sm">
                     <span>Subtotal</span>
                     <span className="font-medium text-white">
-                        {/* ✅ 2.3 Fix subtotal display */}
                         {formatPriceSync(subtotal, cartCurrency)}
                     </span>
                 </div>
@@ -326,7 +330,6 @@ export default function CartPage() {
                 {appliedCoupon && (
                     <div className="flex justify-between text-green-400 mb-3 text-sm">
                         <span>Coupon ({appliedCoupon.code})</span>
-                        {/* ✅ 2.4 Fix discount line */}
                         <span>-{formatPriceSync(discount, cartCurrency)}</span>
                     </div>
                 )}
@@ -366,7 +369,6 @@ export default function CartPage() {
                     <span className="text-lg font-bold text-white">Total Amount</span>
                     <div className="text-right">
                         <span className="text-2xl font-serif font-bold text-[#D4AF37]">
-                            {/* ✅ 2.5 Fix total amount */}
                             {formatPriceSync(total, cartCurrency)}
                         </span>
                         <p className="text-[10px] text-gray-500 mt-1">
@@ -380,7 +382,6 @@ export default function CartPage() {
                     className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black hover:shadow-lg hover:shadow-[#D4AF37]/20 font-bold py-6 text-lg transition-all"
                     asChild
                 >
-                    {/* LOGIC: Guest -> Login?redirect | User -> Checkout */}
                     <Link
                     href={user 
                         ? `/checkout${appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''}`

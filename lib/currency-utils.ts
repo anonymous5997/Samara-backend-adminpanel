@@ -28,7 +28,8 @@ export async function getCurrencyRates(): Promise<Record<string, number>> {
     const { data, error } = await supabase
       .from('currency_rates')
       .select('base_currency, target_currency, rate')
-      .eq('base_currency', 'INR');
+      .eq('base_currency', 'INR')
+      .eq('enabled', true); 
 
     if (error) throw error;
 

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { getFestiveEditProducts, type ProductWithImages } from '@/lib/content';
 import { Star, Sparkles } from 'lucide-react';
 import { formatPriceSync, type SupportedCurrency } from '@/lib/currency-utils';
+// ✅ STEP 1: Import currency rates fetcher
+import { getCurrencyRates } from '@/lib/currency-utils';
 
 /* -----------------------------------------------------
    ✅ PRICING UTILITIES & REGION FIX
@@ -18,9 +20,11 @@ export default function FestiveEditPage() {
   const [loading, setLoading] = useState(true);
 
   // ---------------------------------------------------------
-  // 1. REGION (Single Source of Truth)
+  // 1. REGION & RATES
   // ---------------------------------------------------------
   const region = getUserRegion();
+  // ✅ STEP 2: Add rates state
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
 
   // ---------------------------------------------------------
   // 2. PRICE STATE (Simplified for Display)
@@ -38,7 +42,19 @@ export default function FestiveEditPage() {
   >({});
 
   /* -----------------------------------------------------
-     3. LOAD PRODUCTS
+     3. LOAD RATES (✅ STEP 3: Fetch once on mount)
+  ----------------------------------------------------- */
+  useEffect(() => {
+    const loadRates = async () => {
+      const r = await getCurrencyRates();
+      setRates(r);
+    };
+
+    loadRates();
+  }, []);
+
+  /* -----------------------------------------------------
+     4. LOAD PRODUCTS
   ----------------------------------------------------- */
   useEffect(() => {
     const loadProducts = async () => {
@@ -58,17 +74,23 @@ export default function FestiveEditPage() {
   }, []);
 
   /* -----------------------------------------------------
-     4. RESOLVE PRICES (✅ PARALLEL & INSTANT)
+     5. RESOLVE PRICES (✅ STEP 4 & 5: Pass rates)
   ----------------------------------------------------- */
   useEffect(() => {
-    if (!products.length) return;
+    // ✅ Guard: Don't resolve until we have products AND rates
+    if (!products.length || !rates) return;
 
     const loadPrices = async () => {
       // ✅ Parallel Processing: Map all promises first
       const promises = products.map(async (product) => {
         try {
-          // ✅ FIX: Depend only on region. Currency is resolved automatically.
-          const resolved = await resolveFinalPrice(product, region);
+          // ✅ FIX: Pass `rates` as the 4th argument
+          const resolved = await resolveFinalPrice(
+            product,
+            region,
+            undefined,
+            rates
+          );
 
           if (!resolved || resolved.displayPrice <= 0) return null;
 
@@ -109,7 +131,7 @@ export default function FestiveEditPage() {
     };
 
     loadPrices();
-  }, [products, region]); // ✅ Removed `currency` dependency
+  }, [products, region, rates]); // ✅ Added rates dependency
 
   /* -----------------------------------------------------
      RENDER

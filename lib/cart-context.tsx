@@ -12,7 +12,7 @@ import { useAuth } from './auth-context';
 
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
 import { getUserRegion } from '@/lib/region/client';
-import { getCurrencyRates } from '@/lib/currency-utils'; // Ensure path matches your file structure
+import { getCurrencyRates } from '@/lib/currency-utils';
 
 import type { Region } from '@/lib/landed-pricing';
 import type { CurrencyCode } from '@/components/currency-selector';
@@ -32,10 +32,10 @@ export interface CartItem {
   variant_id?: string | null;
   quantity: number;
 
-  unit_price: number;   // The locked price the user SAW (e.g. 250 for USD)
-  unit_price_inr: number; // The locked Base INR price for payment processing
-  currency: string;     // The locked currency (e.g. 'USD')
-  region: Region;
+  unit_price: number;     // Calculated on the fly (Display Price)
+  unit_price_inr: number; // Stored in DB (Base INR Price)
+  currency: string;       // Calculated on the fly
+  region: Region;         // Calculated on the fly
 
   product: any;
   variant?: any;
@@ -74,7 +74,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 ====================================================== */
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const { user, session } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +82,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Global preference state
   const [currency, setCurrencyState] = useState<CurrencyCode>('INR');
   const [rate, setRate] = useState<number>(1);
-  const [rates, setRates] = useState<Record<string, number>>({ INR: 1 });
+
+  // ✅ FIX STEP 1: Initialize rates with a stable shape
+  // This ensures 'rates.USD' is defined (albeit 0) on the first render, 
+  // keeping React happy and preventing hydration mismatches.
+  const [rates, setRates] = useState<Record<string, number>>(() => ({
+    INR: 1,
+    USD: 0,
+    AED: 0,
+    GBP: 0,
+    CAD: 0,
+    // Add other currencies if necessary, but this covers the main checks
+  }));
 
   /* ======================================================
      1. LOAD CURRENCY RATES
@@ -128,7 +139,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   ===================================================== */
 
   const fetchCart = async () => {
-    if (!session || !user) return; // Guard for explicit DB calls
+    if (!session || !user) return; 
+
+    // ✅ FIX STEP 3: HARD GUARD (Kept as requested)
+    // We check for USD specifically to ensure the async fetch has likely completed.
+    if (!rates || !rates.USD) {
+      console.warn('Cart fetch skipped: exchange rates not ready');
+      return;
+    }
+    
+    setLoading(true);
 
     try {
       const { data, error } = await supabase
@@ -138,23 +158,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           product_id,
           variant_id,
           quantity,
-          unit_price,
           unit_price_inr,
-          currency,
-          region,
           product:products(*),
           variant:product_variants(*)
         `)
         .eq('user_id', user.id);
 
       if (error || !data) {
+        console.error('Error fetching cart:', error);
         setItems([]);
         return;
       }
 
+      const currentRegion = getUserRegion();
+
       const cartItems: CartItem[] = await Promise.all(
         data.map(async (item: any) => {
-          // Fetch primary image for each item
+          // 1. Fetch primary image
           const { data: img } = await supabase
             .from('product_images')
             .select('image_url')
@@ -162,23 +182,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             .eq('is_primary', true)
             .maybeSingle();
 
+          // 2. Fetch product prices to recalculate display values
+          const { data: productData } = await supabase
+             .from('products')
+             .select('product_prices(*)')
+             .eq('id', item.product_id)
+             .single();
+          
+          const productWithPrices = { 
+            ...item.product, 
+            product_prices: productData?.product_prices || [] 
+          };
+
+          // Safety Fallback for price resolution
+          let resolved;
+          try {
+            resolved = await resolveFinalPrice(
+              productWithPrices,
+              currentRegion,
+              undefined,
+              rates
+            );
+          } catch (e) {
+            console.error('Price resolve failed in cart, falling back to INR', e);
+            resolved = {
+              displayPrice: item.unit_price_inr,
+              currency: 'INR',
+              inrBase: item.unit_price_inr,
+              mrp: null,
+              discountPct: 0,
+              source: 'inr',
+            };
+          }
+
           return {
             ...item,
+            unit_price: resolved.displayPrice, 
+            currency: resolved.currency,
+            region: currentRegion,
             image_url: img?.image_url || null,
           };
         })
       );
 
       setItems(cartItems);
-
-      // Sync global currency state with cart contents
-      // This ensures header currency matches what is in the cart
-      if (cartItems.length > 0) {
-        const cartCurrency = cartItems[0].currency as CurrencyCode;
-        if (cartCurrency && cartCurrency !== currency) {
-           setCurrencyState(cartCurrency);
-        }
-      }
 
     } finally {
       setLoading(false);
@@ -190,21 +237,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   ===================================================== */
 
   useEffect(() => {
-    // A. LOGGED IN → Fetch from DB
-    if (session) {
+    if (authLoading) return;
+
+    if (session && user) {
       fetchCart();
-      return;
+    } else {
+      const guestCart = JSON.parse(
+        localStorage.getItem(GUEST_CART_KEY) || '[]'
+      );
+      setItems(guestCart);
+      setLoading(false);
     }
-
-    // B. GUEST → Fetch from LocalStorage
-    const guestCart = JSON.parse(
-      localStorage.getItem(GUEST_CART_KEY) || '[]'
-    );
-
-    setItems(guestCart);
-    setLoading(false);
-    
-  }, [session]);
+  // ✅ FIX STEP 2: KEEP RATES IN DEPENDENCY ARRAY
+  // This ensures the effect re-runs once the rates state updates from 0 -> Actual Value
+  }, [session, user, authLoading, rates]);
 
   /* ======================================================
      5. EFFECT: MIGRATE GUEST CART TO DB
@@ -225,25 +271,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         await supabase.from('cart_items').upsert({
           user_id: user.id,
           product_id: item.product_id,
-          variant_id: item.variant_id,
+          variant_id: item.variant_id ?? null,
           quantity: item.quantity,
-          unit_price: item.unit_price,
           unit_price_inr: item.unit_price_inr,
-          currency: item.currency,
-          region: item.region,
         }, {
           onConflict: 'user_id,product_id,variant_id'
         });
       }
 
-      // Cleanup LocalStorage and refresh DB cart
       localStorage.removeItem(GUEST_CART_KEY);
       fetchCart();
     };
 
     migrate();
     
-  }, [session]);
+  }, [session, user]); 
 
   /* ======================================================
      6. ADD TO CART
@@ -254,8 +296,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     variantId?: string,
     quantity: number = 1
   ) => {
-    // 1. Get current region
-    const region = getUserRegion();
+    const region = getUserRegion(); 
 
     // 2. Fetch product + prices
     const { data: product } = await supabase
@@ -274,8 +315,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!product) return;
 
     // 3. Resolve the exact price
-    // ✅ FIX: Pass 'undefined' for currency to force Region-based resolution
-    // This ignores whatever the user selected in the UI and trusts the Region.
     const resolved = await resolveFinalPrice(
       product, 
       region, 
@@ -288,7 +327,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const displayCurrency = resolved.currency;
 
     /* ----------------------------------------------------
-       SCENARIO A: GUEST USER
+       SCENARIO A: GUEST USER (Local Storage)
     ---------------------------------------------------- */
     if (!session) {
       const guestCart = JSON.parse(
@@ -304,7 +343,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (existingIndex > -1) {
         guestCart[existingIndex].quantity += quantity;
       } else {
-        // Explicitly fetch the primary image for guest cart
         const { data: img } = await supabase
           .from('product_images')
           .select('image_url')
@@ -318,9 +356,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           variant_id: variantId,
           quantity,
           unit_price: unitPrice,
-          unit_price_inr: unitPriceINR, // Guest cart already had this
+          unit_price_inr: unitPriceINR, 
           currency: displayCurrency,
-          region,
+          region, 
           product, 
           image_url: img?.image_url || null,
         });
@@ -332,25 +370,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     /* ----------------------------------------------------
-       SCENARIO B: LOGGED-IN USER
+       SCENARIO B: LOGGED-IN USER (Database)
     ---------------------------------------------------- */
     if (user) {
-      await supabase
+      const { error } = await supabase
         .from('cart_items')
-        .upsert(
-          {
-            user_id: user.id,
-            product_id: productId,
-            variant_id: variantId,
-            quantity,
-            unit_price: unitPrice,
-            unit_price_inr: unitPriceINR,
-            currency: displayCurrency,
-            region,
-          },
-          { onConflict: 'user_id,product_id,variant_id' }
-        );
-
+        .insert({
+          user_id: user.id,
+          product_id: productId,
+          variant_id: variantId ?? null,
+          quantity,
+          unit_price_inr: unitPriceINR,
+        });
+        
+      if (error) {
+        console.error('❌ CART INSERT ERROR:', error.message);
+        return;
+      }
+      
+      console.log('✅ CART INSERTED');
       fetchCart();
     }
   };

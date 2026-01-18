@@ -1,3 +1,38 @@
+/* =========================
+   Range Slider (Safe for App Router)
+   ✅ MOVED FROM COMPONENT TO GLOBAL CSS
+========================= */
+.range-slider-thumb {
+  pointer-events: none;
+}
+
+.range-slider-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #D4AF37;
+  cursor: pointer;
+  margin-top: -6px;
+  position: relative;
+  z-index: 50;
+}
+
+.range-slider-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 16px;
+  width: 16px;
+  border: none;
+  border-radius: 50%;
+  background: #D4AF37;
+  cursor: pointer;
+  z-index: 50;
+}
+
+/* =========================
+   Tailwind Directives
+========================= */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -34,12 +69,12 @@
       transform: translateY(0);
     }
   }
+
   .luxury-heading {
     text-shadow:
       0 1px 0 rgba(212,175,55,0.25),
       0 6px 20px rgba(212,175,55,0.35);
   }
-
 
   .text-body {
     @apply text-[#F5F5F5];
