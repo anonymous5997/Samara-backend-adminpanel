@@ -104,9 +104,31 @@ export default function ProductDetailClient({
     }
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast.success('Link copied to clipboard!');
+  // ✅ FIX: Updated Share Logic (Web Share API + Fallback)
+  const handleShare = async () => {
+    const shareData = {
+      title: product.name,
+      text: `Check out this ${product.name} on Samara`,
+      url: window.location.href,
+    };
+  
+    // ✅ Mobile: Native share sheet (WhatsApp, Instagram, etc.)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        // User cancelled share — do nothing
+      }
+      return;
+    }
+  
+    // ✅ Desktop fallback
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard!');
+    } catch {
+      toast.error('Unable to share link');
+    }
   };
 
   // ✅ FIX: Step 6 - Wishlist Toggle Logic
@@ -353,7 +375,6 @@ export default function ProductDetailClient({
                   </Button>
 
                   {/* ✅ FIX: Step 7 - Wishlist Button Handler */}
-                  {/* Removed {user &&} wrapper so guests can click and get the toast prompt */}
                   <Button
                     variant="outline"
                     className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
