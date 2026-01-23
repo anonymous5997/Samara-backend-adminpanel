@@ -15,9 +15,9 @@ export default function ProfilePage() {
   
   // ✅ Get auth state
   const { user, profile, refreshProfile, loading } = useAuth();
-
+  
+  // Profile Form State
   const [saving, setSaving] = useState(false); 
-
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -31,16 +31,24 @@ export default function ProfilePage() {
     pin: '',
   });
 
+  // Password Change State
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  // Check if user has a password (hide for Google/Facebook users)
+  const canChangePassword = user?.user_metadata?.has_password === true;
+
   /* ---------------- AUTH GUARD ---------------- */
   useEffect(() => {
     // Wait for auth hydration
     if (loading) return;
-
     if (!user) {
       window.location.href = '/auth/login';
       return;
     }
-
     // Populate form when profile data is available
     if (profile) {
       setFormData({
@@ -62,10 +70,8 @@ export default function ProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
     try {
       if (!user) return;
-
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -81,9 +87,7 @@ export default function ProfilePage() {
           pin: formData.pin,
         })
         .eq('id', user.id);
-
       if (error) throw error;
-
       await refreshProfile();
       toast.success('Profile updated successfully');
     } catch (err) {
@@ -91,6 +95,65 @@ export default function ProfilePage() {
       toast.error('Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  /* ---------------- CHANGE PASSWORD FUNCTION ---------------- */
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword) {
+      toast.error('Both current and new password are required');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+
+    if (!profile?.email) {
+      toast.error('User email not found');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+
+      // 1. Verify Current Password (Re-auth)
+      const { error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password: passwordData.currentPassword,
+        });
+
+      if (signInError) {
+        toast.error('Current password is incorrect');
+        return;
+      }
+
+      // 2. Update to New Password
+      const { error: updateError } =
+        await supabase.auth.updateUser({
+          password: passwordData.newPassword,
+        });
+
+      if (updateError) {
+        toast.error(updateError.message);
+        return;
+      }
+
+      toast.success('Password updated successfully');
+
+      // Clear fields
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+      });
+
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update password');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -102,9 +165,7 @@ export default function ProfilePage() {
       </div>
     );
   }
-
   if (!user) return null;
-
   if (!profile) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
@@ -113,14 +174,13 @@ export default function ProfilePage() {
     );
   }
 
-  /* ---------------- IMPROVED UI ---------------- */
+  /* ---------------- UI ---------------- */
   return (
     <>
       <Toaster />
       
       <div className="min-h-screen bg-black flex justify-center px-4 py-20">
         <div className="w-full max-w-4xl">
-
           {/* HEADER */}
           <div className="mb-12 text-center md:text-left">
             <h1 className="text-4xl font-serif text-[#D4AF37] mb-3">
@@ -140,13 +200,12 @@ export default function ProfilePage() {
               <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
                 Personal Information
               </h2>
-
+              
               <div className="space-y-2">
                 <Label className="text-gray-300">Email</Label>
                 <Input
                   value={profile.email}
                   disabled
-                  // Keeps disabled input gray to differentiate it
                   className="bg-[#111] text-gray-500 cursor-not-allowed border-gray-800 focus-visible:ring-0"
                 />
               </div>
@@ -154,7 +213,6 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-gray-300">Full Name</Label>
-                  {/* ✅ Added text-white */}
                   <Input
                     value={formData.name}
                     onChange={(e) =>
@@ -164,10 +222,8 @@ export default function ProfilePage() {
                     className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label className="text-gray-300">Phone</Label>
-                  {/* ✅ Added text-white */}
                   <Input
                     value={formData.phone}
                     onChange={(e) =>
@@ -178,6 +234,66 @@ export default function ProfilePage() {
                   />
                 </div>
               </div>
+
+              {/* CHANGE PASSWORD UI (Hidden for social logins) */}
+              {canChangePassword && (
+                <div className="space-y-4 pt-6 mt-4 border-t border-gray-800/50">
+                  <h3 className="text-lg font-serif text-[#D4AF37]">
+                    Change Password
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Current Password */}
+                    <Input
+                      type="password"
+                      placeholder="Current Password"
+                      value={passwordData.currentPassword}
+                      onChange={(e) =>
+                        setPasswordData({
+                          ...passwordData,
+                          currentPassword: e.target.value,
+                        })
+                      }
+                      // ✅ Prevent accidental form submission
+                      onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                      className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                    />
+
+                    {/* New Password & Hint */}
+                    <div className="space-y-2">
+                      <Input
+                        type="password"
+                        placeholder="New Password"
+                        value={passwordData.newPassword}
+                        onChange={(e) =>
+                          setPasswordData({
+                            ...passwordData,
+                            newPassword: e.target.value,
+                          })
+                        }
+                        // ✅ Prevent accidental form submission
+                        onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                        className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                      />
+                      {/* ✅ Password Hint */}
+                      <p className="text-xs text-gray-500">
+                        Minimum 8 characters recommended
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-start">
+                    <Button
+                      type="button"
+                      onClick={handleChangePassword}
+                      disabled={changingPassword}
+                      className="bg-[#1a1a1a] text-[#D4AF37] border border-[#D4AF37]/40 hover:bg-[#D4AF37] hover:text-black transition"
+                    >
+                      {changingPassword ? 'Updating...' : 'Update Password'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* ADDRESS */}
@@ -185,9 +301,7 @@ export default function ProfilePage() {
               <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
                 Delivery Address
               </h2>
-
               <div className="grid grid-cols-1 gap-6">
-                {/* ✅ Added text-white to all address inputs */}
                 <Input
                   placeholder="House / Flat Number"
                   value={formData.house}
@@ -196,7 +310,6 @@ export default function ProfilePage() {
                   }
                   className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
-
                 <Input
                   placeholder="Building / Apartment Name"
                   value={formData.building}
@@ -205,7 +318,6 @@ export default function ProfilePage() {
                   }
                   className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
-
                 <Input
                   placeholder="Locality / Area"
                   value={formData.locality}
@@ -215,7 +327,6 @@ export default function ProfilePage() {
                   className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   placeholder="City"
@@ -234,7 +345,6 @@ export default function ProfilePage() {
                   className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   placeholder="State"
@@ -253,7 +363,6 @@ export default function ProfilePage() {
                   className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
                 />
               </div>
-
               <Input
                 placeholder="PIN / ZIP Code"
                 value={formData.pin}

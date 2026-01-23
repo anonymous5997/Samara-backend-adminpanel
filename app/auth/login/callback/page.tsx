@@ -1,35 +1,27 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase/client'
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function AuthCallbackPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   useEffect(() => {
-    const run = async () => {
-      // 🔑 This converts the URL tokens into real login cookies
-      const { error } = await supabase.auth.exchangeCodeForSession(
-        window.location.href
-      )
-
-      if (error) {
-        console.error('Auth callback error:', error.message)
-        router.replace('/auth/login')
-        return
-      }
-
-      // ✅ Cookies are now set → middleware will see the user
-      router.replace('/profile')
-    }
-
-    run()
-  }, [router])
+    // ❌ REMOVED: manual supabase.auth.exchangeCodeForSession()
+    // This was causing the "PKCE code verifier not found" error because
+    // Supabase's client library automatically detects the OAuth code/tokens
+    // in the URL and handles the handshake internally.
+    
+    // We simply redirect to the intended page (Home or Profile).
+    // The AuthProvider will pick up the new session state automatically.
+    router.replace('/');
+  }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center text-lg">
-      Signing you in…
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="text-[#D4AF37] font-serif text-lg tracking-widest animate-pulse">
+        SIGNING YOU IN...
+      </div>
     </div>
-  )
+  );
 }

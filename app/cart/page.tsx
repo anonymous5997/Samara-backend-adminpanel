@@ -13,6 +13,8 @@ import { supabase } from '@/lib/supabase/client';
 import { Coupon } from '@/lib/types';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
+import { trackAnalyticsEvent } from '@/lib/analytics.client';
+
 
 export default function CartPage() {
   const { user } = useAuth();

@@ -186,7 +186,10 @@ const ChartTooltipContent = React.forwardRef<
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
           {payload.map((item, index) => {
-            const key = `${nameKey || item.name || item.dataKey || 'value'}`;
+            // ✅ FIX #1: Strict type casting for safe property access
+            const obj = item as Record<string, any>;
+            const key = `${nameKey || obj?.name || obj?.dataKey || 'value'}`;
+            
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
             const indicatorColor = color || item.payload.fill || item.color;
 
@@ -286,12 +289,15 @@ const ChartLegendContent = React.forwardRef<
         )}
       >
         {payload.map((item) => {
-          const key = `${nameKey || item.dataKey || 'value'}`;
+          // ✅ FIX #2: Strict type casting and robust fallback logic for key generation
+          const obj = item as Record<string, any>;
+          const key = `${nameKey || obj?.dataKey || obj?.name || obj?.value || 'value'}`;
+          
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
 
           return (
             <div
-              key={item.value}
+              key={key}
               className={cn(
                 'flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground'
               )}
@@ -302,7 +308,7 @@ const ChartLegendContent = React.forwardRef<
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
                   style={{
-                    backgroundColor: item.color,
+                    backgroundColor: obj?.color, // ✅ Safe access to color
                   }}
                 />
               )}

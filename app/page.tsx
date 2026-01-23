@@ -1,5 +1,3 @@
-// app/page.tsx
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
@@ -8,9 +6,9 @@ import { CollectionsGrid } from '@/components/CollectionsGrid';
 import { ProductSection } from '@/components/ProductSection';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 import AutoCurrencyWrapper from '@/components/AutoCurrencyWrapper';
-import { createClient } from '@/lib/supabase/server'; // ✅ Added Import
+import { createClient } from '@/lib/supabase/server'; 
 
-// ✅ STEP 1: Speed Fix - Enabled caching with 60s revalidation
+// ✅ Speed Fix - Enabled caching with 60s revalidation
 export const revalidate = 60;
 
 export default async function Home() {
@@ -18,7 +16,7 @@ export default async function Home() {
   const mostLovedProducts = await getMostLovedProducts(4);
   const newArrivals = await getNewArrivals(4);
 
-  // ✅ STEP 3: Fetch Hero Data on Server
+  // Fetch Hero Data on Server
   const supabase = await createClient();
   const { data: slides } = await supabase
     .from('hero_slides')
@@ -28,11 +26,39 @@ export default async function Home() {
 
   return (
     <div className="bg-[#000000]">
-      {/* ✅ Client-only currency detection */}
+      {/* Client-only currency detection */}
       <AutoCurrencyWrapper />
 
-      {/* ✅ Pass server-fetched slides to component */}
+      {/* Pass server-fetched slides to component */}
       <HeroSlider slides={slides ?? []} />
+
+      {/* -----------------------------------------------------------------------
+        ✅ APP PURPOSE & BRANDING SECTION (CRITICAL FOR GOOGLE OAUTH)
+        1. "Samara" is H1 to match App Name (Fix 4).
+        2. Description explains "browse", "purchase", "sign in", "manage profiles" (Fix 3).
+        -----------------------------------------------------------------------
+      */}
+      <section className="py-10 border-t border-[#D4AF37]/10 bg-[#000000]">
+        <div className="container mx-auto px-4 text-center">
+          {/* FIX 4: Exact App Name Match */}
+          <h1 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37]">
+            Samara
+          </h1>
+          <p className="text-lg text-[#CFCFCF] mt-2 mb-6">
+            Premium Saree & Fashion Platform
+          </p>
+
+          {/* FIX 3: Detailed OAuth Purpose Explanation */}
+          <p className="text-sm text-[#BEBEBE] max-w-3xl mx-auto leading-relaxed">
+            Samara is an online fashion and e-commerce platform that allows users
+            to browse and purchase handcrafted Sambalpuri sarees and traditional
+            Indian apparel. Users can create accounts or sign in using email,
+            Google, or Facebook to manage their profiles, delivery addresses,
+            and orders.
+          </p>
+        </div>
+      </section>
+      {/* ----------------------------------------------------------------------- */}
 
       {mostLovedProducts.length > 0 && (
         <section className="py-20 md:py-24 bg-[#050505]">

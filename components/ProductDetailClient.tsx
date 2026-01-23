@@ -10,17 +10,19 @@ import {
   ShieldCheck,
   Sparkles,
   Zap,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
-// ✅ FIX: Import supabase for database operations
 import { supabase } from '@/lib/supabase/client';
 import { ProductTryOnModal } from '@/components/ProductTryOnModal';
 import { BuyNowModal } from '@/components/BuyNowModal';
 import { SimilarProductsSection } from '@/components/SimilarProductsSection';
+import { ProductReviewsSection } from '@/components/ProductReviewsSection';
+import { WriteReviewModal } from '@/components/WriteReviewModal';
 import { 
   formatPriceSync, 
   type SupportedCurrency 
@@ -28,7 +30,6 @@ import {
 import { usePricePreview } from '@/lib/price-preview-context';
 
 // INTERFACES
-
 interface ProductPriceRow {
   currency_code: string; 
   price: number;
@@ -69,6 +70,12 @@ interface ProductDetailClientProps {
   images: ProductImage[];
   priceData: PriceData;
   similarProducts: any[];
+  reviews: any[];
+  isVerifiedBuyer: boolean;
+  avgRating: number | null;
+  reviewCount: number;
+  // ✅ STEP 3: Add hasUserReviewed to interface
+  hasUserReviewed: boolean;
 }
 
 export default function ProductDetailClient({
@@ -76,6 +83,12 @@ export default function ProductDetailClient({
   images,
   priceData,
   similarProducts,
+  reviews,
+  isVerifiedBuyer,
+  avgRating,
+  reviewCount,
+  // ✅ STEP 3: Destructure hasUserReviewed
+  hasUserReviewed,
 }: ProductDetailClientProps) {
   const { user } = useAuth();
   const { addToCart } = useCart();
@@ -88,10 +101,10 @@ export default function ProductDetailClient({
   // Modals
   const [tryOnModalOpen, setTryOnModalOpen] = useState(false);
   const [buyNowModalOpen, setBuyNowModalOpen] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const handleAddToCart = async () => {
     if (!product) return;
-
     setAddingToCart(true);
     try {
       await addToCart(String(product.id), undefined, 1);
@@ -104,7 +117,7 @@ export default function ProductDetailClient({
     }
   };
 
-  // ✅ FIX: Updated Share Logic (Web Share API + Fallback)
+  // Shared Logic
   const handleShare = async () => {
     const shareData = {
       title: product.name,
@@ -112,7 +125,7 @@ export default function ProductDetailClient({
       url: window.location.href,
     };
   
-    // ✅ Mobile: Native share sheet (WhatsApp, Instagram, etc.)
+    // Mobile: Native share sheet
     if (navigator.share) {
       try {
         await navigator.share(shareData);
@@ -122,7 +135,7 @@ export default function ProductDetailClient({
       return;
     }
   
-    // ✅ Desktop fallback
+    // Desktop fallback
     try {
       await navigator.clipboard.writeText(window.location.href);
       toast.success('Link copied to clipboard!');
@@ -131,7 +144,7 @@ export default function ProductDetailClient({
     }
   };
 
-  // ✅ FIX: Step 6 - Wishlist Toggle Logic
+  // Wishlist Logic
   const toggleWishlist = async () => {
     if (!user) {
       toast.error('Please login to save to wishlist');
@@ -169,7 +182,6 @@ export default function ProductDetailClient({
   // =========================================================
   
   const previewCurrency = preview.currency as SupportedCurrency | undefined;
-
   const previewPrice = previewCurrency && product.product_prices
     ? product.product_prices.find((p: any) => 
         (p.currency_code === previewCurrency || p.currency === previewCurrency)
@@ -204,7 +216,6 @@ export default function ProductDetailClient({
   return (
     <div className="bg-black text-white min-h-screen">
       <Toaster />
-
       <section className="py-12 bg-gradient-to-b from-black to-luxury-charcoal">
         <div className="container mx-auto px-4 md:px-8">
           <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
@@ -276,6 +287,29 @@ export default function ProductDetailClient({
                 <h1 className="font-serif text-4xl md:text-5xl font-bold text-gold mb-3 tracking-tighter">
                   {product.name}
                 </h1>
+
+                {/* Rating Display */}
+                {avgRating !== null && (
+                  <div className="flex items-center gap-2 mt-3 mb-4">
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i <= Math.round(avgRating)
+                              ? 'text-[#D4AF37]'
+                              : 'text-gray-600'
+                          }`}
+                          fill={i <= Math.round(avgRating) ? '#D4AF37' : 'none'}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-gray-400">
+                      {avgRating.toFixed(1)} ({reviewCount} reviews)
+                    </span>
+                  </div>
+                )}
+
                 {product.brand && (
                   <p className="text-gray-400 text-lg mb-6">
                     by {product.brand}
@@ -302,8 +336,12 @@ export default function ProductDetailClient({
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-500">
-                  Inclusive of all taxes
+
+                {/* Mandatory Price Disclaimer */}
+                <p className="text-xs text-gray-500 mt-1 max-w-md leading-relaxed">
+                  Price includes applicable taxes. Shipping charges, import duties,
+                  and international taxes may vary based on delivery location and
+                  will be calculated at checkout.
                 </p>
               </div>
 
@@ -374,7 +412,6 @@ export default function ProductDetailClient({
                     {addingToCart ? 'Adding...' : 'Add to Bag'}
                   </Button>
 
-                  {/* ✅ FIX: Step 7 - Wishlist Button Handler */}
                   <Button
                     variant="outline"
                     className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
@@ -410,7 +447,41 @@ export default function ProductDetailClient({
                   <p className="text-xs text-gray-400">Handcrafted</p>
                 </div>
               </div>
+
             </div>
+          </div>
+
+          {/* REVIEWS SECTION */}
+          <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-[#D4AF37]/20">
+            <h2 className="font-serif text-3xl text-[#D4AF37] mb-6">
+              Customer Reviews
+            </h2>
+            
+            <ProductReviewsSection reviews={reviews} />
+
+            {/* If NOT verified buyer */}
+            {!isVerifiedBuyer && (
+              <p className="text-sm text-gray-500 mt-6 italic">
+                Only verified buyers can leave a review.
+              </p>
+            )}
+
+            {/* ✅ STEP 4: Render Button only if Verified + Has NOT Reviewed */}
+            {isVerifiedBuyer && !hasUserReviewed && (
+              <button
+                className="mt-6 px-6 py-2 border border-[#D4AF37] text-[#D4AF37] rounded-lg hover:bg-[#D4AF37]/10 transition text-sm font-medium"
+                onClick={() => setReviewModalOpen(true)}
+              >
+                Write a Review
+              </button>
+            )}
+
+            {/* ✅ STEP 4: Show message if already reviewed */}
+            {hasUserReviewed && (
+              <p className="mt-6 text-sm text-gray-500 italic">
+                You’ve already reviewed this product.
+              </p>
+            )}
           </div>
 
           {/* Similar Products */}
@@ -427,7 +498,7 @@ export default function ProductDetailClient({
         productImage={selectedImage}
         productName={product.name}
       />
-
+      
       <BuyNowModal
         isOpen={buyNowModalOpen}
         onClose={() => setBuyNowModalOpen(false)}
@@ -437,6 +508,12 @@ export default function ProductDetailClient({
         currency={currencyCode}
         productPriceInr={priceData.inrBase || product.base_price_inr}
         productImage={selectedImage}
+      />
+
+      <WriteReviewModal
+        isOpen={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        productId={product.id}
       />
     </div>
   );

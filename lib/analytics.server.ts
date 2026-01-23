@@ -1,5 +1,7 @@
-import { supabase } from '@/lib/supabase/client'; // Client-side (for tracking events)
-import { supabaseServer } from '@/lib/supabase/server'; // Server-side (for fetching Admin stats)
+'use server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+
+// ---------------- TYPES ----------------
 
 interface SareeSalesStats {
   thisMonth: number;
@@ -14,87 +16,39 @@ interface DailySalesStat {
 }
 
 interface ConversionStat {
-  addToCart: number; // Represents "Checkout Started"
-  orderPlaced: number; // Represents "Checkout Completed"
+  addToCart: number;
+  orderPlaced: number;
   conversionPercent: number;
 }
 
-// ------------------------------------------------------------------
-// 1️⃣ WRITE FUNCTIONS (Client-Side Tracking)
-// ------------------------------------------------------------------
-
-/**
- * Tracks user actions. Uses the CLIENT supabase instance to capture 
- * the current user's session context automatically.
- */
-export async function trackAnalyticsEvent(
-  eventType: 'checkout_started' | 'checkout_completed',
-  productId?: string,
-  orderId?: string,
-  userId?: string,
-  sessionId?: string
-) {
-  try {
-    const { error } = await supabase
-      .from('analytics_events')
-      .insert({
-        event_type: eventType,
-        product_id: productId,
-        order_id: orderId,
-        user_id: userId,
-        session_id: sessionId,
-      });
-
-    if (error) {
-      console.error('Error tracking analytics event:', error);
-    }
-  } catch (error) {
-    console.error('Error in trackAnalyticsEvent:', error);
-  }
-}
-
-/**
- * Updates the daily sales counter.
- */
-export async function incrementDailySareeSales(quantity: number) {
-  try {
-    const { error } = await supabase.rpc('increment_saree_sales_today', {
-      quantity: quantity
-    });
-
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error updating daily sales counter:', error);
-  }
-}
-
-// ------------------------------------------------------------------
-// 2️⃣ READ FUNCTIONS (Server-Side Admin Stats)
-// ------------------------------------------------------------------
+// ---------------- SAREE SALES STATS ----------------
 
 export async function getSareeSalesStats(): Promise<SareeSalesStats> {
   try {
     const now = new Date();
+
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
     const sareeCategories = await getSareeCategories();
 
-    if (!sareeCategories || sareeCategories.length === 0) {
+    if (!sareeCategories.length) {
       return { thisMonth: 0, lastMonth: 0, momChangePercent: 0, thisMonthRevenue: 0 };
     }
 
     const categoryIds = sareeCategories.map(c => c.id);
 
-    const { data: thisMonthData } = await supabaseServer
+    // This Month Sales
+    const { data: thisMonthData } = await supabaseAdmin
       .from('order_items')
       .select('quantity, orders!inner(id, payment_status), products!inner(category_id)')
       .in('products.category_id', categoryIds)
       .gte('orders.created_at', thisMonthStart.toISOString())
       .eq('orders.payment_status', 'paid');
 
-    const { data: lastMonthData } = await supabaseServer
+    // Last Month Sales
+    const { data: lastMonthData } = await supabaseAdmin
       .from('order_items')
       .select('quantity, orders!inner(id, payment_status), products!inner(category_id)')
       .in('products.category_id', categoryIds)
@@ -102,34 +56,36 @@ export async function getSareeSalesStats(): Promise<SareeSalesStats> {
       .lte('orders.created_at', lastMonthEnd.toISOString())
       .eq('orders.payment_status', 'paid');
 
-    const thisMonthCount = (thisMonthData || []).reduce(
-      (sum: number, item: any) => sum + (item.quantity || 0), 0
-    );
+    const thisMonthCount = (thisMonthData || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const lastMonthCount = (lastMonthData || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-    const lastMonthCount = (lastMonthData || []).reduce(
-      (sum: number, item: any) => sum + (item.quantity || 0), 0
-    );
+    // ✅ FIXED: Revenue Calculation (Safe Array Access & Typing)
+    // We cast 'd' to any to handle the discrepancy between Supabase types (Object) vs Runtime (Array)
+    const orderIds: string[] = (thisMonthData || [])
+      .map((d: any) => d.orders?.[0]?.id as string | undefined)
+      .filter((id): id is string => typeof id === 'string');
 
-    // Calculate Revenue
-    const orderIds = (thisMonthData || []).map((d: any) => d.orders?.id).filter(Boolean);
     let thisMonthRevenue = 0;
 
     if (orderIds.length > 0) {
       const uniqueOrderIds = Array.from(new Set(orderIds));
-      const { data: revenueData } = await supabaseServer
+
+
+      const { data: revenueData } = await supabaseAdmin
         .from('orders')
         .select('total_amount_inr')
         .in('id', uniqueOrderIds)
         .eq('payment_status', 'paid');
 
       thisMonthRevenue = (revenueData || []).reduce(
-        (sum: number, order: any) => sum + Number(order.total_amount_inr || 0), 0
+        (sum, order) => sum + Number(order.total_amount_inr || 0), 0
       );
     }
 
-    const momChangePercent = lastMonthCount === 0
-      ? thisMonthCount > 0 ? 100 : 0
-      : ((thisMonthCount - lastMonthCount) / lastMonthCount) * 100;
+    const momChangePercent =
+      lastMonthCount === 0
+        ? thisMonthCount > 0 ? 100 : 0
+        : ((thisMonthCount - lastMonthCount) / lastMonthCount) * 100;
 
     return {
       thisMonth: thisMonthCount,
@@ -138,38 +94,44 @@ export async function getSareeSalesStats(): Promise<SareeSalesStats> {
       thisMonthRevenue: Math.round(thisMonthRevenue),
     };
   } catch (error) {
-    console.error('Error getting saree sales stats:', error);
+    console.error('Error getting saree stats:', error);
     return { thisMonth: 0, lastMonth: 0, momChangePercent: 0, thisMonthRevenue: 0 };
   }
 }
+
+// ---------------- LAST 30 DAYS SALES ----------------
 
 export async function getSareeSalesLast30Days(): Promise<DailySalesStat[]> {
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const fromDate = thirtyDaysAgo.toISOString().split('T')[0];
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabaseAdmin
       .from('saree_sales_daily')
       .select('*')
       .gte('sale_date', fromDate)
       .order('sale_date', { ascending: true });
 
     if (error) {
-      console.error('Error fetching daily sales:', error);
+      console.error('Error fetching sales:', error);
       return [];
     }
 
     const map = new Map<string, number>();
-    data.forEach((row: any) => {
+    data.forEach(row => {
       map.set(row.sale_date, Number(row.units_sold));
     });
 
     const result: DailySalesStat[] = [];
+
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
+
       const key = d.toISOString().split('T')[0];
+
       result.push({
         date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         sales: map.get(key) || 0,
@@ -178,41 +140,42 @@ export async function getSareeSalesLast30Days(): Promise<DailySalesStat[]> {
 
     return result;
   } catch (error) {
-    console.error('Error processing chart data:', error);
+    console.error('Error processing last 30 days:', error);
     return [];
   }
 }
+
+// ---------------- CART → ORDER CONVERSION ----------------
 
 export async function getCartVsOrderStatsLast30Days(): Promise<ConversionStat> {
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Checkout Started = Funnel Step 1
-    const { count: checkoutStartedCount } = await supabaseServer
+    // Funnel Step 1 = Add to Cart
+    const { count: addToCart } = await supabaseAdmin
       .from('analytics_events')
       .select('id', { count: 'exact', head: true })
-      .eq('event_type', 'checkout_started')
+      .eq('event_type', 'add_to_cart')
       .gte('created_at', thirtyDaysAgo.toISOString());
 
-    // Checkout Completed = Funnel Step 2
-    const { count: checkoutCompletedCount } = await supabaseServer
+    // Funnel Step 2 = Checkout Completed
+    const { count: completed } = await supabaseAdmin
       .from('analytics_events')
       .select('id', { count: 'exact', head: true })
       .eq('event_type', 'checkout_completed')
       .gte('created_at', thirtyDaysAgo.toISOString());
 
-    // Simplified Logic
-    const started = checkoutStartedCount || 0;
-    const completed = checkoutCompletedCount || 0;
-    
-    const conversionPercent = started === 0 
-      ? 0 
-      : (completed / started) * 100;
+    const addCount = addToCart || 0;
+    const completedCount = completed || 0;
+
+    const conversionPercent = addCount === 0
+      ? 0
+      : (completedCount / addCount) * 100;
 
     return {
-      addToCart: started,
-      orderPlaced: completed,
+      addToCart: addCount,
+      orderPlaced: completedCount,
       conversionPercent: Math.round(conversionPercent * 10) / 10,
     };
   } catch (error) {
@@ -221,13 +184,16 @@ export async function getCartVsOrderStatsLast30Days(): Promise<ConversionStat> {
   }
 }
 
+// ---------------- SAREE CATEGORY LOOKUP ----------------
+
 async function getSareeCategories() {
   try {
-    const { data, error } = await supabaseServer
+    const { data } = await supabaseAdmin
       .from('categories')
       .select('id, name')
       .or(`name.ilike.%saree%,slug.ilike.%saree%`)
       .eq('is_active', true);
+
     return data || [];
   } catch (error) {
     console.error('Error fetching saree categories:', error);

@@ -1,11 +1,49 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import dynamic from 'next/dynamic'; 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase/client';
-import { Package, ShoppingCart, IndianRupee, Users, TrendingUp, TrendingDown } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { getSareeSalesStats, getSareeSalesLast30Days, getCartVsOrderStatsLast30Days } from '@/lib/analytics';
+import { 
+  Package, 
+  ShoppingCart, 
+  IndianRupee, 
+  Users, 
+  TrendingUp, 
+  TrendingDown, 
+  Filter 
+} from 'lucide-react';
+
+// ✅ 1️⃣ DYNAMIC IMPORTS
+const AdminSalesChart = dynamic(() => import('@/components/AdminSalesChart'), { 
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center bg-gray-50 rounded-lg border border-dashed text-gray-400">
+      Loading Real Chart...
+    </div>
+  )
+});
+
+// ✅ New Pie Chart Component
+const OrderPieChart = dynamic(() => import('@/components/OrderPieChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center text-gray-400">
+      Loading Chart...
+    </div>
+  )
+});
+
+const COLORS = {
+  primary: '#2563eb',
+  success: '#16a34a',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  neutral: '#6b7280',
+  // Colors: Pending, Shipped, Delivered, Returned, Unknown
+  pie: ['#f59e0b', '#3b82f6', '#16a34a', '#ef4444', '#6b7280'],
+  noData: '#e5e7eb' 
+};
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -15,18 +53,30 @@ export default function AdminDashboard() {
     totalUsers: 0,
     todayOrders: 0,
   });
+  
   const [sareeStats, setSareeStats] = useState({
     thisMonth: 0,
     lastMonth: 0,
     momChangePercent: 0,
     thisMonthRevenue: 0,
   });
+
   const [chartData, setChartData] = useState<any[]>([]);
+  
   const [conversionData, setConversionData] = useState({
     addToCart: 0,
     orderPlaced: 0,
     conversionPercent: 0,
   });
+
+  const [orderStatusStats, setOrderStatusStats] = useState({
+    pending: 0,
+    shipped: 0,
+    delivered: 0,
+    returned: 0,
+    unknown: 0
+  });
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,29 +85,17 @@ export default function AdminDashboard() {
 
   const fetchAllStats = async () => {
     try {
-      const { count: productCount } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true });
+      const { count: productCount } = await supabase.from('products').select('*', { count: 'exact', head: true });
+      const { count: orderCount } = await supabase.from('orders').select('*', { count: 'exact', head: true });
+      const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
 
-      const { count: orderCount } = await supabase
-        .from('orders')
-        .select('*', { count: 'exact', head: true });
-
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('total_amount_inr, payment_status');
-
+      const { data: orders } = await supabase.from('orders').select('total_amount_inr, payment_status');
       const totalRevenue = orders
         ?.filter((order) => order.payment_status === 'paid')
         .reduce((sum, order) => sum + Number(order.total_amount_inr), 0) || 0;
 
-      const { count: userCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
       const { count: todayOrderCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
@@ -71,14 +109,20 @@ export default function AdminDashboard() {
         todayOrders: todayOrderCount || 0,
       });
 
-      const sareeSalesStats = await getSareeSalesStats();
-      setSareeStats(sareeSalesStats);
+      const analyticsRes = await fetch('/api/admin/analytics', { cache: 'no-store' });
+      const analytics = await analyticsRes.json();
 
-      const chartDataPoints = await getSareeSalesLast30Days();
-      setChartData(chartDataPoints);
+      console.log("API ANALYTICS RESPONSE:", analytics);
+      console.log("ORDER STATUS STATE:", analytics.orderStatusStats);
 
-      const conversionStats = await getCartVsOrderStatsLast30Days();
-      setConversionData(conversionStats);
+      if (analytics.success) {
+        setSareeStats(analytics.sareeStats);
+        setChartData(analytics.chartData);
+        setConversionData(analytics.conversionData);
+        if (analytics.orderStatusStats) {
+          setOrderStatusStats(analytics.orderStatusStats);
+        }
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -87,260 +131,229 @@ export default function AdminDashboard() {
   };
 
   if (loading) {
-    return <div className="p-8">Loading analytics...</div>;
+    return (
+      <div className="flex h-96 w-full items-center justify-center text-gray-500">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-4 w-4 bg-gray-300 rounded-full mb-2"></div>
+          Loading Analytics...
+        </div>
+      </div>
+    );
   }
 
+  // ✅ FIXED: Data Sanitization
+  const pieDataRaw = [
+    { name: 'Pending', value: Number(orderStatusStats.pending) || 0 },
+    { name: 'Shipped', value: Number(orderStatusStats.shipped) || 0 },
+    { name: 'Delivered', value: Number(orderStatusStats.delivered) || 0 },
+    { name: 'Returned', value: Number(orderStatusStats.returned) || 0 },
+    { name: 'Unknown', value: Number(orderStatusStats.unknown) || 0 }
+  ];
+
+  // ✅ FIXED: Logic to map data correctly and check for non-zero existence
+  const pieData = pieDataRaw.map(item => ({
+    name: item.name,
+    value: Number(item.value) || 0
+  }));
+
+  const hasRealData = pieData.some(item => item.value > 0);
+
+  // Fallback to show empty chart placeholder if all data is 0
+  const safePieData = hasRealData 
+    ? pieData 
+    : [{ name: 'No Data', value: 1 }];
+  
+  console.log("FINAL PIE DATA:", safePieData);
+
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
-
-      {/* OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <IndianRupee className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ₹{stats.totalRevenue.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalOrders}</div>
-            <p className="text-xs text-gray-600 mt-1">
-              {stats.todayOrders} today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Products</CardTitle>
-            <Package className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProducts}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Users</CardTitle>
-            <Users className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalUsers}</div>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Overview of your store's performance and business health.
+        </p>
       </div>
 
-      <div className="text-2xl font-bold mb-6">Saree Sales Analytics</div>
-
-      {/* SAREE ANALYTICS CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Sarees Sold - This Month</CardTitle>
-            <Package className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{sareeStats.thisMonth}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Sarees Sold - Last Month</CardTitle>
-            <Package className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{sareeStats.lastMonth}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">MoM Change %</CardTitle>
-            {sareeStats.momChangePercent >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${sareeStats.momChangePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {sareeStats.momChangePercent >= 0 ? '+' : ''}{sareeStats.momChangePercent.toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Saree Revenue - This Month</CardTitle>
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-gray-500">Total Revenue</CardTitle>
             <IndianRupee className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              ₹{sareeStats.thisMonthRevenue.toLocaleString()}
+            <div className="text-2xl font-bold text-gray-900">
+              ₹{stats.totalRevenue.toLocaleString()}
             </div>
+            <p className="text-xs text-green-600 mt-1 flex items-center">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Lifetime earnings
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-gray-500">Total Orders</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalOrders}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              <span className="text-blue-600 font-medium">+{stats.todayOrders}</span> new today
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-l-4 border-l-amber-500 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-gray-500">Products</CardTitle>
+            <Package className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalProducts}</div>
+            <p className="text-xs text-gray-500 mt-1">Active inventory</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-purple-500 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-gray-500">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalUsers}</div>
+            <p className="text-xs text-gray-500 mt-1">Registered customers</p>
           </CardContent>
         </Card>
       </div>
 
       {/* CHARTS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
         
-        {/* FIX 1: SAREE SALES CHART WITH FORCED DOTS & SCALE */}
-        <Card className="h-[420px]">
+        {/* SALES TREND BAR CHART */}
+        <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>Saree Sales - Last 30 Days</CardTitle>
+            <CardTitle>Sales Trend</CardTitle>
+            <CardDescription>Daily units sold over the last 30 days</CardDescription>
           </CardHeader>
-          <CardContent className="h-[340px]">
-            {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" stroke="#6b7280" />
-                  
-                  {/* ✅ Y-AXIS FIX: Force min domain to 3 so small numbers don't look flat */}
-                  <YAxis 
-                    domain={[0, Math.max(3, ...chartData.map(d => d.sales))]}
-                    allowDecimals={false}
-                    stroke="#6b7280"
-                  />
-                  
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
-                  />
-                  <Legend />
-                  
-                  {/* ✅ LINE FIX: Linear type + Forced Dot Props + No Animation */}
-                  <Line
-                    type="linear"
-                    dataKey="sales"
-                    stroke="#2563eb"
-                    strokeWidth={3}
-                    dot={{ r: 6, stroke: '#2563eb', fill: '#2563eb' }}
-                    connectNulls={true}
-                    isAnimationActive={false}
-                    name="Units Sold"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
-                No data available yet
-              </div>
-            )}
+          <CardContent className="min-h-[360px] flex flex-col gap-6">
+            <div style={{ height: 340 }}>
+              {chartData.length > 0 ? (
+                <AdminSalesChart data={chartData} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-400 flex-col">
+                  <Filter className="w-8 h-8 mb-2 opacity-20" />
+                  <p>Data will appear once sales start flowing</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* FIX 2: BAR CHART */}
-        <Card className="h-[420px]">
+        {/* ORDER DISTRIBUTION PIE CHART */}
+        <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Add to Cart vs Orders - Last 30 Days</CardTitle>
+            <CardTitle>Order Distribution</CardTitle>
+            <CardDescription>Overview of order statuses</CardDescription>
           </CardHeader>
-          <CardContent className="h-[340px] flex flex-col">
-            <div className="flex-1 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[
-                  { name: 'Add to Cart', value: conversionData.addToCart },
-                  { name: 'Orders', value: conversionData.orderPlaced },
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="name" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" allowDecimals={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb' }}
-                  />
-                  <Bar dataKey="value" fill="#2563eb" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 shrink-0">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">Conversion Rate</p>
-                  <p className="text-xs text-gray-600">
-                    {conversionData.orderPlaced} orders from {conversionData.addToCart} carts
-                  </p>
-                </div>
-                <p className="text-2xl font-bold text-blue-600">
-                  {conversionData.conversionPercent.toFixed(1)}%
-                </p>
-              </div>
-            </div>
+          
+          {/* ✅ FIXED: Removed explicit height and used flex center for wrapper */}
+          <CardContent className="h-[360px] flex justify-center items-center">   
+            <OrderPieChart data={safePieData} colors={COLORS.pie} />
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* BOTTOM SECTION */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* CONVERSION FUNNEL */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>Conversion Funnel</CardTitle>
+            <CardDescription>Customer journey from cart to purchase</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+             <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 font-medium">Added to Cart</span>
+                <span className="font-bold">{conversionData.addToCart}</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-200 w-full" />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <a
-                href="/admin/products/new"
-                className="block p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Add New Product
-              </a>
-              <a
-                href="/admin/categories/new"
-                className="block p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Add New Category
-              </a>
-              <a
-                href="/admin/coupons/new"
-                className="block p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Create Coupon
-              </a>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 font-medium">Order Placed</span>
+                <span className="font-bold">{conversionData.orderPlaced}</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-500" 
+                  style={{ width: `${Math.min(100, conversionData.conversionPercent)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-blue-600 uppercase font-bold tracking-wider">Conversion Rate</p>
+                <p className="text-xs text-gray-600 mt-1">Orders / Carts</p>
+              </div>
+              <div className="text-2xl font-bold text-blue-700">
+                {Math.min(100, conversionData.conversionPercent).toFixed(1)}%
+              </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* MONTHLY PERFORMANCE */}
         <Card>
           <CardHeader>
-            <CardTitle>Analytics Overview</CardTitle>
+            <CardTitle>Monthly Performance</CardTitle>
+            <CardDescription>Current month vs Last month</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Avg Daily Saree Sales:</span>
-                <span className="font-semibold">
-                  {(sareeStats.thisMonth / new Date().getDate()).toFixed(1)}
-                </span>
+            <div className="grid grid-cols-2 gap-4">
+              
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <p className="text-xs text-gray-500 mb-1">This Month Sales</p>
+                <p className="text-xl font-bold text-gray-900">{sareeStats.thisMonth} units</p>
+                <p className="text-xs text-gray-500 mt-1">
+                   ₹{sareeStats.thisMonthRevenue.toLocaleString()} Revenue
+                </p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Conversion Rate:</span>
-                <span className="font-semibold text-blue-600">
-                  {conversionData.conversionPercent.toFixed(1)}%
-                </span>
+
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <p className="text-xs text-gray-500 mb-1">Last Month Sales</p>
+                <p className="text-xl font-bold text-gray-900">{sareeStats.lastMonth} units</p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Add to Cart:</span>
-                <span className="font-semibold">{conversionData.addToCart}</span>
+
+              <div className="col-span-2 p-4 border rounded-lg flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Month-over-Month Growth</p>
+                  <p className="text-xs text-gray-500">Comparison with previous period</p>
+                </div>
+                <div className={`flex items-center text-lg font-bold ${
+                  sareeStats.momChangePercent >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {sareeStats.momChangePercent >= 0 ? (
+                    <TrendingUp className="w-5 h-5 mr-2" />
+                  ) : (
+                    <TrendingDown className="w-5 h-5 mr-2" />
+                  )}
+                  {sareeStats.momChangePercent > 0 ? '+' : ''}
+                  {sareeStats.momChangePercent.toFixed(1)}%
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Orders:</span>
-                <span className="font-semibold">{conversionData.orderPlaced}</span>
-              </div>
+
             </div>
           </CardContent>
         </Card>
+
       </div>
     </div>
   );

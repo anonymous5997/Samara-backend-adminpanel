@@ -16,6 +16,8 @@ import { getCurrencyRates } from '@/lib/currency-utils';
 
 import type { Region } from '@/lib/landed-pricing';
 import type { CurrencyCode } from '@/components/currency-selector';
+// ✅ STEP 1: Import Analytics Tracker
+import { trackAnalyticsEvent } from '@/lib/analytics.client';
 
 /* ======================================================
    CONSTANTS
@@ -83,16 +85,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyCode>('INR');
   const [rate, setRate] = useState<number>(1);
 
-  // ✅ FIX STEP 1: Initialize rates with a stable shape
-  // This ensures 'rates.USD' is defined (albeit 0) on the first render, 
-  // keeping React happy and preventing hydration mismatches.
+  // Initialize rates with a stable shape
   const [rates, setRates] = useState<Record<string, number>>(() => ({
     INR: 1,
     USD: 0,
     AED: 0,
     GBP: 0,
     CAD: 0,
-    // Add other currencies if necessary, but this covers the main checks
   }));
 
   /* ======================================================
@@ -141,8 +140,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const fetchCart = async () => {
     if (!session || !user) return; 
 
-    // ✅ FIX STEP 3: HARD GUARD (Kept as requested)
-    // We check for USD specifically to ensure the async fetch has likely completed.
+    // HARD GUARD: Check for USD to ensure async fetch has likely completed.
     if (!rates || !rates.USD) {
       console.warn('Cart fetch skipped: exchange rates not ready');
       return;
@@ -248,8 +246,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setItems(guestCart);
       setLoading(false);
     }
-  // ✅ FIX STEP 2: KEEP RATES IN DEPENDENCY ARRAY
-  // This ensures the effect re-runs once the rates state updates from 0 -> Actual Value
+  // KEEP RATES IN DEPENDENCY ARRAY
   }, [session, user, authLoading, rates]);
 
   /* ======================================================
@@ -366,6 +363,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       localStorage.setItem(GUEST_CART_KEY, JSON.stringify(guestCart));
       setItems(guestCart);
+
+      // ✅ STEP 3: Track Guest Add-To-Cart (FIXED: Removed token arg)
+      await trackAnalyticsEvent(
+        'add_to_cart',
+        productId,
+        undefined,
+        null
+      );
+
       return;
     }
 
@@ -389,6 +395,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       
       console.log('✅ CART INSERTED');
+
+      // ✅ STEP 4: Track Logged-In Add-To-Cart (FIXED: Removed token arg)
+      await trackAnalyticsEvent(
+        'add_to_cart',
+        productId,
+        undefined,
+        user.id
+      );
+
       fetchCart();
     }
   };

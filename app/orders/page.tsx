@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase/client'
-import { formatPriceSync } from '@/lib/currency-utils';
-
+import { formatPriceSync } from '@/lib/currency-utils'
 
 type OrderRow = {
   order_id: string
@@ -30,6 +29,7 @@ export default function OrdersPage() {
   async function fetchOrders() {
     setLoading(true)
 
+    // ✅ STEP 1: FIX - Query updated to join order_items -> products
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -40,8 +40,10 @@ export default function OrdersPage() {
         total_amount,
         currency,
         order_items (
-          product_name,
-          image_url
+          products (
+            name,
+            image_url
+          )
         )
       `)
       .order('created_at', { ascending: false })
@@ -52,9 +54,13 @@ export default function OrdersPage() {
       return
     }
 
+    // ✅ STEP 2: FIX - Mapping logic updated to access the nested 'products' object
     const mapped: OrderRow[] =
       data?.map((o: any) => {
+        // Get the first item from the order
         const item = o.order_items?.[0]
+        // Get the product details from that item
+        const product = item?.products
 
         return {
           order_id: o.id,
@@ -66,8 +72,9 @@ export default function OrdersPage() {
           payment_status: o.payment_status,
           total_amount: o.total_amount,
           currency: o.currency,
-          product_name: item?.product_name ?? 'Product',
-          image_url: item?.image_url ?? null,
+          // Map product.name to the local state product_name
+          product_name: product?.name ?? 'Product', 
+          image_url: product?.image_url ?? null,
         }
       }) ?? []
 
@@ -75,7 +82,7 @@ export default function OrdersPage() {
     setLoading(false)
   }
 
-  const filtered = orders.filter(o =>
+  const filtered = orders.filter((o) =>
     o.product_name.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -91,7 +98,7 @@ export default function OrdersPage() {
         className="w-full mb-6 rounded-md px-4 py-3 bg-black border border-[#D4AF37] text-white"
         placeholder="Search your orders"
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={(e) => setSearch(e.target.value)}
       />
 
       {filtered.length === 0 && (
@@ -99,7 +106,7 @@ export default function OrdersPage() {
       )}
 
       <div className="space-y-4">
-        {filtered.map(order => (
+        {filtered.map((order) => (
           <Link
             key={order.order_id}
             href={`/orders/${order.order_id}`}
@@ -121,13 +128,10 @@ export default function OrdersPage() {
               </div>
 
               <div className="flex-1">
-                <p className="font-medium text-lg">
-                  {order.product_name}
-                </p>
+                <p className="font-medium text-lg">{order.product_name}</p>
 
                 <p className="text-sm text-gray-400">
-                  Ordered on{' '}
-                  {new Date(order.created_at).toLocaleDateString()}
+                  Ordered on {new Date(order.created_at).toLocaleDateString()}
                 </p>
 
                 <p className="text-sm mt-1">

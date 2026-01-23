@@ -11,7 +11,6 @@ const playfair = Playfair_Display({
   variable: "--font-playfair",
 });
 
-
 export const metadata: Metadata = {
   title: "Samara - Best Handcrafted Sambalpuri Sarees | Traditional Indian Sarees",
   description:
@@ -30,15 +29,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={playfair.variable}>
-      <head>
-        {/* Razorpay SDK */}
+      <body className="antialiased">
+        {/* Razorpay SDK - Load AFTER page is interactive */}
         <Script
           src="https://checkout.razorpay.com/v1/checkout.js"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
-      </head>
 
-      <body className="antialiased">
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
