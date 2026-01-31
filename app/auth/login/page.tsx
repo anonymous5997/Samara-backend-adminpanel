@@ -28,7 +28,7 @@ export default function LoginPage() {
   
   // Track signup flow locally to control UI transitions
   const [isSignupFlow, setIsSignupFlow] = useState(false);
-
+  
   // Cooldown state for Resend OTP
   const [cooldown, setCooldown] = useState(0);
 
@@ -39,7 +39,6 @@ export default function LoginPage() {
     password: '',
     otp: '',
   });
-
   const [loading, setLoading] = useState(false);
 
   /* ---------------- 1. SAFE AUTO-REDIRECT EFFECT ---------------- */
@@ -100,7 +99,6 @@ export default function LoginPage() {
         redirectTo: `${window.location.origin}/auth/login/callback`,
       },
     });
-
     if (error) toast.error(error.message);
   };
 
@@ -112,7 +110,6 @@ export default function LoginPage() {
       password: form.password,
     });
     setLoading(false);
-
     if (error) toast.error(error.message);
     // Redirect handled by useEffect
   };
@@ -120,21 +117,18 @@ export default function LoginPage() {
   /* ---------------- SEND OTP ---------------- */
   const sendOtp = async () => {
     if (loading || cooldown > 0) return;
-
     if (!form.email) {
       toast.error('Email is required');
       return;
     }
 
     setLoading(true);
-
     const { error } = await supabase.auth.signInWithOtp({
       email: form.email.trim(),
       options: {
         shouldCreateUser: true,
       },
     });
-
     setLoading(false);
 
     if (error) {
@@ -151,19 +145,25 @@ export default function LoginPage() {
   const verifyOtp = async () => {
     if (loading) return;
 
+    // ✅ CHECK #2: UX Safety Guard
+    // If user is in signup flow but lost the name (e.g. refresh), force restart
+    if (isSignupFlow && !localStorage.getItem('pending_name')) {
+      toast.error('Signup name missing. Please restart signup.');
+      setMode('signup');
+      return;
+    }
+
     if (!form.otp || form.otp.length !== 6) {
       toast.error('Enter the 6-digit OTP');
       return;
     }
 
     setLoading(true);
-
     const { error } = await supabase.auth.verifyOtp({
       email: form.email.trim(),
       token: form.otp.trim(),
       type: 'email',
     });
-
     setLoading(false);
 
     if (error) {
@@ -171,21 +171,30 @@ export default function LoginPage() {
       return;
     }
 
-    // Handle pending name update
+    // ✅ CHECK #1: Critical Fix (Upsert Profile)
+    // Fetch latest user state to ensure we have the ID
+    const { data: { user } } = await supabase.auth.getUser();
     const pendingName = localStorage.getItem('pending_name');
-    if (pendingName) {
+
+    if (user && pendingName) {
+      // 1️⃣ Save name into auth metadata
       await supabase.auth.updateUser({
         data: { name: pendingName },
       });
 
-      const { data: { user } } = await supabase.auth.getUser();
+      // 2️⃣ UPSERT profile name (handles race condition & ensures profile exists)
+      await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: user.id,
+            email: user.email!,
+            name: pendingName,
+            role: 'customer',
+          },
+          { onConflict: 'id' }
+        );
 
-      if (user) {
-        await supabase
-          .from('profiles')
-          .update({ name: pendingName })
-          .eq('id', user.id);
-      }
       localStorage.removeItem('pending_name');
     }
 
@@ -199,7 +208,7 @@ export default function LoginPage() {
     // Redirect handled by useEffect
   };
 
-  /* ---------------- SET PASSWORD (CRITICAL FIX) ---------------- */
+  /* ---------------- SET PASSWORD ---------------- */
   const setPassword = async () => {
     if (!form.password || form.password.length < 8) {
       toast.error(
@@ -209,7 +218,6 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-
     // ✅ Update user AND set 'has_password' metadata
     const { error } = await supabase.auth.updateUser({
       password: form.password,
@@ -217,7 +225,6 @@ export default function LoginPage() {
         has_password: true, // 🔑 This flag allows the redirect to happen
       },
     });
-
     setLoading(false);
 
     if (error) {
@@ -241,7 +248,6 @@ export default function LoginPage() {
     
     // Mark flow as signup
     setIsSignupFlow(true);
-
     await sendOtp();
   };
 
@@ -253,7 +259,6 @@ export default function LoginPage() {
   /* ---------------- SUBMIT HANDLER ---------------- */
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (mode === 'login' && tab === 'password') return loginPassword();
     if (mode === 'login' && (tab === 'email' || tab === 'phone')) return sendOtp();
     if (mode === 'signup') return signupStart();
@@ -332,7 +337,6 @@ export default function LoginPage() {
                 className="mb-3 bg-white text-black"
               />
             )}
-
             {tab === 'phone' && (
               <Input
                 placeholder="Phone"
@@ -401,7 +405,6 @@ export default function LoginPage() {
               <span className="text-xs text-gray-400">OR CONTINUE WITH</span>
               <div className="flex-1 h-px bg-gray-700" />
             </div>
-
             <div className="space-y-3">
               <Button
                 type="button"
@@ -411,7 +414,6 @@ export default function LoginPage() {
                 <Image src="/icons/google.svg" alt="Google" width={18} height={18} />
                 Continue with Google
               </Button>
-
               <Button
                 type="button"
                 onClick={() => signInWithProvider('facebook')}

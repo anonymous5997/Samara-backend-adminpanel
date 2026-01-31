@@ -30,7 +30,7 @@ type Profile = {
 
 type AuthContextType = {
   user: User | null;
-  session: Session | null; // ✅ Added Session type
+  session: Session | null;
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
@@ -46,7 +46,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null); // ✅ Added Session state
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,15 +60,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (existingProfile) {
+      // 🔁 Backfill missing name if metadata has it
+      if (!existingProfile.name) {
+        const nameFromProvider =
+          authUser.user_metadata?.full_name ||
+          authUser.user_metadata?.name ||
+          authUser.user_metadata?.given_name ||
+          null;
+
+        if (nameFromProvider) {
+          const { data: updatedProfile } = await supabase
+            .from('profiles')
+            .update({ name: nameFromProvider })
+            .eq('id', authUser.id)
+            .select()
+            .single();
+
+          setProfile(updatedProfile);
+          return;
+        }
+      }
+
       setProfile(existingProfile);
       return;
     }
 
-    // 2️⃣ Create profile if missing
-    // We strictly use insert here (not upsert) to avoid overwriting name
+    // ✅ Extract name from OAuth provider (Google, Facebook, etc.)
+    const nameFromProvider =
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      authUser.user_metadata?.given_name ||
+      null;
+
+    // 2️⃣ Create profile if missing (with name)
+    // We strictly use insert here (not upsert) to avoid overwriting existing data accidentally
     await supabase.from('profiles').insert({
       id: authUser.id,
       email: authUser.email!,
+      name: nameFromProvider, // ✅ SAVES GOOGLE NAME
       role: 'customer',
     });
 
@@ -159,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setSession(null); // ✅ Clear session
+    setSession(null);
     setProfile(null);
     window.location.href = '/';
   };
@@ -170,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        session, // ✅ Expose session
+        session,
         profile,
         loading,
         isAdmin: profile?.role === 'admin',
