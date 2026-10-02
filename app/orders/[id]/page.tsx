@@ -19,14 +19,10 @@ import {
   Star
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { WriteReviewModal } from '@/components/WriteReviewModal'
+import { AccountHero, BTN_GHOST, BTN_GOLD, Detail, FOCUS, StatusTag, TEXT_LINK } from '@/components/account/ui'
 
 /* ---------------- CONFIGURATION ---------------- */
 const COMPANY = {
@@ -294,8 +290,8 @@ export default function OrderDetailsPage() {
   }
 
   /* ---------------- LOADING STATES ---------------- */
-  if (loading) return <div className="container mx-auto px-4 py-20 text-white">Loading order…</div>
-  if (!order) return <div className="container mx-auto px-4 py-20 text-white">Order not found.</div>
+  if (loading) return <div className="flex min-h-[70vh] items-center justify-center bg-samara-ink"><span className="sm-eyebrow animate-pulse motion-reduce:animate-none">Loading order…</span></div>
+  if (!order) return <div className="flex min-h-[70vh] items-center bg-samara-ink"><div className="sm-container py-20"><p className="sm-eyebrow text-samara-gold">My Orders</p><p className="sm-display-m mt-6 font-light">Order not <span className="sm-accent">found.</span></p><Link href="/orders" className="sm-link mt-8 inline-block font-sans text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-samara-ivory hover:text-samara-gold">Back to orders</Link></div></div>
 
   /* ---------------- STATUS & RETURN LOGIC ---------------- */
   const displayStatus =
@@ -349,127 +345,140 @@ export default function OrderDetailsPage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="container mx-auto px-4 py-12 text-white">
-      <Card className="bg-black border border-[#D4AF37]/40">
-        <CardHeader className="border-b border-[#D4AF37]/30">
-          <div className="flex justify-between items-start gap-4 flex-wrap">
-            <div>
-              <CardTitle className="text-xl text-white">Order #{order.order_number}</CardTitle>
-              <p className="text-sm text-gray-300 mt-1">{format(new Date(order.created_at), 'MMMM dd, yyyy')}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-semibold text-white">{formatPriceSync(order.total_amount, order.currency)}</p>
-              <div className="flex gap-2 justify-end mt-2 flex-wrap">
-                <span className={`px-2 py-1 text-xs rounded capitalize font-medium ${
-                  displayStatus === 'cancelled' ? 'bg-red-600' :
-                  displayStatus === 'confirmed' ? 'bg-blue-600' :
-                  displayStatus === 'shipped' ? 'bg-purple-600' :
-                  displayStatus === 'delivered' ? 'bg-green-600' : 'bg-yellow-500 text-black'
-                } text-white`}>
-                  {displayStatus}
-                </span>
-                <span className="px-2 py-1 text-xs rounded bg-green-600 text-white">{order.payment_status}</span>
-              </div>
+    <div className="bg-samara-ink text-samara-ivory">
+      <AccountHero
+        eyebrow={format(new Date(order.created_at), 'MMMM dd, yyyy')}
+        title={<>Order <span className="sm-accent break-all">#{order.order_number}</span></>}
+        titleClassName="text-[clamp(2.25rem,5vw,4.5rem)]"
+        aside={
+          <div className="flex flex-col gap-4 md:items-end">
+            <p className="font-serif text-[2rem] font-light leading-none tabular-nums text-samara-ivory md:text-[2.5rem]">{formatPriceSync(order.total_amount, order.currency)}</p>
+            <div className="flex flex-wrap gap-2 md:justify-end">
+              <StatusTag className={`${
+                displayStatus === 'cancelled' ? 'border-[#D9806B]/60 text-[#D9806B]' :
+                displayStatus === 'confirmed' ? 'border-samara-ivory/40 text-samara-ivory' :
+                displayStatus === 'shipped' ? 'border-samara-gold/60 text-samara-gold' :
+                displayStatus === 'delivered' ? 'border-samara-gold bg-samara-gold text-samara-cream-ink' : 'border-samara-ivory/25 text-samara-mute'
+              }`}>
+                {displayStatus}
+              </StatusTag>
+              <StatusTag tone="ivory"><span className="sr-only">Payment </span>{order.payment_status}</StatusTag>
             </div>
           </div>
-        </CardHeader>
-        
-        <CardContent className="space-y-10 pt-8">
+        }
+      />
+
+      <div className="sm-container grid grid-cols-1 gap-14 pb-20 pt-12 md:pb-28 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-16 lg:pt-16 xl:grid-cols-[minmax(0,1fr)_420px] xl:gap-24">
+        <div className="min-w-0 space-y-14">
           {/* DELIVERY PROGRESS */}
-          <div>
-            <p className="font-semibold mb-6 text-white">Delivery Progress</p>
-            <div className="relative flex justify-between items-center">
-              <div className="absolute top-4 left-0 right-0 h-[2px] bg-gray-700" />
-              <div className="absolute top-4 left-0 h-[2px] bg-[#D4AF37]" style={{ width: `${(stepIndex / 3) * 100}%` }} />
+          <section aria-labelledby="order-progress">
+            <h2 id="order-progress" className="sm-eyebrow !tracking-[0.28em] text-samara-ivory">Delivery Progress</h2>
+            <div className="relative mt-8 flex items-start justify-between">
+              <div className="absolute left-[12.5%] right-[12.5%] top-[22px] h-px bg-samara-ivory/20" />
+              <div className="absolute left-[12.5%] right-[12.5%] top-[22px] h-px">
+                <div className="h-px bg-samara-gold transition-[width] duration-700 ease-editorial" style={{ width: `${(stepIndex / 3) * 100}%` }} />
+              </div>
               {steps.map((step, i) => {
                 const active = i <= stepIndex && !isCancelled
                 return (
-                  <div key={step} className="relative z-10 flex flex-col items-center flex-1">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 ${active ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-gray-600 text-gray-400'}`}>
-                      {i === 0 ? <Package className="w-4 h-4" /> : i === 3 ? <CheckCircle2 className="w-4 h-4" /> : <Truck className="w-4 h-4" />}
+                  <div key={step} className="relative z-10 flex flex-1 flex-col items-center text-center">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-full border ${active ? 'border-samara-gold bg-samara-gold text-samara-cream-ink' : 'border-samara-ivory/25 bg-samara-ink text-samara-mute'}`}>
+                      {i === 0 ? <Package className="h-4 w-4" strokeWidth={1.25} /> : i === 3 ? <CheckCircle2 className="h-4 w-4" strokeWidth={1.25} /> : <Truck className="h-4 w-4" strokeWidth={1.25} />}
                     </div>
-                    <span className={`mt-3 text-xs ${active ? 'text-[#D4AF37]' : 'text-gray-400'}`}>{step}</span>
+                    <span className={`mt-4 px-1 font-sans text-[0.625rem] font-medium uppercase leading-snug tracking-[0.16em] sm:tracking-[0.2em] ${active ? 'text-samara-gold' : 'text-samara-mute'}`}>{step}</span>
                   </div>
                 )
               })}
             </div>
-          </div>
+          </section>
 
           {/* ✅ RATE YOUR PURCHASE SECTION */}
           {shouldAskForReview && (
-            <div className="border border-[#D4AF37]/40 rounded-lg p-5 bg-[#0a0a0a]">
-              <div className="flex items-center gap-2 mb-3">
-                <Star className="w-5 h-5 text-[#D4AF37] fill-[#D4AF37]" />
-                <p className="font-semibold text-[#D4AF37]">Rate your purchase</p>
+            <section className="border border-samara-line bg-samara-char px-6 py-7 sm:px-8">
+              <div className="flex items-center gap-3">
+                <Star className="h-4 w-4 text-samara-gold" strokeWidth={1.25} />
+                <p className="font-serif text-[1.5rem] font-light leading-tight text-samara-ivory">Rate your <span className="sm-accent">purchase</span></p>
               </div>
               
-              <div className="space-y-3">
+              <div className="mt-5">
                 {items.map(item => {
                   const alreadyReviewed = reviewedProductIds.includes(item.product_id)
                   if (alreadyReviewed) return null
 
                   return (
-                    <div key={item.product_id} className="flex items-center justify-between bg-white/5 p-3 rounded border border-white/10">
-                      <span className="text-sm text-gray-200">{item.product_name}</span>
-                      <Button
-                        size="sm"
-                        className="bg-[#D4AF37] text-black hover:bg-[#b5952f] text-xs h-8"
+                    <div key={item.product_id} className="flex flex-wrap items-center justify-between gap-4 border-t border-samara-line py-4">
+                      <span className="font-serif text-[1.125rem] text-samara-ivory">{item.product_name}</span>
+                      <button
+                        type="button"
+                        className={cn(BTN_GOLD, 'min-h-[44px] px-5 text-[0.6875rem]')}
                         onClick={() => {
                           setSelectedProductId(item.product_id)
                           setReviewModalOpen(true)
                         }}
                       >
                         Write Review
-                      </Button>
+                      </button>
                     </div>
                   )
                 })}
               </div>
-            </div>
+            </section>
           )}
 
+          {/* PIECES */}
+          <section aria-labelledby="order-items">
+            <h2 id="order-items" className="sm-eyebrow !tracking-[0.28em] border-b border-samara-line pb-4 text-samara-ivory">Pieces</h2>
+            <ul>
+              {items.map((item, index) => (
+                <li key={`${item.product_id}-${index}`} className="flex items-baseline gap-5 border-b border-samara-line py-5">
+                  <span className="font-sans text-[0.6875rem] tabular-nums tracking-[0.18em] text-samara-mute">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="font-serif text-[1.25rem] leading-snug text-samara-ivory">{item.product_name}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <aside className="h-fit space-y-10 border border-samara-line bg-samara-char px-6 py-8 sm:px-8 sm:py-10 lg:sticky lg:top-[calc(var(--sm-header-h)+2rem)]">
           {/* TRACKING & SHIPPING */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-            <div>
-              <p className="text-gray-400">Tracking Number</p>
-              <p className="text-white">{order.tracking_number || 'Not assigned yet'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400">Carrier</p>
-              <p className="text-white">{order.carrier || 'Will be updated soon'}</p>
-            </div>
-            <div className="col-span-1 md:col-span-2">
-              <p className="text-gray-400 mb-2">Shipping Address</p>
-              <p className="text-white font-medium">{order.shipping_name}</p>
-              <p className="text-white">{order.shipping_address}</p>
-              <p className="text-white">{order.shipping_city}, {order.shipping_state} – {order.shipping_pincode}</p>
-              <p className="text-white">{order.shipping_country}</p>
-            </div>
-          </div>
+          <dl className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-1">
+            <Detail label="Tracking Number">
+              <span className="break-all">{order.tracking_number || 'Not assigned yet'}</span>
+            </Detail>
+            <Detail label="Carrier">
+              {order.carrier || 'Will be updated soon'}
+            </Detail>
+            <Detail label="Shipping Address" className="sm:col-span-2 lg:col-span-1">
+              <span className="block font-serif text-[1.125rem] text-samara-ivory">{order.shipping_name}</span>
+              <span className="mt-1 block text-samara-mute">{order.shipping_address}</span>
+              <span className="block text-samara-mute">{order.shipping_city}, {order.shipping_state} – {order.shipping_pincode}</span>
+              <span className="block text-samara-mute">{order.shipping_country}</span>
+            </Detail>
+          </dl>
 
           {/* ACTIONS & RETURN WINDOW */}
-          <div className="border-t border-gray-800 pt-6">
-            <div className="flex gap-4 flex-wrap items-center">
-              <Button onClick={downloadInvoice} className="bg-[#D4AF37] text-black hover:bg-[#b5952f]">
-                <Download className="w-4 h-4 mr-2" />
+          <div className="border-t border-samara-line pt-8">
+            <div className="flex flex-col gap-3">
+              <button type="button" onClick={downloadInvoice} className={cn(BTN_GOLD, 'w-full')}>
+                <Download className="h-4 w-4" strokeWidth={1.25} />
                 Download Invoice
-              </Button>
+              </button>
               
               {canCancel && (
-                <Button variant="destructive" onClick={cancelOrder}>
-                  <XCircle className="w-4 h-4 mr-2" />
+                <button type="button" onClick={cancelOrder} className="sm-btn w-full border-[#D9806B]/50 text-[#D9806B] hover:border-[#D9806B] hover:bg-[#D9806B] hover:text-samara-cream-ink">
+                  <XCircle className="h-4 w-4" strokeWidth={1.25} />
                   Cancel Order
-                </Button>
+                </button>
               )}
               
               {/* Return Button */}
               {canReturn && (
-                <div className="flex flex-col gap-1">
-                  <Button variant="outline" onClick={requestReturn} className="border-gray-600 text-gray-200 hover:bg-gray-800">
-                    <RotateCcw className="w-4 h-4 mr-2" />
+                <div className="flex flex-col gap-2">
+                  <button type="button" onClick={requestReturn} className={cn(BTN_GHOST, 'w-full')}>
+                    <RotateCcw className="h-4 w-4" strokeWidth={1.25} />
                     Request Return
-                  </Button>
-                  <span className="text-[10px] text-gray-500 text-center">
+                  </button>
+                  <span className="text-center font-sans text-[0.6875rem] text-samara-mute">
                     {daysLeftToReturn} days left to return
                   </span>
                 </div>
@@ -478,13 +487,17 @@ export default function OrderDetailsPage() {
 
             {/* Return Window Closed Message */}
             {isDelivered && !returnEligible && !isCancelled && (
-              <p className="text-sm text-gray-500 mt-4 italic">
+              <p className="mt-5 font-serif text-[1rem] italic text-samara-mute">
                 Return window closed (14 days after delivery).
               </p>
             )}
           </div>
-        </CardContent>
-      </Card>
+
+          <Link href="/orders" className={cn(TEXT_LINK, FOCUS, 'text-samara-mute hover:text-samara-ivory')}>
+            All orders
+          </Link>
+        </aside>
+      </div>
 
       {/* REVIEW MODAL */}
       {selectedProductId && (
