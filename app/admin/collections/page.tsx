@@ -45,6 +45,8 @@ const emptyForm = {
   hero_image_url: null as string | null,
   is_active: true,
   sort_order: '1',
+  /** '' = no linked category (products matched by the collection's keyword). */
+  category_id: '',
 };
 
 export default function AdminCollectionsPage() {
@@ -57,9 +59,15 @@ export default function AdminCollectionsPage() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     fetchCollections();
+    supabase
+      .from('categories')
+      .select('id, name')
+      .order('name')
+      .then(({ data }) => setCategories(data ?? []));
   }, []);
 
   const fetchCollections = async () => {
@@ -102,6 +110,7 @@ export default function AdminCollectionsPage() {
       hero_image_url: collection.hero_image_url ?? null,
       is_active: collection.is_active,
       sort_order: String(collection.sort_order ?? 1),
+      category_id: collection.category_id ?? '',
     });
     setSlugTouched(true);
     setImageFile(null);
@@ -142,6 +151,9 @@ export default function AdminCollectionsPage() {
         hero_image_url: heroImageUrl,
         is_active: formData.is_active,
         sort_order: Number(formData.sort_order) || 0,
+        // A linked category decides which products the collection page shows.
+        category_id: formData.category_id || null,
+        collection_type: formData.category_id ? 'category' : 'manual',
       };
 
       if (editing) {
@@ -156,7 +168,6 @@ export default function AdminCollectionsPage() {
         const { error } = await supabase.from('collections').insert({
           ...payload,
           slug: formData.slug.trim(),
-          collection_type: 'manual',
         });
 
         if (error) throw error;
@@ -260,6 +271,27 @@ export default function AdminCollectionsPage() {
                     setFormData({ ...formData, description: e.target.value })
                   }
                 />
+              </div>
+              <div>
+                <Label htmlFor="linkedCategory">Linked category (products shown)</Label>
+                <select
+                  id="linkedCategory"
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                >
+                  <option value="">None: match products by the collection name</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The collection page lists active products in this category (and its
+                  sub-categories). Without one, products whose name, fabric or work
+                  contains the collection&apos;s keyword are shown (e.g. &ldquo;Silk&rdquo;).
+                </p>
               </div>
               <AdminImageField
                 id="heroImage"

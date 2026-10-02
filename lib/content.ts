@@ -298,7 +298,7 @@ export async function getCollectionProducts(
   // 1️⃣ Fetch collection FIRST
   const { data: collection, error: collectionError } = await supabase
     .from('collections')
-    .select('id, name')
+    .select('id, name, slug, collection_type, category_id')
     .eq('slug', slug)
     .single();
 
@@ -308,11 +308,14 @@ export async function getCollectionProducts(
     return [];
   }
 
-  // 2️⃣ Fetch products ONLY if collection.id exists
-  const { data, error } = await supabase
-    .from('products')
-    .select(
-      `
+  // Products have no collection_id column, so a collection resolves its
+  // products from data that does exist:
+  //   a) its linked category (Admin → Collections → "Linked category"),
+  //      including that category's direct children;
+  //   b) the festive flag for the "festive-edit" collection;
+  //   c) otherwise its keyword (e.g. "Silk" from "Silk Sarees") matched
+  //      against product name / fabric / work.
+  const select = `
       *,
       product_prices (
         currency,
@@ -325,10 +328,30 @@ export async function getCollectionProducts(
         is_primary,
         display_order
       )
-    `,
-    )
-    .eq('collection_id', collection.id)
-    .eq('is_active', true);
+    `;
+  let query = supabase.from('products').select(select).eq('is_active', true);
+
+  if (collection.category_id) {
+    const { data: children } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('parent_id', collection.category_id);
+    const ids = [collection.category_id, ...(children ?? []).map((c) => c.id)];
+    query = query.in('category_id', ids);
+  } else if (collection.slug === 'festive-edit') {
+    query = query.eq('show_in_festive_edit', true);
+  } else {
+    const keyword = String(collection.name ?? '')
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-z0-9]/gi, ''))
+      .find((w) => w.length > 2 && !/^(the|edit|collection|sarees?)$/i.test(w));
+    if (!keyword) return [];
+    query = query.or(
+      `name.ilike.%${keyword}%,fabric.ilike.%${keyword}%,work.ilike.%${keyword}%`,
+    );
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching collection products:', error);
