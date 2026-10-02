@@ -479,11 +479,9 @@
     color: var(--sm-ivory);
   }
 
-  .storefront h1,
-  .storefront h2,
-  .storefront h3,
-  .storefront h4,
-  .storefront h5 {
+  /* :where() keeps specificity at one class, so Tailwind font-weight
+     utilities (font-light, font-normal) on headings still win. */
+  .storefront :where(h1, h2, h3, h4, h5) {
     font-weight: 500;
     letter-spacing: -0.01em;
   }
