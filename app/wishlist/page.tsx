@@ -1,105 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/lib/auth-context';
-import { useCart } from '@/lib/cart-context';
-import { supabase } from '@/lib/supabase/client';
-import { Product, ProductImage } from '@/lib/types';
-import { formatPriceSync } from '@/lib/currency-utils';
+import { useWishlist } from '@/hooks/useWishlist';
 import { Heart, ShoppingCart } from 'lucide-react';
-import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { useRouter } from 'next/navigation';
 
 export default function WishlistPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  // ✅ Get 'rate' from context to handle conversions
-  const { currency, rate, addToCart } = useCart();
-  const [items, setItems] = useState<{ product: Product; image?: ProductImage }[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Fetching, removal, add-to-bag and price formatting live in useWishlist.
+  const { user, items, loading, removeFromWishlist, handleAddToCart, formatPrice } =
+    useWishlist();
 
   useEffect(() => {
     if (!user) {
       router.push('/auth/login');
-      return;
     }
-
-    fetchWishlist();
-  }, [user, currency]); 
-
-  const fetchWishlist = async () => {
-    if (!user) return;
-
-    try {
-      const { data: wishlistData } = await supabase
-        .from('wishlist_items')
-        .select('product_id')
-        .eq('user_id', user.id);
-
-      if (!wishlistData || wishlistData.length === 0) {
-        setItems([]);
-        setLoading(false);
-        return;
-      }
-
-      const productIds = wishlistData.map((item) => item.product_id);
-
-      const { data: products } = await supabase
-        .from('products')
-        .select('*')
-        .in('id', productIds);
-
-      if (products) {
-        const productsWithImages = await Promise.all(
-          products.map(async (product) => {
-            const { data: image } = await supabase
-              .from('product_images')
-              .select('*')
-              .eq('product_id', product.id)
-              .eq('is_primary', true)
-              .maybeSingle();
-
-            return { product, image };
-          })
-        );
-        setItems(productsWithImages);
-      }
-    } catch (error) {
-      console.error('Error fetching wishlist:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const removeFromWishlist = async (productId: string) => {
-    if (!user) return;
-
-    try {
-      await supabase
-        .from('wishlist_items')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('product_id', productId);
-
-      toast.success('Removed from wishlist');
-      fetchWishlist();
-    } catch (error) {
-      toast.error('Failed to remove from wishlist');
-    }
-  };
-
-  const handleAddToCart = async (productId: string) => {
-    try {
-      await addToCart(productId);
-      toast.success('Added to cart');
-    } catch (error) {
-      toast.error('Failed to add to cart');
-    }
-  };
+  }, [user, router]);
 
   if (loading) {
     return (
@@ -175,10 +95,10 @@ export default function WishlistPage() {
                   {product.name}
                 </h3>
               </Link>
-              
+
               {/* Price */}
               <p className="font-serif text-lg font-bold text-[#D4AF37] tracking-wide mb-3">
-                {formatPriceSync(product.base_price_inr * rate, currency)}
+                {formatPrice(product)}
               </p>
 
               {/* Action Button */}

@@ -1,126 +1,157 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Facebook, Instagram, Twitter } from 'lucide-react';
+import { Reveal } from '@/components/motion/Reveal';
+
+interface FooterLink {
+  label: string;
+  href: string;
+}
+
+const COLUMNS: { heading: string; links: FooterLink[] }[] = [
+  {
+    heading: 'Shop',
+    links: [
+      { label: 'Shop All', href: '/shop' },
+      { label: 'Sarees', href: '/sarees' },
+      { label: 'Collections', href: '/collections' },
+      { label: 'Festive Edit', href: '/festive-edit' },
+    ],
+  },
+  {
+    heading: 'Help',
+    links: [
+      { label: 'Contact', href: '/contact' },
+      { label: 'Track Order', href: '/track-order' },
+      { label: 'Return Policy', href: '/return-policy' },
+    ],
+  },
+  {
+    heading: 'House',
+    links: [
+      { label: 'Our Story', href: '/about' },
+      { label: 'Privacy Policy', href: '/privacy-policy' },
+      { label: 'Terms', href: '/terms' },
+    ],
+  },
+];
+
+const LEGAL_LINKS: FooterLink[] = [
+  { label: 'Privacy Policy', href: '/privacy-policy' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'Return Policy', href: '/return-policy' },
+];
+
+// Real social profile URLs are pending from the owner. Add entries here
+// (e.g. { label: 'Instagram', href: 'https://…' }) and the row appears.
+const SOCIAL_LINKS: { label: string; href: string }[] = [];
+
+const linkClass =
+  'text-samara-ivory/80 transition-colors duration-300 hover:text-samara-gold focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold';
 
 export function Footer() {
+  const year = new Date().getFullYear();
+
   return (
-    <footer className="bg-[#000000] border-t border-[#D4AF37]/10 mt-auto">
-      <div className="container mx-auto px-4 md:px-8 py-16 md:py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-          <div>
-            <Link href="/" className="inline-block mb-6 group">
-              <div className="relative w-48 h-14 transition-all duration-300 group-hover:scale-105">
-                <Image
-                  src="/samara-logo.png"
-                  alt="Samara - Best Handcrafted Sambalpuri Sarees"
-                  fill
-                  className="object-contain"
-                />
-              </div>
+    <footer className="mt-auto overflow-hidden border-t border-samara-line bg-samara-black text-samara-ivory">
+      <div className="sm-container pt-20 md:pt-28">
+        <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-10">
+          {/* House statement */}
+          <div className="lg:col-span-5">
+            <Link
+              href="/"
+              aria-label="Samara home"
+              className="inline-block focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold"
+            >
+              <Image
+                src="/samara-logo.png"
+                alt="Samara - Best Handcrafted Sambalpuri Sarees"
+                width={794}
+                height={290}
+                sizes="176px"
+                className="h-auto w-36 md:w-44"
+              />
             </Link>
-            <p className="text-sm text-[#CFCFCF] leading-relaxed">
+            <p className="sm-body mt-8 max-w-sm text-sm leading-relaxed">
               Discover the finest handcrafted Sambalpuri sarees. Authentic traditional Indian sarees woven with heritage craftsmanship for the modern woman.
             </p>
-          </div>
-
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-6 text-[#D4AF37]">Shop</h4>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link href="/shop" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Shop All
-                </Link>
-              </li>
-              <li>
-                <Link href="/sarees" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Sarees
-                </Link>
-              </li>
-              <li>
-                <Link href="/collections/coord-sets" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Co-ord Sets
-                </Link>
-              </li>
-              <li>
-                <Link href="/collections/kurta-sets" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Kurta Sets
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-6 text-[#D4AF37]">Support</h4>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link href="/contact" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Contact
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link href="/track-order" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Track Order
-                </Link>
-              </li>
-              <li>
-                <Link href="/return-policy" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Return Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-6 text-[#D4AF37]">Newsletter</h4>
-            <p className="text-sm text-[#CFCFCF] mb-4 leading-relaxed">
-              Subscribe to receive updates, access to exclusive deals, and more
+            <p className="sm-eyebrow mt-10 flex items-center gap-4">
+              <span aria-hidden className="h-px w-8 bg-samara-line" />
+              Payments secured by Razorpay
             </p>
-            <form className="flex gap-2 mb-6">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-4 py-2 bg-[#050505] border border-[#D4AF37]/30 rounded-lg text-[#F5F5F5] placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] transition-colors text-sm"
-              />
-              <button
-                type="submit"
-                className="px-6 py-2 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-bold rounded-lg transition-all duration-300 hover:scale-105"
-              >
-                Send
-              </button>
-            </form>
-            <div className="flex gap-4">
-              <a href="#" className="text-[#D4AF37] hover:text-[#F4D03F] transition-colors">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-[#D4AF37] hover:text-[#F4D03F] transition-colors">
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-[#D4AF37] hover:text-[#F4D03F] transition-colors">
-                <Twitter className="h-5 w-5" />
-              </a>
-            </div>
           </div>
+
+          {/* Link columns */}
+          <nav
+            aria-label="Footer"
+            className="grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:col-span-6 lg:col-start-7"
+          >
+            {COLUMNS.map((column) => (
+              <div key={column.heading}>
+                <h2 className="sm-eyebrow">{column.heading}</h2>
+                <ul className="mt-6 space-y-1 font-sans text-sm">
+                  {column.links.map((link) => (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        className={`${linkClass} inline-flex min-h-[44px] items-center md:min-h-[36px]`}
+                      >
+                        <span className="sm-link">{link.label}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
         </div>
 
-        <div className="border-t border-[#D4AF37]/10 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-600">
-              &copy; {new Date().getFullYear()} Samara. All rights reserved.
-            </p>
-            <div className="flex gap-6 text-sm">
-              <Link href="/privacy-policy" className="text-gray-600 hover:text-[#D4AF37] transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="text-gray-600 hover:text-[#D4AF37] transition-colors">
-                Terms of Service
-              </Link>
-            </div>
-          </div>
+        {SOCIAL_LINKS.length > 0 && (
+          <ul className="mt-16 flex flex-wrap gap-x-8 gap-y-2 font-sans text-sm">
+            {SOCIAL_LINKS.map((social) => (
+              <li key={social.href}>
+                <a
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${linkClass} inline-flex min-h-[44px] items-center`}
+                >
+                  <span className="sm-link">{social.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Signature. Solid tone (ivory at ~10% over black) rather than an
+          alpha colour, so glyphs that overlap under tight tracking don't
+          double up. */}
+      <Reveal variant="mask" className="mt-20 md:mt-28">
+        <p
+          aria-hidden
+          className="select-none whitespace-nowrap text-center font-serif font-light uppercase leading-[0.78] tracking-[-0.03em] text-[#1d1d1b]"
+          style={{ fontSize: 'clamp(4rem, 23vw, 22rem)' }}
+        >
+          Samara
+        </p>
+      </Reveal>
+
+      {/* Bottom bar */}
+      <div className="sm-container">
+        <div className="flex flex-col gap-4 border-t border-samara-line py-8 font-sans text-xs text-samara-mute md:flex-row md:items-center md:justify-between">
+          <p>&copy; {year} Samara. All rights reserved.</p>
+          <ul className="flex flex-wrap gap-x-6 gap-y-1">
+            {LEGAL_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="inline-flex min-h-[44px] items-center transition-colors duration-300 hover:text-samara-gold focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold md:min-h-0"
+                >
+                  <span className="sm-link">{link.label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </footer>
