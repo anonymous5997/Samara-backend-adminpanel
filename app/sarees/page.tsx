@@ -2,9 +2,11 @@
 
 import { useCart } from '@/lib/cart-context';
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { getSareeProducts, type ProductWithImages } from '@/lib/content';
-import { Star, Sparkles, ChevronDown, Filter, X } from 'lucide-react';
+import { Check, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
+import { ListingHero, PieceCount } from '@/components/listing/ListingHero';
+import { ListingProductCard } from '@/components/listing/ListingProductCard';
+import { ListingEmpty, ListingSkeleton } from '@/components/listing/ListingEmpty';
 
 /* -----------------------------------------------------------
    ✅ CURRENCY UTILS
@@ -298,290 +300,256 @@ export default function SareesPage() {
   const minPercent = getPercent(priceRangeDraft[0]);
   const maxPercent = getPercent(priceRangeDraft[1]);
 
+
+  const activeFilterCount = selectedFabrics.length + selectedColors.length + selectedOccasions.length;
+
+  const RANGE_INPUT =
+    'pointer-events-none absolute inset-0 m-0 h-full w-full appearance-none bg-transparent p-0 focus-visible:outline-none ' +
+    '[&::-webkit-slider-runnable-track]:bg-transparent [&::-moz-range-track]:bg-transparent ' +
+    '[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-samara-gold [&::-webkit-slider-thumb]:bg-samara-ivory ' +
+    '[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-samara-gold [&::-moz-range-thumb]:bg-samara-ivory ' +
+    'focus-visible:[&::-webkit-slider-thumb]:bg-samara-gold focus-visible:[&::-moz-range-thumb]:bg-samara-gold';
+
+  const CHECKBOX =
+    'h-4 w-4 shrink-0 cursor-pointer appearance-none border border-samara-ivory/40 bg-transparent transition-colors duration-300 ' +
+    'checked:border-samara-gold checked:bg-samara-gold checked:shadow-[inset_0_0_0_3px_#101914] ' +
+    'focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold';
+
+  const optionGroups: Array<{ title: string; options: string[]; selected: string[]; setter: (next: string[]) => void }> = [
+    { title: 'Fabric', options: fabricOptions, selected: selectedFabrics, setter: setSelectedFabrics },
+    { title: 'Color', options: colorOptions, selected: selectedColors, setter: setSelectedColors },
+    { title: 'Occasion', options: occasionOptions, selected: selectedOccasions, setter: setSelectedOccasions },
+  ];
+
   // ------------------------------------------------------------------
   // 7. SHARED FILTER CONTENT (Desktop Sidebar + Mobile Sheet)
   // ------------------------------------------------------------------
   const FilterContent = (
-    <div className="space-y-4">
+    <div className="divide-y divide-samara-line border-y border-samara-line">
       {/* Price Filter */}
-      <div className="bg-[#0b0b0b] border-2 border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-        <div className="flex items-center justify-between mb-6">
-          <span className="font-serif text-lg font-semibold text-[#D4AF37]">Price</span>
-          <ChevronDown className="h-5 w-5 text-[#D4AF37]" />
-        </div>
+      <div className="py-7">
+        <p className="sm-eyebrow mb-6 text-samara-ivory">Price</p>
 
-        <div className="space-y-6">
-          <div className="flex justify-between items-center text-sm text-gray-300">
-            <div>Min: <span className="font-semibold text-[#D4AF37]">{formatPriceSync(priceRangeDraft[0], displayCurrency)}</span></div>
-            <div>Max: <span className="font-semibold text-[#D4AF37]">{formatPriceSync(priceRangeDraft[1], displayCurrency)}</span></div>
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <div className="border border-samara-line px-3 py-2.5">
+            <span className="block font-sans text-[0.625rem] uppercase tracking-[0.2em] text-samara-mute">Min</span>
+            <span className="mt-1 block font-sans text-sm tabular-nums text-samara-ivory">
+              {formatPriceSync(priceRangeDraft[0], displayCurrency)}
+            </span>
           </div>
-
-          <div className="relative h-6 w-full">
-            <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-700 rounded-full -translate-y-1/2 z-0"></div>
-            <div 
-              className="absolute top-1/2 h-1 bg-[#D4AF37] rounded-full -translate-y-1/2 z-10"
-              style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
-            ></div>
-
-            {/* Note: Standard Range Inputs without custom styling for now */}
-            <input
-              type="range"
-              min={priceMinDisplayed}
-              max={priceMaxDisplayed}
-              value={priceRangeDraft[0]}
-              onChange={(e) => {
-                const val = Math.min(Number(e.target.value), priceRangeDraft[1] - 1);
-                setPriceRangeDraft([val, priceRangeDraft[1]]);
-              }}
-              className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent z-20 m-0 p-0 pointer-events-auto"
-            />
-
-            <input
-              type="range"
-              min={priceMinDisplayed}
-              max={priceMaxDisplayed}
-              value={priceRangeDraft[1]}
-              onChange={(e) => {
-                const val = Math.max(Number(e.target.value), priceRangeDraft[0] + 1);
-                setPriceRangeDraft([priceRangeDraft[0], val]);
-              }}
-              className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent z-30 m-0 p-0 pointer-events-auto"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              className="flex-1 px-3 py-2 rounded bg-[#111] border border-[#D4AF37]/20 text-xs text-gray-400 hover:text-white transition-colors"
-              onClick={() => {
-                setPriceRangeDraft([priceMinDisplayed, priceMaxDisplayed]);
-                setPriceRangeApplied([priceMinDisplayed, priceMaxDisplayed]);
-              }}
-            >
-              Reset
-            </button>
-            <button
-              className="flex-1 px-3 py-2 rounded bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 transition-all"
-              onClick={() => {
-                setPriceRangeApplied(priceRangeDraft);
-                const el = document.querySelector('#products-grid');
-                if (el) {
-                  const y = el.getBoundingClientRect().top + window.scrollY - 120;
-                  window.scrollTo({ top: y, behavior: 'smooth' });
-                }
-              }}
-            >
-              Apply
-            </button>
+          <div className="border border-samara-line px-3 py-2.5">
+            <span className="block font-sans text-[0.625rem] uppercase tracking-[0.2em] text-samara-mute">Max</span>
+            <span className="mt-1 block font-sans text-sm tabular-nums text-samara-ivory">
+              {formatPriceSync(priceRangeDraft[1], displayCurrency)}
+            </span>
           </div>
         </div>
+
+        <div className="relative mx-2 h-6">
+          <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-samara-ivory/20" />
+          <div
+            className="absolute top-1/2 h-px -translate-y-1/2 bg-samara-gold"
+            style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
+          />
+
+          <input
+            type="range"
+            aria-label="Minimum price"
+            min={priceMinDisplayed}
+            max={priceMaxDisplayed}
+            value={priceRangeDraft[0]}
+            onChange={(e) => {
+              const val = Math.min(Number(e.target.value), priceRangeDraft[1] - 1);
+              setPriceRangeDraft([val, priceRangeDraft[1]]);
+            }}
+            className={`${RANGE_INPUT} z-20`}
+          />
+
+          <input
+            type="range"
+            aria-label="Maximum price"
+            min={priceMinDisplayed}
+            max={priceMaxDisplayed}
+            value={priceRangeDraft[1]}
+            onChange={(e) => {
+              const val = Math.max(Number(e.target.value), priceRangeDraft[0] + 1);
+              setPriceRangeDraft([priceRangeDraft[0], val]);
+            }}
+            className={`${RANGE_INPUT} z-30`}
+          />
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            className="sm-btn sm-btn-ghost min-h-[44px] px-3 text-[0.6875rem]"
+            onClick={() => {
+              setPriceRangeDraft([priceMinDisplayed, priceMaxDisplayed]);
+              setPriceRangeApplied([priceMinDisplayed, priceMaxDisplayed]);
+            }}
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            className="sm-btn min-h-[44px] bg-samara-gold px-3 text-[0.6875rem] text-samara-cream-ink hover:bg-samara-ivory"
+            onClick={() => {
+              setPriceRangeApplied(priceRangeDraft);
+              const el = document.querySelector('#products-grid');
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.scrollY - 120;
+                window.scrollTo({ top: y, behavior: 'smooth' });
+              }
+            }}
+          >
+            Apply
+          </button>
+        </div>
       </div>
 
-      {/* Fabric Filter */}
-      <div className="bg-[#0b0b0b] border-2 border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-        <div className="w-full flex items-center justify-between mb-4">
-          <span className="font-serif text-lg font-semibold text-[#D4AF37]">Fabric</span>
-          <ChevronDown className="h-5 w-5 text-[#D4AF37]" />
-        </div>
-        <div className="space-y-2">
-          {fabricOptions.map((fabric) => (
-            <label key={fabric} className="flex items-center gap-3 text-gray-400 hover:text-[#D4AF37] cursor-pointer transition-colors">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-[#D4AF37]/30 accent-[#D4AF37]"
-                checked={selectedFabrics.includes(fabric)}
-                onChange={() => toggleValue(fabric, selectedFabrics, setSelectedFabrics)}
-              />
-              <span className="text-sm">{fabric}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Color Filter */}
-      <div className="bg-[#0b0b0b] border-2 border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-        <div className="w-full flex items-center justify-between mb-4">
-          <span className="font-serif text-lg font-semibold text-[#D4AF37]">Color</span>
-          <ChevronDown className="h-5 w-5 text-[#D4AF37]" />
-        </div>
-        <div className="space-y-2">
-          {colorOptions.map((color) => (
-            <label key={color} className="flex items-center gap-3 text-gray-400 hover:text-[#D4AF37] cursor-pointer transition-colors">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-[#D4AF37]/30 accent-[#D4AF37]"
-                checked={selectedColors.includes(color)}
-                onChange={() => toggleValue(color, selectedColors, setSelectedColors)}
-              />
-              <span className="text-sm">{color}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-      
-      {/* Occasion Filter */}
-      <div className="bg-[#0b0b0b] border-2 border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-        <div className="w-full flex items-center justify-between mb-4">
-          <span className="font-serif text-lg font-semibold text-[#D4AF37]">Occasion</span>
-          <ChevronDown className="h-5 w-5 text-[#D4AF37]" />
-        </div>
-        <div className="space-y-2">
-          {occasionOptions.map((occasion) => (
-            <label key={occasion} className="flex items-center gap-3 text-gray-400 hover:text-[#D4AF37] cursor-pointer transition-colors">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-[#D4AF37]/30 accent-[#D4AF37]"
-                checked={selectedOccasions.includes(occasion)}
-                onChange={() => toggleValue(occasion, selectedOccasions, setSelectedOccasions)}
-              />
-              <span className="text-sm">{occasion}</span>
-            </label>
-          ))}
-        </div>
-      </div>
+      {/* Fabric / Color / Occasion Filters */}
+      {optionGroups.map((group) =>
+        group.options.length === 0 ? null : (
+          <fieldset key={group.title} className="py-7">
+            <legend className="sm-eyebrow float-left mb-4 w-full text-samara-ivory">{group.title}</legend>
+            <div className="clear-left">
+              {group.options.map((option) => (
+                <label
+                  key={option}
+                  className="flex min-h-[44px] cursor-pointer items-center gap-3.5 py-1 font-sans text-sm capitalize text-samara-mute transition-colors hover:text-samara-ivory has-[:checked]:text-samara-ivory"
+                >
+                  <input
+                    type="checkbox"
+                    className={CHECKBOX}
+                    checked={group.selected.includes(option)}
+                    onChange={() => toggleValue(option, group.selected, group.setter)}
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ),
+      )}
     </div>
   );
 
   return (
-    <div className="bg-black text-white min-h-screen">
-      {/* HERO SECTION */}
-      {/* ✅ STEP 1: Desktop padding reduced (md:pb-12), Mobile (pt-14 pb-8) maintained */}
-      <section className="pt-14 pb-8 md:pt-20 md:pb-12 bg-gradient-to-b from-black to-[#0b0b0b] border-b border-[#D4AF37]/10">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="font-serif text-6xl md:text-7xl lg:text-8xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] tracking-tighter">
-              Sarees
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-300 leading-relaxed mt-2 mb-4 md:mb-8">
-              Explore our curated saree collection
-            </p>
-          </div>
+    <div className="min-h-screen bg-samara-black text-samara-ivory">
+      {/* HERO */}
+      <ListingHero
+        eyebrow="The Saree Edit"
+        title={
+          <>
+            The <span className="sm-accent">Sarees</span>
+          </>
+        }
+        intro="Explore our curated saree collection"
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Sarees' }]}
+        meta={!loading && allProducts.length > 0 ? <PieceCount count={allProducts.length} /> : null}
+      />
+
+      {/* MOBILE FILTER BAR */}
+      <div className="sticky top-[60px] z-30 border-b border-samara-line bg-samara-black/95 backdrop-blur-md lg:hidden">
+        <div className="grid grid-cols-2 divide-x divide-samara-line">
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="flex min-h-[52px] items-center justify-center gap-2.5 font-sans text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-samara-ivory active:bg-samara-char"
+          >
+            <SlidersHorizontal aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-samara-gold px-1 text-[0.625rem] tracking-normal text-samara-cream-ink">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileSortOpen(true)}
+            className="flex min-h-[52px] items-center justify-center gap-2.5 font-sans text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-samara-ivory active:bg-samara-char"
+          >
+            Sort
+            <ChevronDown aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+          </button>
         </div>
-      </section>
+      </div>
 
       {/* LISTING + FILTERS */}
-      {/* ✅ STEP 2: Desktop listing pulled up (md:pt-6) */}
-      <section className="pt-4 pb-12 md:pt-6 md:pb-16">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            
+      <section className="pb-[clamp(4rem,8vw,7.5rem)] pt-8 md:pt-12">
+        <div className="sm-container">
+          <div className="flex flex-col gap-10 lg:flex-row lg:gap-12 xl:gap-16">
             {/* ------------------- SIDEBAR FILTERS (DESKTOP) ------------------- */}
-            <aside className="hidden lg:block lg:w-72 flex-shrink-0">
-              {/* ✅ STEP 3: Sticky offset reduced to top-20 */}
-              <div className="sticky top-20">
+            <aside className="hidden flex-shrink-0 lg:block lg:w-60 xl:w-64" aria-label="Filters">
+              <div className="sticky top-[calc(72px+2rem)] max-h-[calc(100vh-72px-4rem)] overflow-y-auto overscroll-contain pr-1 [scrollbar-width:thin]">
+                <p className="mb-6 font-serif text-2xl font-light text-samara-ivory">Refine</p>
                 {FilterContent}
               </div>
             </aside>
 
             {/* ------------------- PRODUCT GRID ------------------- */}
-            <div className="flex-1">
-              
-              {/* MOBILE FILTER BAR & COUNT */}
-              <div className="lg:hidden flex items-center justify-between gap-3 mb-2">
-                <button
-                  onClick={() => setMobileFiltersOpen(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg
-                             bg-[#0b0b0b] border border-[#D4AF37]/30 text-[#D4AF37]
-                             font-semibold text-sm active:bg-[#1a1a1a]"
-                >
-                  <Filter className="w-4 h-4" />
-                  Filters
-                </button>
-
-                <button
-                  onClick={() => setMobileSortOpen(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg
-                             bg-[#0b0b0b] border border-[#D4AF37]/30 text-[#D4AF37]
-                             font-semibold text-sm active:bg-[#1a1a1a]"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                  Sort
-                </button>
-              </div>
-
-              {/* Product Count */}
-              {/* ✅ STEP 4: Reduced margin below count (md:mb-2) */}
-              <div className="mb-4 md:mb-2">
-                <p className="text-gray-400 text-sm md:text-lg">
-                  <span className="text-[#D4AF37] font-semibold">{filteredProducts.length}</span> products
+            <div className="min-w-0 flex-1">
+              {/* Count + desktop sort */}
+              <div className="mb-8 flex items-center justify-between gap-4 md:mb-10">
+                <p className="font-sans text-[0.6875rem] uppercase tracking-[0.2em] text-samara-mute" aria-live="polite">
+                  <span className="text-samara-ivory tabular-nums">{filteredProducts.length}</span> products
                 </p>
+
+                <label className="hidden items-center gap-4 lg:flex">
+                  <span className="font-sans text-[0.6875rem] uppercase tracking-[0.2em] text-samara-mute">Sort By</span>
+                  <span className="relative">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as SortOption)}
+                      className="h-11 cursor-pointer appearance-none border border-samara-line bg-samara-black pl-4 pr-10 font-sans text-[0.8125rem] text-samara-ivory transition-colors hover:border-samara-ivory/40 focus:outline-none focus-visible:border-samara-gold"
+                    >
+                      {SORT_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      aria-hidden
+                      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-samara-mute"
+                      strokeWidth={1.25}
+                    />
+                  </span>
+                </label>
               </div>
 
               {loading ? (
-                <div className="text-center py-20 bg-[#0b0b0b] border-2 border-[#D4AF37]/20 rounded-lg">
-                  <p className="text-gray-500 text-lg">Loading sarees...</p>
+                <div role="status">
+                  <span className="sr-only">Loading sarees...</span>
+                  <ListingSkeleton count={4} className={SAREES_GRID} />
                 </div>
               ) : filteredProducts.length === 0 ? (
-                <div className="text-center py-20 bg-[#0b0b0b] border-2 border-[#D4AF37]/20 rounded-lg">
-                  <p className="text-gray-500 text-lg">No sarees match your filters.</p>
-                </div>
+                <ListingEmpty
+                  title="No sarees match your filters."
+                  actions={[{ label: 'Shop All', href: '/shop', variant: 'ghost' }]}
+                />
               ) : (
-                <div
-                  id="products-grid"
-                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6"
-                >
-                  {filteredProducts.map((product) => (
-                    <Link key={product.id} href={`/products/${product.slug}`}>
-                      <div className="group relative bg-black rounded-lg overflow-hidden border-2 border-[#D4AF37]/20 hover:border-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/40 transition-all duration-500 hover:-translate-y-2">
-                        
-                        <div className="aspect-[2/3] md:aspect-[3/4] relative overflow-hidden bg-[#111111]">
-                          <img
-                            src={product.primary_image_url || ''}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                          {product.is_bestseller && (
-                            <div className="absolute top-3 left-3 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-[#D4AF37]/50">
-                              <Star className="h-3 w-3 fill-current" />
-                              {product.bestseller_badge_label || 'Bestseller'}
-                            </div>
-                          )}
-
-                          {product.is_new_arrival && !product.is_bestseller && (
-                            <div className="absolute top-3 right-3 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-[#D4AF37]/50">
-                              <Sparkles className="h-3 w-3" />
-                              New
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="p-3 md:p-4 bg-gradient-to-b from-black to-[#0b0b0b]">
-                          <h3 className="font-serif text-base md:text-lg font-semibold mb-1 line-clamp-1 text-[#D4AF37] group-hover:text-[#F4D03F] transition-colors">
-                            {product.name}
-                          </h3>
-                          {product.brand && <p className="text-xs text-gray-500 mb-2">{product.brand}</p>}
-                          
-                          {(() => {
-                            const resolved = priceMap[product.id];
-                            if (!resolved) return <div className="h-6 w-24 bg-gray-800 animate-pulse rounded" />;
-
-                            return (
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-lg md:text-xl font-bold text-[#D4AF37]">
-                                    {formatPriceSync(resolved.price, resolved.currency)}
-                                  </p>
-
-                                  {resolved.mrp && resolved.mrp > resolved.price && (
-                                    <p className="text-xs md:text-sm text-gray-500 line-through">
-                                      {formatPriceSync(resolved.mrp, resolved.currency)}
-                                    </p>
-                                  )}
-
-                                  {resolved.discountPct > 0 && (
-                                    <span className="text-[10px] md:text-xs font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded ml-auto">
-                                      {resolved.discountPct}% OFF
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                <div id="products-grid" className={SAREES_GRID}>
+                  {filteredProducts.map((product, index) => {
+                    const resolved = priceMap[product.id];
+                    const badges = product.is_bestseller
+                      ? [product.bestseller_badge_label || 'Bestseller']
+                      : product.is_new_arrival
+                        ? ['New']
+                        : [];
+                    return (
+                      <ListingProductCard
+                        key={product.id}
+                        product={product}
+                        index={index}
+                        badges={badges}
+                        price={resolved ? { price: resolved.price, currency: resolved.currency, mrp: resolved.mrp } : undefined}
+                        sizes="(min-width: 1280px) 19vw, (min-width: 1024px) 24vw, (min-width: 768px) 31vw, 47vw"
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -591,42 +559,37 @@ export default function SareesPage() {
 
       {/* MOBILE FILTER BOTTOM SHEET */}
       {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex justify-end">
+        <div className="fixed inset-0 z-[1100] flex justify-end lg:hidden" role="dialog" aria-modal="true" aria-label="Filters">
           {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
-            onClick={() => setMobileFiltersOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] motion-safe:animate-[sm-overlay-in_300ms_ease-out_both]" onClick={() => setMobileFiltersOpen(false)} />
 
           {/* Sheet */}
-          <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-[#0a0a0a] rounded-t-2xl border-t border-[#D4AF37]/30 flex flex-col shadow-2xl transition-transform duration-300 translate-y-0">
-            
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col border-t border-samara-line bg-samara-ink motion-safe:animate-[sm-rise_500ms_cubic-bezier(0.22,1,0.36,1)_both]">
             {/* Header */}
-            <div className="p-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-[#0a0a0a] z-10 rounded-t-2xl">
-              <h3 className="font-serif text-lg font-bold text-[#D4AF37] flex items-center gap-2">
-                <Filter className="w-5 h-5" />
-                Filters
-              </h3>
+            <div className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-baseline gap-3">
+                <h3 className="font-serif text-2xl font-normal text-samara-ivory">Filters</h3>
+                <span className="sm-eyebrow tabular-nums">{filteredProducts.length} products</span>
+              </div>
               <button
+                type="button"
                 onClick={() => setMobileFiltersOpen(false)}
-                className="p-2 text-gray-400 hover:text-white bg-gray-900 rounded-full"
+                aria-label="Close filters"
+                className="-mr-2 flex h-11 w-11 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" strokeWidth={1.25} />
               </button>
             </div>
 
             {/* Filter Content (Scrollable) */}
-            <div className="p-5 overflow-y-auto overflow-x-hidden flex-1 space-y-6">
-              {FilterContent}
-            </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5">{FilterContent}</div>
 
             {/* Footer Apply Button */}
-            <div className="p-4 bg-[#0a0a0a] border-t border-gray-800 sticky bottom-0 z-10 pb-[env(safe-area-inset-bottom)]">
+            <div className="border-t border-samara-line px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
               <button
+                type="button"
                 onClick={() => setMobileFiltersOpen(false)}
-                className="w-full py-3.5 rounded-lg
-                           bg-gradient-to-r from-[#D4AF37] to-[#F4D03F]
-                           text-black font-bold tracking-wide shadow-lg shadow-[#D4AF37]/20"
+                className="sm-btn w-full bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
               >
                 Apply Filters
               </button>
@@ -637,40 +600,54 @@ export default function SareesPage() {
 
       {/* MOBILE SORT BOTTOM SHEET */}
       {mobileSortOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/80"
-            onClick={() => setMobileSortOpen(false)}
-          />
+        <div className="fixed inset-0 z-[1100] lg:hidden" role="dialog" aria-modal="true" aria-label="Sort by">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] motion-safe:animate-[sm-overlay-in_300ms_ease-out_both]" onClick={() => setMobileSortOpen(false)} />
 
-          <div className="absolute bottom-0 left-0 right-0 bg-[#0a0a0a] rounded-t-2xl border-t border-[#D4AF37]/30">
-            <div className="p-4 border-b border-gray-800 font-serif text-lg text-[#D4AF37]">
-              Sort By
+          <div className="absolute inset-x-0 bottom-0 border-t border-samara-line bg-samara-ink pb-[env(safe-area-inset-bottom)] motion-safe:animate-[sm-rise_500ms_cubic-bezier(0.22,1,0.36,1)_both]">
+            <div className="flex items-center justify-between px-5 py-4">
+              <h3 className="font-serif text-2xl font-normal text-samara-ivory">Sort By</h3>
+              <button
+                type="button"
+                onClick={() => setMobileSortOpen(false)}
+                aria-label="Close sort"
+                className="-mr-2 flex h-11 w-11 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold"
+              >
+                <X className="h-5 w-5" strokeWidth={1.25} />
+              </button>
             </div>
 
-            {[
-              ['relevance', 'Relevance'],
-              ['price_low_high', 'Price: Low to High'],
-              ['price_high_low', 'Price: High to Low'],
-              ['newest', 'Newest First'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => {
-                  setSortBy(value as any);
-                  setMobileSortOpen(false);
-                }}
-                className={`w-full px-4 py-4 text-left border-b border-gray-800
-                  ${sortBy === value
-                    ? 'text-[#D4AF37] font-bold'
-                    : 'text-gray-300'}`}
-              >
-                {label}
-              </button>
-            ))}
+            <div className="border-t border-samara-line px-5 pb-4">
+              {SORT_OPTIONS.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setSortBy(value as any);
+                    setMobileSortOpen(false);
+                  }}
+                  aria-pressed={sortBy === value}
+                  className={`flex min-h-[56px] w-full items-center justify-between border-b border-samara-line text-left font-sans text-sm transition-colors ${
+                    sortBy === value ? 'text-samara-gold' : 'text-samara-ivory/80 hover:text-samara-ivory'
+                  }`}
+                >
+                  {label}
+                  {sortBy === value && <Check aria-hidden className="h-4 w-4" strokeWidth={1.5} />}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+const SAREES_GRID =
+  'grid grid-cols-2 gap-x-3 gap-y-10 sm:gap-x-5 md:grid-cols-3 md:gap-x-6 md:gap-y-14 xl:grid-cols-4';
+
+const SORT_OPTIONS = [
+  ['relevance', 'Relevance'],
+  ['price_low_high', 'Price: Low to High'],
+  ['price_high_low', 'Price: High to Low'],
+  ['newest', 'Newest First'],
+] as const;
