@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { Star } from 'lucide-react';
+import { isOptimizable } from '@/components/pdp/pdp-utils';
 
 interface Review {
   id: string;
@@ -13,63 +15,87 @@ interface Review {
   };
 }
 
+function reviewDate(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
 export function ProductReviewsSection({ reviews }: { reviews: Review[] }) {
   if (!reviews.length) {
     return (
-      <p className="text-gray-500 text-sm">
-        No reviews yet. Be the first to review this saree.
-      </p>
+      <div className="border-t border-samara-line pt-8 lg:border-t-0 lg:pt-2">
+        <p className="font-serif text-[1.5rem] font-light italic text-samara-ivory/80">
+          No reviews yet.
+        </p>
+        <p className="mt-2 font-sans text-[0.8125rem] text-samara-mute">
+          Be the first to review this saree.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {reviews.map((r) => (
-        <div
-          key={r.id}
-          className="border border-[#D4AF37]/20 rounded-lg p-4 bg-[#050505]"
-        >
-          {/* Rating */}
-          <div className="flex gap-1 mb-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Star
-                key={i}
-                className={`h-4 w-4 ${
-                  i <= r.rating ? 'text-[#D4AF37]' : 'text-gray-600'
-                }`}
-                fill={i <= r.rating ? '#D4AF37' : 'none'}
-              />
-            ))}
-          </div>
+    <ol className="border-t border-samara-line">
+      {reviews.map((r) => {
+        const date = reviewDate(r.created_at);
+        return (
+          <li key={r.id} className="grid gap-4 border-b border-samara-line py-8 sm:grid-cols-[1fr_auto] sm:gap-8">
+            <div className="min-w-0">
+              {/* Rating */}
+              <p className="flex gap-1" aria-label={`Rated ${r.rating} out of 5`}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Star
+                    key={i}
+                    aria-hidden
+                    className={`h-3.5 w-3.5 ${i <= r.rating ? 'text-samara-gold' : 'text-samara-mute/50'}`}
+                    fill={i <= r.rating ? 'currentColor' : 'none'}
+                    strokeWidth={1.25}
+                  />
+                ))}
+              </p>
 
-          {/* Review text */}
-          <p className="text-sm text-gray-300 leading-relaxed">
-            {r.review_text}
-          </p>
+              {/* Review text */}
+              <p className="mt-4 whitespace-pre-line break-words font-serif text-[1.25rem] font-light leading-snug text-samara-ivory sm:text-[1.375rem]">
+                {r.review_text}
+              </p>
 
-          {/* Review image */}
-          {r.review_image_url && (
-            <img
-              src={r.review_image_url}
-              alt="Customer review"
-              className="mt-3 w-32 h-32 object-cover rounded-md border border-gold/20"
-            />
-          )}
+              {/* ✅ UPDATED: Polished User Name & Verified Badge */}
+              <p className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-[0.6875rem] uppercase tracking-[0.18em] text-samara-mute">
+                <span className="text-samara-ivory/90">
+                  {r.profiles?.name ?? 'Verified Buyer'}
+                </span>
 
-          {/* ✅ UPDATED: Polished User Name & Verified Badge */}
-          <p className="text-xs text-gray-400 mt-2 flex items-center gap-2">
-            <span>
-              {r.profiles?.name ?? 'Verified Buyer'}
-            </span>
+                {r.profiles?.name && (
+                  <span className="text-samara-gold">
+                    Verified Buyer
+                  </span>
+                )}
 
-            {r.profiles?.name && (
-              <span className="text-green-400 text-[11px]">
-                • Verified Buyer
+                {date && (
+                  <time dateTime={r.created_at} className="normal-case tracking-normal">
+                    {date}
+                  </time>
+                )}
+              </p>
+            </div>
+
+            {/* Review image */}
+            {r.review_image_url && (
+              <span className="relative block h-32 w-28 bg-samara-char sm:h-40 sm:w-32">
+                <Image
+                  src={r.review_image_url}
+                  alt="Customer review"
+                  fill
+                  sizes="128px"
+                  unoptimized={!isOptimizable(r.review_image_url)}
+                  className="object-cover"
+                />
               </span>
             )}
-          </p>
-        </div>
-      ))}
-    </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
