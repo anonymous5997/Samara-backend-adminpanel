@@ -41,6 +41,13 @@ export function Drawer({
         <DialogPrimitive.Content
           data-side={side}
           aria-describedby={undefined}
+          // Focus the panel itself on open (focus is still trapped inside) so
+          // the close button doesn't show a focus ring before any keyboard use.
+          tabIndex={-1}
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement | null)?.focus();
+          }}
           className={cn(
             'sm-drawer-panel fixed inset-y-0 z-[1101] flex w-full max-w-[440px] flex-col bg-samara-ink text-samara-ivory outline-none',
             side === 'right' ? 'right-0 border-l' : 'left-0 border-r',
