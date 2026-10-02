@@ -16,17 +16,13 @@ import {
   XCircle,
   RotateCcw,
   Download,
-  Star
+  Star,
+  ArrowLeft
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { WriteReviewModal } from '@/components/WriteReviewModal'
+import Link from 'next/link'
 
 /* ---------------- CONFIGURATION ---------------- */
 const COMPANY = {
@@ -64,11 +60,9 @@ type OrderItem = {
 /* ---------------- HELPER: Return Window ---------------- */
 function isWithinReturnWindow(dateString: string | null | undefined) {
   if (!dateString) return false
-
   const date = new Date(dateString).getTime()
   const now = Date.now()
   const diffInDays = (now - date) / (1000 * 60 * 60 * 24)
-
   return diffInDays <= 14
 }
 
@@ -84,13 +78,11 @@ export default function OrderDetailsPage() {
   const params = useParams()
   const orderId = typeof params?.id === 'string' ? params.id : null
 
-  // State
   const [order, setOrder] = useState<Order | null>(null)
   const [items, setItems] = useState<OrderItem[]>([])
   const [reviewedProductIds, setReviewedProductIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modal State
   const [reviewModalOpen, setReviewModalOpen] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
 
@@ -102,7 +94,6 @@ export default function OrderDetailsPage() {
     }
 
     const fetchOrderData = async () => {
-      // 1. Fetch Order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select('*')
@@ -117,9 +108,6 @@ export default function OrderDetailsPage() {
 
       setOrder({ ...orderData, currency: orderData.currency as SupportedCurrency })
 
-      // 2. Fetch Order Items (STEP 3 FIX: EXPLICIT ALIAS)
-      // We use 'product:products' so the result object has a key named 'product'
-      // This is the critical fix for the mapping logic below.
       const { data: itemsData, error: itemsError } = await supabase
         .from('order_items')
         .select(`
@@ -130,23 +118,15 @@ export default function OrderDetailsPage() {
         `)
         .eq('order_id', orderId)
 
-      // STEP 4 DEBUG: Raw Data
-      console.log('ORDER ITEMS RAW ===>', itemsData)
       if (itemsError) console.error('ITEMS ERROR:', itemsError)
 
       const parsedItems: OrderItem[] = itemsData?.map((i: any) => ({
         product_id: i.product_id,
-        // Because we used 'product:products', the key here is 'product'
-        // We use optional chaining (?.) just in case the join returns null
         product_name: i.product?.name || 'Product',
       })) || []
 
-      // STEP 5 DEBUG: Parsed Data
-      console.log('PARSED ITEMS ===>', parsedItems)
-
       setItems(parsedItems)
 
-      // 3. Check Reviews (User Specific)
       const { data: { user } } = await supabase.auth.getUser()
       if (user && parsedItems.length > 0) {
         const { data: reviews } = await supabase
@@ -175,21 +155,17 @@ export default function OrderDetailsPage() {
     const pageWidth = doc.internal.pageSize.width
     const margin = 14
     
-    // Colors
     const gold = [212, 175, 55] as [number, number, number]
     
-    // Logo
     const logo = new Image()
     logo.src = '/samara-logo.png' 
     logo.onload = () => {
-      // Header Bar
       doc.setFillColor(245, 245, 245)
       doc.rect(0, 0, pageWidth, 40, 'F') 
       doc.addImage(logo, 'PNG', 14, 8, 40, 16)
       doc.setFontSize(14)
       doc.text('TAX INVOICE', pageWidth - margin - 30, 24)
 
-      // Seller Info
       const sellerY = 55
       doc.setFontSize(10)
       doc.text('Sold By:', margin, sellerY)
@@ -200,7 +176,6 @@ export default function OrderDetailsPage() {
       doc.text(`GSTIN: ${COMPANY.gstin}`, margin, sellerY + 17)
       doc.text(`Email: ${COMPANY.email}`, margin, sellerY + 23)
 
-      // Invoice Box
       const boxX = pageWidth - margin - 80
       const boxY = 50
       const boxW = 80
@@ -226,7 +201,6 @@ export default function OrderDetailsPage() {
       doc.setTextColor(0)
       doc.text(currency, boxX + 50, boxY + 28)
 
-      // Billing Info
       const billY = 95
       doc.setFontSize(11)
       doc.text('Billing Address', margin, billY)
@@ -236,7 +210,6 @@ export default function OrderDetailsPage() {
       doc.text(`${order.shipping_city}, ${order.shipping_state} - ${order.shipping_pincode}`, margin, billY + 18)
       doc.text(order.shipping_country || '', margin, billY + 24)
 
-      // Dynamic Items for Invoice
       const tableBody = items.map(item => [
         item.product_name,
         '1',
@@ -244,7 +217,6 @@ export default function OrderDetailsPage() {
         currency === 'INR' ? '18% GST (Included)' : 'Export – No GST',
         '-'
       ])
-      // Fallback if items empty
       if (tableBody.length === 0) {
         tableBody.push(['Samara Premium Saree', '1', formatted, 'Tax Included', formatted])
       }
@@ -266,7 +238,6 @@ export default function OrderDetailsPage() {
 
       const y = (doc as any).lastAutoTable.finalY + 10
 
-      // Totals
       const totalBoxW = 85
       const totalBoxX = pageWidth - margin - totalBoxW
       const totalTextX = totalBoxX + 4
@@ -285,7 +256,6 @@ export default function OrderDetailsPage() {
       doc.setFontSize(9)
       doc.text('Price includes applicable taxes and shipping.', totalTextX, y + 36)
 
-      // Footer
       doc.setTextColor(100)
       doc.text('This is a computer generated tax invoice.', margin, 277)
       doc.save(`Samara-Invoice-${order.order_number}.pdf`)
@@ -294,8 +264,28 @@ export default function OrderDetailsPage() {
   }
 
   /* ---------------- LOADING STATES ---------------- */
-  if (loading) return <div className="container mx-auto px-4 py-20 text-white">Loading order…</div>
-  if (!order) return <div className="container mx-auto px-4 py-20 text-white">Order not found.</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-samara-void flex items-center justify-center">
+        <div className="animate-pulse text-samara-ivory/40 font-sans tracking-widest uppercase text-sm">
+          Loading order details...
+        </div>
+      </div>
+    )
+  }
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-samara-void flex items-center justify-center text-center">
+        <div>
+          <h2 className="font-serif text-3xl text-samara-gold mb-4">Order Not Found</h2>
+          <Link href="/orders" className="text-[11px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60 hover:text-samara-gold border-b border-samara-ivory/20 hover:border-samara-gold pb-1 transition-colors">
+            Back to Orders
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   /* ---------------- STATUS & RETURN LOGIC ---------------- */
   const displayStatus =
@@ -306,13 +296,10 @@ export default function OrderDetailsPage() {
   const isCancelled = displayStatus === 'cancelled'
   const isDelivered = displayStatus === 'delivered'
   const isShipped = displayStatus === 'shipped'
-  const isPaid = order.payment_status === 'paid'
 
-  // Progress Steps
   const steps = ['Order Placed', 'Packed', 'Shipped', 'Delivered']
   const stepIndex = isCancelled ? 0 : displayStatus === 'packed' ? 1 : displayStatus === 'shipped' ? 2 : displayStatus === 'delivered' ? 3 : 0
 
-  // Reference date for returns (Step 9 Logic)
   const referenceDate = order.delivered_at || order.updated_at
   const returnEligible = isDelivered && isWithinReturnWindow(referenceDate)
   const daysLeftToReturn = isDelivered ? getDaysLeftToReturn(referenceDate) : 0
@@ -320,20 +307,6 @@ export default function OrderDetailsPage() {
   const canCancel = !isCancelled && !isShipped && !isDelivered
   const canReturn = returnEligible && !isCancelled
 
-  // STEP 6 DEBUG: Order Status
-  console.log('ORDER STATUS ===>', order.status)
-
-  // STEP 7 DEBUG: Reviewed IDs
-  console.log('REVIEWED PRODUCT IDS ===>', reviewedProductIds)
-
-  // STEP 8 DEBUG: Gate Condition
-  console.log('SHOULD ASK FOR REVIEW ===>', {
-    isDelivered,
-    itemsLength: items.length,
-    reviewedProductIds,
-  })
-
-  // ✅ REVIEW LOGIC
   const shouldAskForReview = isDelivered && items.some(i => !reviewedProductIds.includes(i.product_id))
 
   /* ---------------- HANDLERS ---------------- */
@@ -347,144 +320,191 @@ export default function OrderDetailsPage() {
     setOrder({ ...order, status: 'return_requested' })
   }
 
+  const statusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'text-samara-gold bg-samara-gold/10';
+      case 'shipped': return 'text-blue-400 bg-blue-400/10';
+      case 'delivered': return 'text-green-400 bg-green-400/10';
+      case 'cancelled': return 'text-red-400 bg-red-400/10';
+      case 'return_requested': return 'text-orange-400 bg-orange-400/10';
+      default: return 'text-samara-ivory/60 bg-samara-ivory/5';
+    }
+  };
+
   /* ---------------- UI ---------------- */
   return (
-    <div className="container mx-auto px-4 py-12 text-white">
-      <Card className="bg-black border border-[#D4AF37]/40">
-        <CardHeader className="border-b border-[#D4AF37]/30">
-          <div className="flex justify-between items-start gap-4 flex-wrap">
-            <div>
-              <CardTitle className="text-xl text-white">Order #{order.order_number}</CardTitle>
-              <p className="text-sm text-gray-300 mt-1">{format(new Date(order.created_at), 'MMMM dd, yyyy')}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-semibold text-white">{formatPriceSync(order.total_amount, order.currency)}</p>
-              <div className="flex gap-2 justify-end mt-2 flex-wrap">
-                <span className={`px-2 py-1 text-xs rounded capitalize font-medium ${
-                  displayStatus === 'cancelled' ? 'bg-red-600' :
-                  displayStatus === 'confirmed' ? 'bg-blue-600' :
-                  displayStatus === 'shipped' ? 'bg-purple-600' :
-                  displayStatus === 'delivered' ? 'bg-green-600' : 'bg-yellow-500 text-black'
-                } text-white`}>
-                  {displayStatus}
-                </span>
-                <span className="px-2 py-1 text-xs rounded bg-green-600 text-white">{order.payment_status}</span>
-              </div>
-            </div>
+    <div className="bg-samara-void text-samara-ivory min-h-screen pt-32 pb-24 md:pb-32">
+      <div className="container mx-auto px-6 md:px-12 lg:px-16 max-w-4xl">
+
+        {/* BACK LINK */}
+        <div className="mb-8">
+          <Link href="/orders" className="inline-flex items-center gap-2 text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60 hover:text-samara-gold transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            All Orders
+          </Link>
+        </div>
+
+        {/* HEADER */}
+        <div className="mb-16 text-center">
+          <span className="text-[10px] font-sans tracking-[0.3em] uppercase text-samara-gold mb-4 block">
+            Order Details
+          </span>
+          <h1 className="text-4xl md:text-5xl font-serif text-samara-ivory mb-4">
+            Order <em className="italic text-samara-gold">#{order.order_number}</em>
+          </h1>
+          <p className="text-sm font-sans tracking-wide text-samara-ivory/60">
+            Placed on {format(new Date(order.created_at), 'MMMM dd, yyyy')}
+          </p>
+        </div>
+
+        {/* STATUS + PRICE BAR */}
+        <div className="bg-samara-void1 border border-samara-ivory/10 p-6 md:p-8 flex flex-wrap justify-between items-center gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <span className={`px-4 py-2 text-[10px] font-sans tracking-[0.2em] uppercase ${statusColor(displayStatus)} capitalize`}>
+              {displayStatus}
+            </span>
+            <span className={`px-4 py-2 text-[10px] font-sans tracking-[0.2em] uppercase ${
+              order.payment_status === 'paid' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
+            } capitalize`}>
+              {order.payment_status}
+            </span>
           </div>
-        </CardHeader>
-        
-        <CardContent className="space-y-10 pt-8">
-          {/* DELIVERY PROGRESS */}
-          <div>
-            <p className="font-semibold mb-6 text-white">Delivery Progress</p>
-            <div className="relative flex justify-between items-center">
-              <div className="absolute top-4 left-0 right-0 h-[2px] bg-gray-700" />
-              <div className="absolute top-4 left-0 h-[2px] bg-[#D4AF37]" style={{ width: `${(stepIndex / 3) * 100}%` }} />
-              {steps.map((step, i) => {
-                const active = i <= stepIndex && !isCancelled
+          <span className="text-2xl md:text-3xl font-serif text-samara-gold">
+            {formatPriceSync(order.total_amount, order.currency)}
+          </span>
+        </div>
+
+        {/* DELIVERY PROGRESS */}
+        <div className="bg-samara-void1 border border-samara-ivory/10 p-8 md:p-12 mb-8">
+          <h2 className="text-lg font-serif text-samara-gold mb-10">Delivery Progress</h2>
+          <div className="relative flex justify-between items-start">
+            {/* Track Line */}
+            <div className="absolute top-4 left-[12.5%] right-[12.5%] h-px bg-samara-ivory/10" />
+            <div
+              className="absolute top-4 left-[12.5%] h-px bg-samara-gold transition-all duration-700"
+              style={{ width: `${(stepIndex / 3) * 75}%` }}
+            />
+            {steps.map((step, i) => {
+              const active = i <= stepIndex && !isCancelled
+              return (
+                <div key={step} className="relative z-10 flex flex-col items-center flex-1">
+                  <div className={`w-9 h-9 flex items-center justify-center border transition-all duration-300 ${
+                    active
+                      ? 'bg-samara-gold border-samara-gold text-samara-void'
+                      : 'bg-samara-void border-samara-ivory/20 text-samara-ivory/40'
+                  }`}>
+                    {i === 0 ? <Package className="w-4 h-4" /> : i === 3 ? <CheckCircle2 className="w-4 h-4" /> : <Truck className="w-4 h-4" />}
+                  </div>
+                  <span className={`mt-4 text-[10px] font-sans tracking-[0.15em] uppercase ${
+                    active ? 'text-samara-gold' : 'text-samara-ivory/40'
+                  }`}>{step}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* RATE YOUR PURCHASE */}
+        {shouldAskForReview && (
+          <div className="bg-samara-void1 border border-samara-gold/20 p-8 md:p-10 mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <Star className="w-5 h-5 text-samara-gold fill-samara-gold" />
+              <h2 className="text-lg font-serif text-samara-gold">Rate Your Purchase</h2>
+            </div>
+            
+            <div className="space-y-4">
+              {items.map(item => {
+                const alreadyReviewed = reviewedProductIds.includes(item.product_id)
+                if (alreadyReviewed) return null
+
                 return (
-                  <div key={step} className="relative z-10 flex flex-col items-center flex-1">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 ${active ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : 'bg-black border-gray-600 text-gray-400'}`}>
-                      {i === 0 ? <Package className="w-4 h-4" /> : i === 3 ? <CheckCircle2 className="w-4 h-4" /> : <Truck className="w-4 h-4" />}
-                    </div>
-                    <span className={`mt-3 text-xs ${active ? 'text-[#D4AF37]' : 'text-gray-400'}`}>{step}</span>
+                  <div key={item.product_id} className="flex items-center justify-between p-4 border border-samara-ivory/10 bg-samara-void">
+                    <span className="text-sm font-serif text-samara-ivory">{item.product_name}</span>
+                    <Button
+                      size="sm"
+                      className="bg-samara-gold hover:bg-samara-goldDeep text-samara-void rounded-none font-sans text-[10px] tracking-[0.2em] uppercase h-9 px-6"
+                      onClick={() => {
+                        setSelectedProductId(item.product_id)
+                        setReviewModalOpen(true)
+                      }}
+                    >
+                      Write Review
+                    </Button>
                   </div>
                 )
               })}
             </div>
           </div>
+        )}
 
-          {/* ✅ RATE YOUR PURCHASE SECTION */}
-          {shouldAskForReview && (
-            <div className="border border-[#D4AF37]/40 rounded-lg p-5 bg-[#0a0a0a]">
-              <div className="flex items-center gap-2 mb-3">
-                <Star className="w-5 h-5 text-[#D4AF37] fill-[#D4AF37]" />
-                <p className="font-semibold text-[#D4AF37]">Rate your purchase</p>
-              </div>
-              
-              <div className="space-y-3">
-                {items.map(item => {
-                  const alreadyReviewed = reviewedProductIds.includes(item.product_id)
-                  if (alreadyReviewed) return null
-
-                  return (
-                    <div key={item.product_id} className="flex items-center justify-between bg-white/5 p-3 rounded border border-white/10">
-                      <span className="text-sm text-gray-200">{item.product_name}</span>
-                      <Button
-                        size="sm"
-                        className="bg-[#D4AF37] text-black hover:bg-[#b5952f] text-xs h-8"
-                        onClick={() => {
-                          setSelectedProductId(item.product_id)
-                          setReviewModalOpen(true)
-                        }}
-                      >
-                        Write Review
-                      </Button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TRACKING & SHIPPING */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+        {/* TRACKING & SHIPPING */}
+        <div className="bg-samara-void1 border border-samara-ivory/10 p-8 md:p-12 mb-8">
+          <h2 className="text-lg font-serif text-samara-gold mb-8 border-b border-samara-ivory/10 pb-4">Shipping Information</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <p className="text-gray-400">Tracking Number</p>
-              <p className="text-white">{order.tracking_number || 'Not assigned yet'}</p>
+              <span className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/40 block mb-2">Tracking Number</span>
+              <p className="text-sm font-sans text-samara-ivory">{order.tracking_number || 'Not assigned yet'}</p>
             </div>
             <div>
-              <p className="text-gray-400">Carrier</p>
-              <p className="text-white">{order.carrier || 'Will be updated soon'}</p>
+              <span className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/40 block mb-2">Carrier</span>
+              <p className="text-sm font-sans text-samara-ivory">{order.carrier || 'Will be updated soon'}</p>
             </div>
-            <div className="col-span-1 md:col-span-2">
-              <p className="text-gray-400 mb-2">Shipping Address</p>
-              <p className="text-white font-medium">{order.shipping_name}</p>
-              <p className="text-white">{order.shipping_address}</p>
-              <p className="text-white">{order.shipping_city}, {order.shipping_state} – {order.shipping_pincode}</p>
-              <p className="text-white">{order.shipping_country}</p>
+            <div className="md:col-span-2 mt-4 pt-8 border-t border-samara-ivory/10">
+              <span className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/40 block mb-4">Delivery Address</span>
+              <p className="font-serif text-lg text-samara-ivory mb-1">{order.shipping_name}</p>
+              <p className="text-sm font-sans text-samara-ivory/80">{order.shipping_address}</p>
+              <p className="text-sm font-sans text-samara-ivory/80">{order.shipping_city}, {order.shipping_state} – {order.shipping_pincode}</p>
+              <p className="text-sm font-sans text-samara-ivory/80">{order.shipping_country}</p>
             </div>
           </div>
+        </div>
 
-          {/* ACTIONS & RETURN WINDOW */}
-          <div className="border-t border-gray-800 pt-6">
-            <div className="flex gap-4 flex-wrap items-center">
-              <Button onClick={downloadInvoice} className="bg-[#D4AF37] text-black hover:bg-[#b5952f]">
-                <Download className="w-4 h-4 mr-2" />
-                Download Invoice
+        {/* ACTIONS */}
+        <div className="bg-samara-void1 border border-samara-ivory/10 p-8 md:p-12">
+          <div className="flex gap-4 flex-wrap items-center">
+            <Button
+              onClick={downloadInvoice}
+              className="h-12 px-8 bg-samara-gold hover:bg-samara-goldDeep text-samara-void rounded-none font-sans text-[10px] tracking-[0.2em] uppercase transition-colors"
+            >
+              <Download className="w-4 h-4 mr-3" />
+              Download Invoice
+            </Button>
+            
+            {canCancel && (
+              <Button
+                onClick={cancelOrder}
+                className="h-12 px-8 bg-transparent border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-none font-sans text-[10px] tracking-[0.2em] uppercase transition-colors"
+              >
+                <XCircle className="w-4 h-4 mr-3" />
+                Cancel Order
               </Button>
-              
-              {canCancel && (
-                <Button variant="destructive" onClick={cancelOrder}>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cancel Order
+            )}
+            
+            {canReturn && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={requestReturn}
+                  className="h-12 px-8 bg-transparent border border-samara-ivory/20 hover:border-samara-gold text-samara-ivory hover:text-samara-gold rounded-none font-sans text-[10px] tracking-[0.2em] uppercase transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4 mr-3" />
+                  Request Return
                 </Button>
-              )}
-              
-              {/* Return Button */}
-              {canReturn && (
-                <div className="flex flex-col gap-1">
-                  <Button variant="outline" onClick={requestReturn} className="border-gray-600 text-gray-200 hover:bg-gray-800">
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Request Return
-                  </Button>
-                  <span className="text-[10px] text-gray-500 text-center">
-                    {daysLeftToReturn} days left to return
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Return Window Closed Message */}
-            {isDelivered && !returnEligible && !isCancelled && (
-              <p className="text-sm text-gray-500 mt-4 italic">
-                Return window closed (14 days after delivery).
-              </p>
+                <span className="text-[10px] font-sans tracking-widest text-samara-ivory/40 uppercase text-center">
+                  {daysLeftToReturn} days left
+                </span>
+              </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+
+          {isDelivered && !returnEligible && !isCancelled && (
+            <p className="text-[10px] font-sans tracking-widest text-samara-ivory/30 uppercase mt-6">
+              Return window closed (14 days after delivery).
+            </p>
+          )}
+        </div>
+
+      </div>
 
       {/* REVIEW MODAL */}
       {selectedProductId && (

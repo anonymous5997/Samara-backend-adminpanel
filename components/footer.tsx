@@ -1,128 +1,135 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Facebook, Instagram, Twitter } from 'lucide-react';
+import { Facebook, Instagram, Twitter, ArrowRight } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="bg-[#000000] border-t border-[#D4AF37]/10 mt-auto">
-      <div className="container mx-auto px-4 md:px-8 py-16 md:py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-          <div>
-            <Link href="/" className="inline-block mb-6 group">
-              <div className="relative w-48 h-14 transition-all duration-300 group-hover:scale-105">
+    <footer className="bg-samara-void1 border-t border-samara-gold/10 mt-auto text-samara-ivory">
+      <div className="container mx-auto px-4 md:px-8 py-20 md:py-32">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8 mb-20">
+          
+          {/* BRAND COLUMN */}
+          <div className="lg:col-span-4 flex flex-col items-start">
+            <Link href="/" className="inline-block mb-8">
+              <div className="relative w-40 h-12">
                 <Image
                   src="/samara-logo.png"
-                  alt="Samara - Best Handcrafted Sambalpuri Sarees"
+                  alt="Samara"
                   fill
-                  className="object-contain"
+                  className="object-contain object-left"
                 />
               </div>
             </Link>
-            <p className="text-sm text-[#CFCFCF] leading-relaxed">
-              Discover the finest handcrafted Sambalpuri sarees. Authentic traditional Indian sarees woven with heritage craftsmanship for the modern woman.
+            <p className="text-sm font-sans leading-relaxed text-samara-ivory/70 max-w-sm mb-8">
+              Timeless. Ethical. Exquisite. Discover the finest handcrafted Indian fashion woven with heritage craftsmanship for the modern era.
             </p>
+            <div className="flex gap-6">
+              <a href="#" className="text-samara-gold/70 hover:text-samara-gold transition-colors">
+                <Instagram className="w-5 h-5 stroke-[1.5]" />
+              </a>
+              <a href="#" className="text-samara-gold/70 hover:text-samara-gold transition-colors">
+                <Facebook className="w-5 h-5 stroke-[1.5]" />
+              </a>
+              <a href="#" className="text-samara-gold/70 hover:text-samara-gold transition-colors">
+                <Twitter className="w-5 h-5 stroke-[1.5]" />
+              </a>
+            </div>
           </div>
 
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-6 text-[#D4AF37]">Shop</h4>
-            <ul className="space-y-3 text-sm">
+          {/* LINKS COLUMN 1 */}
+          <div className="lg:col-span-2 lg:col-start-6">
+            <h4 className="font-serif text-lg text-samara-gold mb-6 tracking-wide">Collections</h4>
+            <ul className="space-y-4">
               <li>
-                <Link href="/shop" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Shop All
-                </Link>
-              </li>
-              <li>
-                <Link href="/sarees" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                <Link href="/sarees" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
                   Sarees
                 </Link>
               </li>
               <li>
-                <Link href="/collections/coord-sets" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                <Link href="/collections/coord-sets" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
                   Co-ord Sets
                 </Link>
               </li>
               <li>
-                <Link href="/collections/kurta-sets" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                <Link href="/collections/kurta-sets" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
                   Kurta Sets
+                </Link>
+              </li>
+              <li>
+                <Link href="/shop" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
+                  Shop All
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-6 text-[#D4AF37]">Support</h4>
-            <ul className="space-y-3 text-sm">
+          {/* LINKS COLUMN 2 */}
+          <div className="lg:col-span-2">
+            <h4 className="font-serif text-lg text-samara-gold mb-6 tracking-wide">Assistance</h4>
+            <ul className="space-y-4">
               <li>
-                <Link href="/contact" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Contact
+                <Link href="/contact" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
+                  Contact Us
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                <Link href="/contact" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
                   FAQ
                 </Link>
               </li>
               <li>
-                <Link href="/track-order" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
+                <Link href="/track-order" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
                   Track Order
                 </Link>
               </li>
               <li>
-                <Link href="/return-policy" className="text-[#CFCFCF] hover:text-[#D4AF37] transition-colors duration-300">
-                  Return Policy
+                <Link href="/return-policy" className="text-[11px] font-sans uppercase tracking-[0.15em] text-samara-ivory/60 hover:text-samara-gold transition-colors">
+                  Returns
                 </Link>
               </li>
             </ul>
           </div>
 
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-6 text-[#D4AF37]">Newsletter</h4>
-            <p className="text-sm text-[#CFCFCF] mb-4 leading-relaxed">
-              Subscribe to receive updates, access to exclusive deals, and more
+          {/* NEWSLETTER COLUMN */}
+          <div className="lg:col-span-3">
+            <h4 className="font-serif text-lg text-samara-gold mb-6 tracking-wide">The Inner Circle</h4>
+            <p className="text-xs font-sans text-samara-ivory/70 mb-6 leading-relaxed">
+              Subscribe to receive updates, access to exclusive collections, and styling inspiration.
             </p>
-            <form className="flex gap-2 mb-6">
+            <form className="relative flex items-center group">
               <input
                 type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-4 py-2 bg-[#050505] border border-[#D4AF37]/30 rounded-lg text-[#F5F5F5] placeholder-gray-600 focus:outline-none focus:border-[#D4AF37] transition-colors text-sm"
+                placeholder="Email Address"
+                className="w-full bg-transparent border-b border-samara-gold/30 pb-3 text-sm text-samara-ivory placeholder:text-samara-ivory/30 focus:outline-none focus:border-samara-gold transition-colors"
+                required
               />
               <button
                 type="submit"
-                className="px-6 py-2 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-bold rounded-lg transition-all duration-300 hover:scale-105"
+                className="absolute right-0 bottom-3 text-samara-gold/50 group-hover:text-samara-gold transition-colors"
               >
-                Send
+                <ArrowRight className="w-5 h-5 stroke-[1.5]" />
               </button>
             </form>
-            <div className="flex gap-4">
-              <a href="#" className="text-[#D4AF37] hover:text-[#F4D03F] transition-colors">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-[#D4AF37] hover:text-[#F4D03F] transition-colors">
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-[#D4AF37] hover:text-[#F4D03F] transition-colors">
-                <Twitter className="h-5 w-5" />
-              </a>
-            </div>
           </div>
         </div>
 
-        <div className="border-t border-[#D4AF37]/10 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-gray-600">
-              &copy; {new Date().getFullYear()} Samara. All rights reserved.
-            </p>
-            <div className="flex gap-6 text-sm">
-              <Link href="/privacy-policy" className="text-gray-600 hover:text-[#D4AF37] transition-colors">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="text-gray-600 hover:text-[#D4AF37] transition-colors">
-                Terms of Service
-              </Link>
-            </div>
+        {/* BOTTOM ROW */}
+        <div className="border-t border-samara-gold/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
+          <p className="text-[10px] font-sans uppercase tracking-[0.2em] text-samara-ivory/40">
+            &copy; {new Date().getFullYear()} Samara Select. All rights reserved.
+          </p>
+          <div className="flex gap-8">
+            <Link href="/privacy-policy" className="text-[10px] font-sans uppercase tracking-[0.2em] text-samara-ivory/40 hover:text-samara-gold transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="text-[10px] font-sans uppercase tracking-[0.2em] text-samara-ivory/40 hover:text-samara-gold transition-colors">
+              Terms
+            </Link>
           </div>
         </div>
       </div>
     </footer>
   );
 }
+
+export default Footer;

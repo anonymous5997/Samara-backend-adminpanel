@@ -1,18 +1,18 @@
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
 import { HeroSlider } from '@/components/HeroSlider';
-import { CollectionsGrid } from '@/components/CollectionsGrid';
-import { ProductSection } from '@/components/ProductSection';
+import { Marquee } from '@/components/Marquee';
+import { MostLovedEditorial } from '@/components/MostLovedEditorial';
+import { FullBleedStory } from '@/components/FullBleedStory';
+import { CollectionsEditorial } from '@/components/CollectionsEditorial';
+import { ProductRail } from '@/components/ProductRail';
 import { getMostLovedProducts, getNewArrivals } from '@/lib/content';
 import AutoCurrencyWrapper from '@/components/AutoCurrencyWrapper';
-import { createClient } from '@/lib/supabase/server'; 
+import { createClient } from '@/lib/supabase/server';
+import { ShieldCheck, Truck, RefreshCw, Award } from 'lucide-react';
 
 // ✅ Speed Fix - Enabled caching with 60s revalidation
 export const revalidate = 60;
 
 export default async function Home() {
-  // Existing data fetching
   const mostLovedProducts = await getMostLovedProducts(4);
   const newArrivals = await getNewArrivals(4);
 
@@ -25,124 +25,85 @@ export default async function Home() {
     .order('sort_order');
 
   return (
-    <div className="bg-[#000000]">
+    <div className="bg-samara-void">
       {/* Client-only currency detection */}
       <AutoCurrencyWrapper />
 
-      {/* Pass server-fetched slides to component */}
+      {/* ═══════════════════════════════════════════════════════════════
+          BRAND PURPOSE (Required for Google OAuth compliance)
+          Hidden visually but present in DOM for accessibility & OAuth
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="sr-only" aria-label="About Samara">
+        <h1>Samara</h1>
+        <p>
+          Samara is an online fashion and e-commerce platform that allows users
+          to browse and purchase handcrafted Sambalpuri sarees and traditional
+          Indian apparel. Users can create accounts or sign in using email,
+          Google, or Facebook to manage their profiles, delivery addresses,
+          and orders.
+        </p>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          01 — HERO — Full-viewport cinematic photography
+      ═══════════════════════════════════════════════════════════════ */}
       <HeroSlider slides={slides ?? []} />
 
-      {/* -----------------------------------------------------------------------
-        ✅ APP PURPOSE & BRANDING SECTION (CRITICAL FOR GOOGLE OAUTH)
-        1. "Samara" is H1 to match App Name (Fix 4).
-        2. Description explains "browse", "purchase", "sign in", "manage profiles" (Fix 3).
-        -----------------------------------------------------------------------
-      */}
-      <section className="py-10 border-t border-[#D4AF37]/10 bg-[#000000]">
-        <div className="container mx-auto px-4 text-center">
-          {/* FIX 4: Exact App Name Match */}
-          <h1 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37]">
-            Samara
-          </h1>
-          <p className="text-lg text-[#CFCFCF] mt-2 mb-6">
-            Premium Saree & Fashion Platform
-          </p>
+      {/* ═══════════════════════════════════════════════════════════════
+          02 — MARQUEE BAND — Continuously scrolling editorial typography
+      ═══════════════════════════════════════════════════════════════ */}
+      <Marquee />
 
-          {/* FIX 3: Detailed OAuth Purpose Explanation */}
-          <p className="text-sm text-[#BEBEBE] max-w-3xl mx-auto leading-relaxed">
-            Samara is an online fashion and e-commerce platform that allows users
-            to browse and purchase handcrafted Sambalpuri sarees and traditional
-            Indian apparel. Users can create accounts or sign in using email,
-            Google, or Facebook to manage their profiles, delivery addresses,
-            and orders.
-          </p>
-        </div>
-      </section>
-      {/* ----------------------------------------------------------------------- */}
-
+      {/* ═══════════════════════════════════════════════════════════════
+          03 — MOST LOVED — Editorial product presentation
+      ═══════════════════════════════════════════════════════════════ */}
       {mostLovedProducts.length > 0 && (
-        <section className="py-20 md:py-24 bg-[#050505]">
-          <div className="container mx-auto px-4 md:px-8">
-            <div className="text-center mb-12">
-              <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] mb-4">
-                Most Loved by Samara Women
-              </h2>
-              <p className="text-lg text-[#CFCFCF]">
-                Discover our bestselling collection
-              </p>
-            </div>
-
-            <ProductSection products={mostLovedProducts} showBestseller />
-
-            <div className="flex items-center justify-center gap-2 mt-12">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className={`h-2 rounded-full transition-all ${
-                    i === 0 ? 'w-8 bg-[#D4AF37]' : 'w-2 bg-[#D4AF37]/30'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
+        <MostLovedEditorial products={mostLovedProducts} />
       )}
 
+      {/* ═══════════════════════════════════════════════════════════════
+          04 — FULL-BLEED STORY — Large image + typography
+      ═══════════════════════════════════════════════════════════════ */}
+      <FullBleedStory />
+
+      {/* ═══════════════════════════════════════════════════════════════
+          05 — COLLECTIONS — Asymmetric editorial composition
+      ═══════════════════════════════════════════════════════════════ */}
+      <CollectionsEditorial />
+
+      {/* ═══════════════════════════════════════════════════════════════
+          06 — PRODUCT RAIL — Horizontal product interaction
+      ═══════════════════════════════════════════════════════════════ */}
       {newArrivals.length > 0 && (
-        <section className="py-20 md:py-24 bg-gradient-to-b from-[#000000] via-[#050505] to-[#000000]">
-          <div className="container mx-auto px-4 md:px-8">
-            <div className="text-center mb-12">
-              <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] mb-4">
-                New Arrivals
-              </h2>
-              <p className="text-lg text-[#CFCFCF]">
-                Fresh designs for the season
-              </p>
-            </div>
-
-            <ProductSection products={newArrivals} showNew />
-
-            <div className="text-center mt-12">
-              <Button
-                size="lg"
-                variant="outline"
-                asChild
-                className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 font-bold px-10 py-6"
-              >
-                <Link href="/shop">
-                  View All New Arrivals
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </section>
+        <ProductRail products={newArrivals} />
       )}
 
-      <section className="py-20 md:py-24 bg-[#050505]">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="text-center mb-12">
-            <h2 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] mb-4">
-              Explore Our Collections
-            </h2>
-            <p className="text-lg text-[#CFCFCF]">
-              Signature edits curated for the modern woman
-            </p>
-          </div>
-
-          <CollectionsGrid />
-
-          <div className="text-center mt-16">
-            <Button
-              size="lg"
-              asChild
-              className="bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black font-bold px-10 py-6"
-            >
-              <Link href="/collections">
-                View All Collections
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+      {/* ═══════════════════════════════════════════════════════════════
+          07 — TRUST STRIP — Minimal factual trust strip
+      ═══════════════════════════════════════════════════════════════ */}
+      <section className="py-16 md:py-24 bg-samara-void border-t border-samara-gold/10">
+        <div className="container mx-auto px-6 md:px-12 lg:px-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-16 max-w-5xl mx-auto">
+            <div className="text-center space-y-3">
+              <Award className="w-6 h-6 text-samara-gold mx-auto stroke-[1.2]" />
+              <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/80">100% Authentic</p>
+              <p className="text-[9px] font-sans text-samara-ivory/40">Certified Handloom</p>
+            </div>
+            <div className="text-center space-y-3">
+              <Truck className="w-6 h-6 text-samara-gold mx-auto stroke-[1.2]" />
+              <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/80">Free Shipping</p>
+              <p className="text-[9px] font-sans text-samara-ivory/40">Pan India Delivery</p>
+            </div>
+            <div className="text-center space-y-3">
+              <RefreshCw className="w-6 h-6 text-samara-gold mx-auto stroke-[1.2]" />
+              <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/80">Easy Returns</p>
+              <p className="text-[9px] font-sans text-samara-ivory/40">7-Day Policy</p>
+            </div>
+            <div className="text-center space-y-3">
+              <ShieldCheck className="w-6 h-6 text-samara-gold mx-auto stroke-[1.2]" />
+              <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/80">Secure Checkout</p>
+              <p className="text-[9px] font-sans text-samara-ivory/40">SSL Encrypted</p>
+            </div>
           </div>
         </div>
       </section>

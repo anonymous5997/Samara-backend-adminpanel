@@ -158,91 +158,89 @@ export default function ProfilePage() {
   };
 
   /* ---------------- RENDER GUARDS ---------------- */
-  if (loading) {
+  if (loading || !profile) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
-        Loading session...
+      <div className="min-h-screen bg-samara-void flex items-center justify-center">
+        <div className="animate-pulse text-samara-ivory/40 font-sans tracking-widest uppercase text-sm">
+          Loading details...
+        </div>
       </div>
     );
   }
   if (!user) return null;
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
-        Creating profile...
-      </div>
-    );
-  }
 
   /* ---------------- UI ---------------- */
   return (
     <>
       <Toaster />
       
-      <div className="min-h-screen bg-black flex justify-center px-4 py-20">
-        <div className="w-full max-w-4xl">
+      <div className="bg-samara-void text-samara-ivory min-h-screen pt-32 pb-24 md:pb-32">
+        <div className="container mx-auto px-6 md:px-12 lg:px-16 max-w-4xl">
           {/* HEADER */}
-          <div className="mb-12 text-center md:text-left">
-            <h1 className="text-4xl font-serif text-[#D4AF37] mb-3">
-              My Profile
+          <div className="mb-16 text-center">
+            <span className="text-[10px] font-sans tracking-[0.3em] uppercase text-samara-gold mb-4 block">
+              Your Account
+            </span>
+            <h1 className="text-4xl md:text-5xl font-serif text-samara-ivory mb-6">
+              My <em className="italic text-samara-gold">Profile</em>
             </h1>
-            <p className="text-gray-400">
-              Manage your personal information and delivery address
+            <p className="text-sm font-sans tracking-wide text-samara-ivory/60">
+              Manage your personal information and delivery details
             </p>
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="bg-[#0b0b0b] border border-[#D4AF37]/30 rounded-3xl p-8 md:p-12 space-y-12 shadow-[0_0_80px_rgba(212,175,55,0.08)]"
+            className="bg-samara-void1 border border-samara-ivory/10 p-8 md:p-12 lg:p-16 space-y-16"
           >
             {/* BASIC INFO */}
-            <section className="space-y-6">
-              <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
+            <section className="space-y-8">
+              <h2 className="text-xl md:text-2xl font-serif text-samara-gold border-b border-samara-ivory/10 pb-4">
                 Personal Information
               </h2>
               
-              <div className="space-y-2">
-                <Label className="text-gray-300">Email</Label>
+              <div className="space-y-4">
+                <Label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60">Email Address</Label>
                 <Input
                   value={profile.email}
                   disabled
-                  className="bg-[#111] text-gray-500 cursor-not-allowed border-gray-800 focus-visible:ring-0"
+                  className="bg-samara-void text-samara-ivory/40 border-samara-ivory/10 cursor-not-allowed rounded-none h-12 text-sm font-sans"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-gray-300">Full Name</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60">Full Name</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
                     placeholder="Your full name"
-                    className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300">Phone</Label>
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60">Phone Number</Label>
                   <Input
                     value={formData.phone}
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
                     }
-                    placeholder="+91XXXXXXXXXX"
-                    className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
+                    placeholder="+91 XXXXX XXXXX"
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors"
                   />
                 </div>
               </div>
 
-              {/* CHANGE PASSWORD UI (Hidden for social logins) */}
+              {/* CHANGE PASSWORD UI */}
               {canChangePassword && (
-                <div className="space-y-4 pt-6 mt-4 border-t border-gray-800/50">
-                  <h3 className="text-lg font-serif text-[#D4AF37]">
+                <div className="space-y-8 pt-8 mt-8 border-t border-samara-ivory/10">
+                  <h3 className="text-lg md:text-xl font-serif text-samara-ivory/80">
                     Change Password
                   </h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     {/* Current Password */}
                     <Input
                       type="password"
@@ -254,13 +252,12 @@ export default function ProfilePage() {
                           currentPassword: e.target.value,
                         })
                       }
-                      // ✅ Prevent accidental form submission
                       onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                      className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                      className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                     />
 
                     {/* New Password & Hint */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Input
                         type="password"
                         placeholder="New Password"
@@ -271,23 +268,21 @@ export default function ProfilePage() {
                             newPassword: e.target.value,
                           })
                         }
-                        // ✅ Prevent accidental form submission
                         onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                        className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                        className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                       />
-                      {/* ✅ Password Hint */}
-                      <p className="text-xs text-gray-500">
-                        Minimum 8 characters recommended
+                      <p className="text-[10px] font-sans tracking-wider text-samara-ivory/40 uppercase">
+                        Minimum 8 characters
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex justify-start">
+                  <div>
                     <Button
                       type="button"
                       onClick={handleChangePassword}
                       disabled={changingPassword}
-                      className="bg-[#1a1a1a] text-[#D4AF37] border border-[#D4AF37]/40 hover:bg-[#D4AF37] hover:text-black transition"
+                      className="h-12 px-8 bg-transparent border border-samara-ivory/20 hover:border-samara-gold text-samara-ivory hover:text-samara-gold transition-colors rounded-none font-sans text-[10px] tracking-[0.2em] uppercase"
                     >
                       {changingPassword ? 'Updating...' : 'Update Password'}
                     </Button>
@@ -297,18 +292,18 @@ export default function ProfilePage() {
             </section>
 
             {/* ADDRESS */}
-            <section className="space-y-6">
-              <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
-                Delivery Address
+            <section className="space-y-8">
+              <h2 className="text-xl md:text-2xl font-serif text-samara-gold border-b border-samara-ivory/10 pb-4">
+                Delivery Details
               </h2>
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-8">
                 <Input
                   placeholder="House / Flat Number"
                   value={formData.house}
                   onChange={(e) =>
                     setFormData({ ...formData, house: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
                 <Input
                   placeholder="Building / Apartment Name"
@@ -316,7 +311,7 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, building: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
                 <Input
                   placeholder="Locality / Area"
@@ -324,17 +319,17 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, locality: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Input
                   placeholder="City"
                   value={formData.city}
                   onChange={(e) =>
                     setFormData({ ...formData, city: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
                 <Input
                   placeholder="District"
@@ -342,17 +337,17 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, district: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Input
                   placeholder="State"
                   value={formData.state}
                   onChange={(e) =>
                     setFormData({ ...formData, state: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
                 <Input
                   placeholder="Country"
@@ -360,7 +355,7 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setFormData({ ...formData, country: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
                 />
               </div>
               <Input
@@ -369,16 +364,16 @@ export default function ProfilePage() {
                 onChange={(e) =>
                   setFormData({ ...formData, pin: e.target.value })
                 }
-                className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] md:w-1/2"
+                className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors md:w-1/2"
               />
             </section>
 
             {/* ACTION */}
-            <div className="pt-6 flex justify-end">
+            <div className="pt-12 flex justify-end">
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-[#D4AF37] text-black font-bold px-10 py-6 rounded-xl hover:bg-[#E6C75A] transition shadow-lg shadow-[#D4AF37]/20 w-full md:w-auto text-lg"
+                className="h-14 px-12 bg-samara-gold hover:bg-samara-goldDeep text-samara-void rounded-none transition-colors w-full md:w-auto font-sans text-[11px] tracking-[0.2em] uppercase"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>

@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabase/client';
-import { useCart } from '@/lib/cart-context';
 import { Product } from '@/lib/types';
+
+import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
+import { getUserRegion } from '@/lib/region/client';
 
 function debounce<T extends (...args: any[]) => any>(
   func: T,
@@ -21,14 +23,15 @@ function debounce<T extends (...args: any[]) => any>(
 }
 
 interface SearchProduct extends Product {
-  is_bestseller: boolean;
-  bestseller_badge_label: string;
-  is_new_arrival: boolean;
-  primary_image_url?: string;
-  product_images: Array<{
+  images: Array<{
     id: string;
     image_url: string;
     is_primary: boolean;
+  }>;
+  product_prices?: Array<{
+    currency: string;
+    price: number;
+    mrp?: number | null;
   }>;
 }
 
@@ -38,7 +41,26 @@ export default function SearchPage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { currency } = useCart();
+  
+  const [rates, setRates] = useState<Record<string, number>>({});
+  
+  useEffect(() => {
+    const loadRates = async () => {
+      const { data, error } = await supabase
+        .from('currency_rates')
+        .select('*');
+
+      if (!error && data) {
+        const map: Record<string, number> = {};
+        data.forEach((r: any) => {
+          const code = r.currency || r.target_currency;
+          if (code) map[code] = Number(r.rate);
+        });
+        setRates(map);
+      }
+    };
+    loadRates();
+  }, []);
 
   const searchProducts = async (query: string) => {
     if (!query.trim()) {
@@ -52,10 +74,15 @@ export default function SearchPage() {
         .from('products')
         .select(`
           *,
-          product_images (
+          images:product_images (
             id,
             image_url,
             is_primary
+          ),
+          product_prices (
+            currency,
+            price,
+            mrp
           )
         `)
         .eq('is_active', true)
@@ -64,13 +91,7 @@ export default function SearchPage() {
 
       if (error) throw error;
 
-      const productsWithImages: SearchProduct[] = (data || []).map(product => ({
-        ...product,
-        primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                            (product.product_images || [])[0]?.image_url,
-      }));
-
-      setProducts(productsWithImages);
+      setProducts(data || []);
     } catch (error) {
       console.error('Error searching products:', error);
       setProducts([]);
@@ -133,18 +154,45 @@ export default function SearchPage() {
     setProducts([]);
     setSuggestions([]);
   };
+  
+  const region = getUserRegion();
+  const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
+
+  useEffect(() => {
+    if (!products.length) return;
+    if (Object.keys(rates).length === 0) return;
+    
+    const loadPrices = async () => {
+      const promises = products.map(async (p) => {
+        try {
+          const resolved = await resolveFinalPrice(p, region, undefined, rates);
+          if (!resolved) return null;
+          return [p.id, resolved] as const;
+        } catch (err) {
+          return null;
+        }
+      });
+      const results = await Promise.all(promises);
+      setPriceMap(
+        Object.fromEntries(
+          results.filter((item): item is [string, ResolvedPrice] => item !== null)
+        )
+      );
+    };
+    loadPrices();
+  }, [products, region, rates]);
 
   return (
-    <div className="min-h-screen bg-[#000000] py-12">
-      <div className="container mx-auto px-4 md:px-8">
-        <div className="max-w-4xl mx-auto mb-12">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-[#D4AF37] mb-8 text-center">
-            Search Products
+    <div className="bg-samara-void text-samara-ivory min-h-screen pt-32 pb-24 md:pb-32">
+      <div className="container mx-auto px-6 md:px-12 lg:px-16 max-w-7xl">
+        <div className="max-w-4xl mx-auto mb-16">
+          <h1 className="text-4xl md:text-5xl font-serif text-samara-ivory mb-12 text-center">
+            Discover <em className="italic text-samara-gold">Samara</em>
           </h1>
 
           <div className="relative">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#D4AF37]" />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-samara-gold stroke-[1.5]" />
               <Input
                 type="text"
                 placeholder="Search for sarees, collections, brands..."
@@ -154,25 +202,25 @@ export default function SearchPage() {
                   setShowSuggestions(true);
                 }}
                 onFocus={() => setShowSuggestions(true)}
-                className="pl-12 pr-12 py-6 text-lg bg-[#111111] border-[#D4AF37]/30 text-[#F5F5F5] placeholder:text-[#888] focus:border-[#D4AF37] focus:ring-[#D4AF37]/50"
+                className="pl-16 pr-12 h-16 text-sm font-sans tracking-wide bg-samara-void1 border border-samara-ivory/20 text-samara-ivory placeholder:text-samara-ivory/40 focus:border-samara-gold focus:ring-0 rounded-none transition-colors"
               />
               {searchQuery && (
                 <button
                   onClick={clearSearch}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#D4AF37] hover:text-[#F4D03F]"
+                  className="absolute right-6 top-1/2 -translate-y-1/2 text-samara-ivory/40 hover:text-samara-gold transition-colors"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-5 w-5 stroke-[1.5]" />
                 </button>
               )}
             </div>
 
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#111111] border border-[#D4AF37]/30 rounded-lg shadow-xl z-50">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-samara-void1 border border-samara-ivory/20 shadow-2xl z-50">
                 {suggestions.map((suggestion, index) => (
                   <button
                     key={index}
                     onClick={() => handleSuggestionClick(suggestion)}
-                    className="w-full text-left px-4 py-3 text-[#F5F5F5] hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] transition-colors border-b border-[#D4AF37]/10 last:border-b-0"
+                    className="w-full text-left px-6 py-4 text-sm font-sans text-samara-ivory hover:bg-samara-gold hover:text-samara-void transition-colors border-b border-samara-ivory/10 last:border-b-0"
                   >
                     {suggestion}
                   </button>
@@ -182,30 +230,37 @@ export default function SearchPage() {
           </div>
 
           {searchQuery && (
-            <p className="mt-4 text-[#888] text-center">
-              {loading ? 'Searching...' : `${products.length} results found`}
+            <p className="mt-6 text-samara-ivory/60 text-xs font-sans tracking-widest uppercase text-center">
+              {loading ? 'Curating results...' : `${products.length} pieces found`}
             </p>
           )}
         </div>
 
         {products.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-              />
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+            {products.map((product) => {
+              const resolvedPrice = priceMap[product.id];
+              const mainImage = product.images?.find(img => img.is_primary) || product.images?.[0];
+              
+              return (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  image={mainImage}
+                  price={resolvedPrice}
+                />
+              );
+            })}
           </div>
         )}
 
         {!loading && searchQuery && products.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-2xl text-[#888] mb-4">No products found</p>
-            <p className="text-[#666]">Try different search terms or browse our collections</p>
+          <div className="text-center py-24">
+            <p className="text-2xl font-serif text-samara-ivory/40 mb-4">No pieces found</p>
+            <p className="text-sm font-sans text-samara-ivory/40 mb-8">Try different search terms or browse our collections.</p>
             <Button
               asChild
-              className="mt-6 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
+              className="px-10 h-14 rounded-none bg-samara-gold hover:bg-samara-goldDeep text-samara-void font-sans text-[11px] tracking-[0.2em] uppercase transition-colors"
             >
               <a href="/collections">Browse Collections</a>
             </Button>
@@ -213,9 +268,11 @@ export default function SearchPage() {
         )}
 
         {!searchQuery && (
-          <div className="text-center py-16">
-            <Search className="h-16 w-16 text-[#D4AF37] mx-auto mb-4" />
-            <p className="text-xl text-[#888]">Start typing to search for products</p>
+          <div className="text-center py-24">
+            <Search className="h-12 w-12 text-samara-gold stroke-[1] mx-auto mb-6 opacity-50" />
+            <p className="text-sm font-sans tracking-widest text-samara-ivory/40 uppercase">
+              Start typing to explore
+            </p>
           </div>
         )}
       </div>

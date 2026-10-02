@@ -10,8 +10,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', 'sans-serif'],
-        serif: ['var(--font-playfair)', 'serif'],
+        sans: ['var(--font-manrope)', 'sans-serif'],
+        serif: ['var(--font-cormorant)', 'serif'],
         display: ['var(--font-cormorant)', 'serif'],
       },
       backgroundImage: {
@@ -25,6 +25,16 @@ const config: Config = {
         'luxury': '-0.02em',
       },
       colors: {
+        samara: {
+          void: '#040906',
+          void1: '#0d1c13',
+          black: '#000000',
+          charcoal: '#080808',
+          ivory: '#F5F5F0',
+          gold: '#C9A35F',
+          goldDeep: '#8A6420',
+          champagne: '#D9C08A',
+        },
         gold: {
           DEFAULT: '#D4AF37',
           light: '#F4D03F',

@@ -3,16 +3,22 @@ import "./globals.css";
 import type { Metadata } from "next";
 import ClientProviders from "./providers";
 import Script from "next/script";
-import { Playfair_Display } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 
-const playfair = Playfair_Display({
+const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
-  weight: ["600", "700", "800", "900"],
-  variable: "--font-playfair",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-cormorant",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-manrope",
 });
 
 export const metadata: Metadata = {
-  title: "Samara - Best Handcrafted Sambalpuri Sarees | Traditional Indian Sarees",
+  title: "Samara - Premium Indian Fashion | Tradition Meets Tomorrow",
   description:
     "Discover the finest handcrafted Sambalpuri sarees at Samara. Authentic traditional Indian sarees woven with heritage craftsmanship.",
   icons: {
@@ -28,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={playfair.variable}>
+    <html lang="en" className={`${cormorant.variable} ${manrope.variable}`}>
       <body className="antialiased">
         {/* Razorpay SDK - Load AFTER page is interactive */}
         <Script

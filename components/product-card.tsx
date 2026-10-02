@@ -13,7 +13,7 @@ import { ResolvedPrice } from '@/lib/resolve-product-price';
 
 interface ProductCardProps {
   product: Product;
-  image?: ProductImage;
+  image?: Partial<ProductImage> & { image_url: string; is_primary: boolean };
   price?: ResolvedPrice;
 }
 
@@ -52,10 +52,10 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group block border border-[#D4AF37]/30 hover:border-[#D4AF37] rounded-xl p-3 transition bg-black"
+      className="group block"
     >
       {/* IMAGE CONTAINER */}
-      <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-[#111]">
+      <div className="relative aspect-[3/4] overflow-hidden bg-samara-void1">
         {image ? (
           <Image
             src={image.image_url}
@@ -64,7 +64,7 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
             className="object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
+          <div className="flex items-center justify-center h-full text-samara-ivory/20 font-serif">
             No Image
           </div>
         )}
@@ -74,51 +74,56 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full h-8 w-8"
+            className="absolute top-3 right-3 bg-samara-void/50 backdrop-blur-sm hover:bg-samara-gold hover:text-samara-void border border-samara-ivory/20 rounded-full h-9 w-9 opacity-0 group-hover:opacity-100 transition-all duration-300"
             onClick={toggleWishlist}
             disabled={loading}
           >
             <Heart
-              className={`h-4 w-4 ${
-                isWishlisted ? 'fill-red-500 text-red-500' : 'text-white'
+              className={`h-4 w-4 stroke-[1.5] ${
+                isWishlisted ? 'fill-red-500 text-red-500' : 'text-samara-ivory'
               }`}
             />
           </Button>
         )}
+
+        {/* Quick View overlay */}
+        <div className="absolute inset-x-0 bottom-0 h-12 flex items-center justify-center bg-samara-void/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-full group-hover:translate-y-0">
+          <span className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory">Quick View</span>
+        </div>
       </div>
 
       {/* DETAILS SECTION */}
-      <div className="mt-3 space-y-1">
+      <div className="pt-4 space-y-2">
         {/* Title */}
-        <h3 className="text-base font-serif font-semibold text-[#D4AF37] line-clamp-2 leading-tight group-hover:text-[#F4CF57] transition-colors">
+        <h3 className="text-base font-serif text-samara-ivory line-clamp-1 leading-tight group-hover:text-samara-gold transition-colors duration-300">
           {product.name}
         </h3>
 
         {/* Brand */}
-        <p className="text-xs text-gray-400 font-medium">
-          {product.brand || 'Samara Heritage'}
+        <p className="text-[11px] font-sans tracking-wider uppercase text-samara-ivory/40">
+          {product.brand || 'Samara'}
         </p>
 
         {/* PRICE */}
         {!price ? (
-          <div className="mt-2 h-5 w-24 bg-gray-800 animate-pulse rounded" />
+          <div className="h-5 w-24 bg-samara-void1 animate-pulse" />
         ) : (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {/* Selling Price */}
-            <span className="text-base font-semibold text-[#D4AF37]">
+            <span className="text-sm font-sans tracking-wide text-samara-gold">
               {formatPriceSync(price.displayPrice, price.currency)}
             </span>
 
             {/* MRP */}
             {price.mrp && price.mrp > price.displayPrice && (
-              <span className="text-xs text-gray-500 line-through decoration-gray-600">
+              <span className="text-xs text-samara-ivory/40 line-through">
                 {formatPriceSync(price.mrp, price.currency)}
               </span>
             )}
 
             {/* Discount */}
             {price.discountPct && price.discountPct > 0 && (
-              <span className="text-[10px] font-bold text-green-400 border border-green-400/30 px-1.5 py-0.5 rounded bg-green-400/10">
+              <span className="text-[10px] font-sans tracking-wider text-green-400 bg-green-400/10 px-2 py-0.5">
                 {price.discountPct}% OFF
               </span>
             )}

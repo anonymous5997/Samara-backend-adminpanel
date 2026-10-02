@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "jetro": {
+      "type": "stdio",
+      "command": "/Users/manmath/.jetro/runtime/node-darwin-arm64",
+      "args": [
+        "/Users/manmath/.jetro/mcp-server/index.js"
+      ],
+      "env": {
+        "JET_WORKSPACE": "/Users/manmath/Samara-backend-adminpanel",
+        "JET_API_URL": "https://api.jetro.ai",
+        "PATH": "/Users/manmath/.jetro/runtime:/usr/bin:/bin:/usr/sbin:/sbin"
+      }
+    }
+  }
+}

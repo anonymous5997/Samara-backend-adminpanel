@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
+import { Toaster } from '@/components/ui/sonner';
 
 type AuthMode =
   | 'login'
@@ -269,200 +270,243 @@ export default function LoginPage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <form
-        onSubmit={onSubmit}
-        className="w-[380px] rounded-2xl border border-[#D4AF37]/40 p-8 bg-black text-white"
-      >
-        {/* LOGO */}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-[#D4AF37] text-black flex items-center justify-center font-bold text-xl">
-            S
-          </div>
-          <span className="text-[#D4AF37] text-xl font-semibold tracking-widest">
-            SAMARA
-          </span>
-        </div>
+    <>
+      <Toaster />
+      <div className="min-h-screen bg-samara-void text-samara-ivory flex items-center justify-center pt-32 pb-24 md:pb-32 px-4 relative overflow-hidden">
+        
+        {/* Decorative background element */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-samara-gold/30 to-transparent" />
+        <div className="absolute -top-[500px] -right-[500px] w-[1000px] h-[1000px] rounded-full bg-samara-gold/5 blur-[120px] pointer-events-none" />
 
-        <h2 className="text-2xl font-semibold text-[#D4AF37] text-center">
-          {mode === 'set-password' ? 'Set Password' : 'Welcome Back'}
-        </h2>
-        <p className="text-center text-gray-400 text-sm mb-6">
-          {mode === 'set-password' ? 'Secure your account' : 'Sign in to continue'}
-        </p>
-
-        {/* TABS */}
-        {mode !== 'verify-otp' && mode !== 'set-password' && (
-          <div className="flex mb-5 bg-[#111] rounded-lg p-1">
-            {['password', 'email', 'phone'].map(t => (
-              <button
-                key={t}
-                type="button"
-                className={`flex-1 py-2 rounded-md text-sm ${
-                  tab === t
-                    ? 'bg-white text-black'
-                    : 'text-gray-400'
-                }`}
-                onClick={() => {
-                  setTab(t as any);
-                  setMode('login');
-                  setIsSignupFlow(false);
-                  localStorage.removeItem('pending_name'); 
-                }}
-              >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* NAME */}
-        {mode === 'signup' && (
-          <Input
-            placeholder="Name"
-            value={form.name}
-            onChange={e => update('name', e.target.value)}
-            className="mb-3 bg-white text-black"
-          />
-        )}
-
-        {/* EMAIL / PHONE */}
-        {mode !== 'set-password' && (
-          <>
-            {tab !== 'phone' && (
-              <Input
-                placeholder="Email"
-                value={form.email}
-                onChange={e => update('email', e.target.value)}
-                className="mb-3 bg-white text-black"
-              />
-            )}
-            {tab === 'phone' && (
-              <Input
-                placeholder="Phone"
-                value={form.phone}
-                onChange={e => update('phone', e.target.value)}
-                className="mb-3 bg-white text-black"
-              />
-            )}
-          </>
-        )}
-
-        {/* PASSWORD */}
-        {(mode === 'login' && tab === 'password') || mode === 'set-password' ? (
-          <div className="relative mb-3">
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              placeholder={mode === 'set-password' ? "New Password" : "Password"}
-              value={form.password}
-              onChange={e => update('password', e.target.value)}
-              className="bg-white text-black pr-10"
-            />
-            <button
-              type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
-              onClick={() => setShowPassword(p => !p)}
-            >
-              <Eye size={18} />
-            </button>
-          </div>
-        ) : null}
-
-        {/* OTP */}
-        {mode === 'verify-otp' && (
-          <Input
-            placeholder="Enter OTP"
-            value={form.otp}
-            onChange={e => update('otp', e.target.value)}
-            className="mb-3 bg-white text-black"
-          />
-        )}
-
-        {/* SUBMIT BUTTON */}
-        <Button
-          type="submit"
-          disabled={loading}
-          className="w-full mt-2 bg-[#1a1a1a] text-white"
+        <form
+          onSubmit={onSubmit}
+          className="w-full max-w-md bg-samara-void1 border border-samara-ivory/10 p-8 md:p-12 relative z-10"
         >
-          {loading
-            ? 'Please wait...'
-            : mode === 'verify-otp'
-            ? 'Verify OTP'
-            : mode === 'signup'
-            ? 'Get OTP'
-            : mode === 'set-password'
-            ? 'Save Password & Login'
-            : tab === 'email' || tab === 'phone'
-            ? 'Send OTP'
-            : 'Sign In'}
-        </Button>
-
-        {/* SOCIAL LOGIN */}
-        {mode === 'login' && (
-          <div className="mt-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-1 h-px bg-gray-700" />
-              <span className="text-xs text-gray-400">OR CONTINUE WITH</span>
-              <div className="flex-1 h-px bg-gray-700" />
-            </div>
-            <div className="space-y-3">
-              <Button
-                type="button"
-                onClick={() => signInWithProvider('google')}
-                className="w-full bg-white text-black hover:bg-gray-200 font-medium flex items-center justify-center gap-3"
-              >
-                <Image src="/icons/google.svg" alt="Google" width={18} height={18} />
-                Continue with Google
-              </Button>
-              <Button
-                type="button"
-                onClick={() => signInWithProvider('facebook')}
-                className="w-full bg-[#1877F2] text-white hover:bg-[#145dbf] font-medium flex items-center justify-center gap-3"
-              >
-                <Image src="/icons/facebook.svg" alt="Facebook" width={18} height={18} />
-                Continue with Facebook
-              </Button>
-            </div>
+          {/* HEADER */}
+          <div className="text-center mb-10">
+            <span className="text-[10px] font-sans tracking-[0.3em] uppercase text-samara-gold mb-3 block">
+              Authentication
+            </span>
+            <h2 className="text-3xl font-serif text-samara-ivory mb-2">
+              {mode === 'set-password' ? 'Set Password' : mode === 'signup' ? 'Create Account' : 'Welcome Back'}
+            </h2>
+            <p className="text-[11px] font-sans tracking-widest uppercase text-samara-ivory/40">
+              {mode === 'set-password' ? 'Secure your account' : mode === 'signup' ? 'Join the Samara collective' : 'Sign in to continue'}
+            </p>
           </div>
-        )}
 
-        {/* FOOTER LINKS */}
-        {mode === 'login' && (
-          <div className="text-center mt-5 text-sm">
-            {tab === 'password' && (
-              <button
-                type="button"
-                className="text-[#D4AF37]"
-                onClick={() => setMode('forgot')}
-              >
-                Forgot password?
-              </button>
+          {/* TABS */}
+          {mode !== 'verify-otp' && mode !== 'set-password' && mode !== 'signup' && mode !== 'forgot' && (
+            <div className="flex mb-8 border-b border-samara-ivory/10">
+              {['password', 'email', 'phone'].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`flex-1 py-3 text-[10px] font-sans tracking-[0.2em] uppercase transition-colors relative ${
+                    tab === t
+                      ? 'text-samara-gold'
+                      : 'text-samara-ivory/40 hover:text-samara-ivory'
+                  }`}
+                  onClick={() => {
+                    setTab(t as any);
+                    setMode('login');
+                    setIsSignupFlow(false);
+                    localStorage.removeItem('pending_name'); 
+                  }}
+                >
+                  {t}
+                  {tab === t && (
+                    <div className="absolute bottom-0 left-0 w-full h-px bg-samara-gold" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {/* NAME */}
+            {mode === 'signup' && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60">Full Name</label>
+                <Input
+                  placeholder="Your Name"
+                  value={form.name}
+                  onChange={e => update('name', e.target.value)}
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors"
+                />
+              </div>
             )}
-            <div className="mt-3 text-gray-400">
-              Don&apos;t have an account?{' '}
+
+            {/* EMAIL / PHONE */}
+            {mode !== 'set-password' && (
+              <>
+                {tab !== 'phone' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60">Email Address</label>
+                    <Input
+                      placeholder="Enter your email"
+                      value={form.email}
+                      onChange={e => update('email', e.target.value)}
+                      className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors"
+                    />
+                  </div>
+                )}
+                {tab === 'phone' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60">Phone Number</label>
+                    <Input
+                      placeholder="+91 XXXXXXXXXX"
+                      value={form.phone}
+                      onChange={e => update('phone', e.target.value)}
+                      className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* PASSWORD */}
+            {(mode === 'login' && tab === 'password') || mode === 'set-password' ? (
+              <div className="space-y-2">
+                <label className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60">Password</label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder={mode === 'set-password' ? "Enter new password" : "Enter password"}
+                    value={form.password}
+                    onChange={e => update('password', e.target.value)}
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-samara-ivory/40 hover:text-samara-gold transition-colors"
+                    onClick={() => setShowPassword(p => !p)}
+                  >
+                    <Eye className="w-4 h-4 stroke-[1.5]" />
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* OTP */}
+            {mode === 'verify-otp' && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60">One Time Password</label>
+                <Input
+                  placeholder="6-digit code"
+                  value={form.otp}
+                  onChange={e => update('otp', e.target.value)}
+                  className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/20 transition-colors tracking-[0.5em] text-center"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* SUBMIT BUTTON */}
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-8 h-12 bg-samara-gold hover:bg-samara-goldDeep text-samara-void rounded-none font-sans text-[11px] tracking-[0.2em] uppercase transition-colors"
+          >
+            {loading
+              ? 'Processing...'
+              : mode === 'verify-otp'
+              ? 'Verify Code'
+              : mode === 'signup'
+              ? 'Send Code'
+              : mode === 'set-password'
+              ? 'Save & Login'
+              : tab === 'email' || tab === 'phone'
+              ? 'Send Code'
+              : 'Sign In'}
+          </Button>
+
+          {/* RESEND OTP */}
+          {mode === 'verify-otp' && (
+            <div className="mt-6 text-center">
               <button
                 type="button"
-                className="text-[#D4AF37]"
-                onClick={() => setMode('signup')}
+                disabled={cooldown > 0 || loading}
+                className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-gold border-b border-samara-gold/30 hover:border-samara-gold pb-1 disabled:opacity-50 disabled:border-transparent transition-colors"
+                onClick={sendOtp}
               >
-                Sign Up
+                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Code'}
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* RESEND OTP */}
-        {mode === 'verify-otp' && (
-          <button
-            type="button"
-            disabled={cooldown > 0 || loading}
-            className="text-xs text-[#D4AF37] mt-4 block mx-auto disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-            onClick={sendOtp}
-          >
-            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend OTP'}
-          </button>
-        )}
-      </form>
-    </div>
+          {/* SOCIAL LOGIN */}
+          {mode === 'login' && (
+            <div className="mt-8 pt-8 border-t border-samara-ivory/10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex-1 h-px bg-samara-ivory/10" />
+                <span className="text-[9px] font-sans tracking-[0.3em] uppercase text-samara-ivory/40">Or Continue With</span>
+                <div className="flex-1 h-px bg-samara-ivory/10" />
+              </div>
+              <div className="space-y-4">
+                <Button
+                  type="button"
+                  onClick={() => signInWithProvider('google')}
+                  className="w-full h-12 bg-transparent border border-samara-ivory/20 hover:border-samara-gold text-samara-ivory hover:text-samara-gold rounded-none font-sans text-[11px] tracking-[0.1em] uppercase transition-colors flex items-center justify-center gap-3"
+                >
+                  <Image src="/icons/google.svg" alt="Google" width={16} height={16} className="opacity-80 group-hover:opacity-100" />
+                  Google
+                </Button>
+                {/* 
+                <Button
+                  type="button"
+                  onClick={() => signInWithProvider('facebook')}
+                  className="w-full h-12 bg-transparent border border-samara-ivory/20 hover:border-samara-gold text-samara-ivory hover:text-samara-gold rounded-none font-sans text-[11px] tracking-[0.1em] uppercase transition-colors flex items-center justify-center gap-3"
+                >
+                  <Image src="/icons/facebook.svg" alt="Facebook" width={16} height={16} className="opacity-80 group-hover:opacity-100" />
+                  Facebook
+                </Button>
+                */}
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER LINKS */}
+          {mode === 'login' && (
+            <div className="text-center mt-8 space-y-4">
+              {tab === 'password' && (
+                <button
+                  type="button"
+                  className="block w-full text-[10px] font-sans tracking-widest uppercase text-samara-ivory/40 hover:text-samara-gold transition-colors"
+                  onClick={() => setMode('forgot')}
+                >
+                  Forgot your password?
+                </button>
+              )}
+              <div className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60">
+                New to Samara?{' '}
+                <button
+                  type="button"
+                  className="text-samara-gold hover:text-samara-goldDeep transition-colors ml-1"
+                  onClick={() => {
+                    setMode('signup');
+                    setTab('password'); // Optional default for signup
+                  }}
+                >
+                  Create Account
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {(mode === 'signup' || mode === 'forgot') && (
+            <div className="text-center mt-8">
+              <button
+                type="button"
+                className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 hover:text-samara-gold transition-colors"
+                onClick={() => setMode('login')}
+              >
+                Back to Sign In
+              </button>
+            </div>
+          )}
+        </form>
+      </div>
+    </>
   );
 }

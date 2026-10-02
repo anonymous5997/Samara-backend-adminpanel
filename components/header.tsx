@@ -3,29 +3,22 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingCart, User, Heart, Search, Menu } from 'lucide-react';
+import { ShoppingBag, User, Heart, Search, Menu, X, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useCart } from '@/lib/cart-context';
 import { Button } from '@/components/ui/button';
-import { useState, useMemo } from 'react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useState, useEffect, useMemo } from 'react';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetClose } from '@/components/ui/sheet';
 import CurrencySelector from '@/components/currency-selector';
 import type { SupportedCurrency } from '@/lib/currency-utils';
 import { setUserRegion } from '@/lib/region/client';
+import { formatPriceSync } from '@/lib/currency-utils';
 
 const navLinks = [
-  { href: '/', label: 'Home' },
   { href: '/sarees', label: 'Sarees' },
   { href: '/collections', label: 'Collections' },
   { href: '/festive-edit', label: 'Festive Edit' },
-  { href: '/about', label: 'About' },
-  { href: '/contact', label: 'Contact' },
+  { href: '/about', label: 'Our Story' },
 ];
 
 export function Header() {
@@ -33,242 +26,264 @@ export function Header() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // ✅ Step 1: Get loading state from auth
   const { user, profile, signOut, loading } = useAuth();
+  const { items, removeFromCart, updateQuantity, currency } = useCart();
   
-  const { items } = useCart();
+  const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  
+  const isHome = pathname === '/';
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const cartSubtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 
-  // Memoize currency to stop re-render loop
   const urlCurrency = useMemo(() => {
     return (searchParams.get("currency") || "INR") as SupportedCurrency;
   }, [searchParams]);
 
-  const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
-    // 1. Sync region cookie (for future requests/shipping)
-    switch (nextCurrency) {
-      case 'USD':
-        setUserRegion('US');
-        break;
-      case 'AED':
-        setUserRegion('AE');
-        break;
-      case 'CAD':
-        setUserRegion('CA');
-        break;
-      case 'GBP':
-        setUserRegion('GB');
-        break;
-      default:
-        setUserRegion('IN');
-    }
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Initial check
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-    // 2. Update URL (this is the ONLY trigger for pricing updates now)
+  const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
+    switch (nextCurrency) {
+      case 'USD': setUserRegion('US'); break;
+      case 'AED': setUserRegion('AE'); break;
+      case 'CAD': setUserRegion('CA'); break;
+      case 'GBP': setUserRegion('GB'); break;
+      default: setUserRegion('IN');
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.set("currency", nextCurrency);
-
-    // Replace URL without scrolling
-    router.replace(`${pathname}?${params.toString()}`, {
-      scroll: false,
-    });
-    
-    // ✅ ISSUE 4 FIX: Only refresh server data on shop/product pages
-    // This keeps the Home page fast and instant
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     if (pathname.startsWith("/shop") || pathname.startsWith("/products")) {
       router.refresh(); 
     }
   };
 
-  // ✅ ISSUE 2 FIX: Prevent header flicker while auth is loading
-  if (loading) {
-    return (
-      <header className="sticky top-0 z-[999] w-full bg-[#050505] border-b border-[#D4AF37]/20">
+  const headerBgClass = (isHome && !isScrolled) ? 'bg-transparent' : 'bg-samara-void1/95 backdrop-blur-md shadow-md';
+  const textColorClass = 'text-samara-ivory'; 
+  const logoSrc = '/samara-logo.png'; // Assuming white/gold logo for dark backgrounds
+
+  return (
+    <>
+      <header className={`fixed top-0 inset-x-0 z-[100] w-full transition-all duration-500 ease-out border-b border-samara-gold/10 ${headerBgClass}`}>
         <div className="container mx-auto px-4 md:px-8">
-          <div className="flex h-[72px] items-center justify-between">
-            {/* Logo Placeholder */}
-            <div className="flex items-center gap-4 h-full opacity-50">
-              <div className="relative h-14 w-44 flex items-center">
-                 {/* Keep logo visible but static */}
-                 <Image
-                  src="/samara-logo.png"
-                  alt="Loading..."
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
+          <div className={`flex items-center justify-between transition-all duration-500 ${isScrolled ? 'h-20' : 'h-24'}`}>
+            
+            {/* LEFT: Mobile Menu Toggle & Desktop Nav */}
+            <div className="flex-1 flex items-center justify-start gap-8">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <button className="lg:hidden p-2 -ml-2 text-samara-ivory hover:text-samara-gold transition-colors">
+                    <Menu className="w-6 h-6 stroke-[1.5]" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[300px] sm:w-[400px] bg-samara-void1 border-r border-samara-gold/10 p-0 flex flex-col z-[1000]">
+                  <SheetHeader className="p-6 text-left border-b border-samara-gold/10">
+                    <SheetTitle className="text-samara-gold font-serif text-2xl tracking-wide">Menu</SheetTitle>
+                  </SheetHeader>
+                  <div className="flex-1 overflow-y-auto py-6 px-6 flex flex-col gap-6">
+                    <nav className="flex flex-col gap-4">
+                      {navLinks.map(link => (
+                        <Link 
+                          key={link.href} href={link.href} 
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="text-lg font-serif tracking-wide text-samara-ivory hover:text-samara-gold transition-colors"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </nav>
+                    <div className="h-[1px] w-full bg-samara-gold/10" />
+                    <div className="flex flex-col gap-4">
+                      {user ? (
+                        <>
+                          <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="text-sm font-sans tracking-widest uppercase text-samara-ivory/70 hover:text-samara-gold">My Account</Link>
+                          <Link href="/orders" onClick={() => setMobileMenuOpen(false)} className="text-sm font-sans tracking-widest uppercase text-samara-ivory/70 hover:text-samara-gold">Orders</Link>
+                          <Link href="/wishlist" onClick={() => setMobileMenuOpen(false)} className="text-sm font-sans tracking-widest uppercase text-samara-ivory/70 hover:text-samara-gold">Wishlist</Link>
+                          {profile?.role === 'admin' && (
+                            <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="text-sm font-sans tracking-widest uppercase text-samara-gold">Admin Panel</Link>
+                          )}
+                          <button onClick={() => { signOut(); setMobileMenuOpen(false); }} className="text-left text-sm font-sans tracking-widest uppercase text-samara-ivory/70 hover:text-samara-gold">Sign Out</button>
+                        </>
+                      ) : (
+                        <>
+                          <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)} className="text-sm font-sans tracking-widest uppercase text-samara-ivory/70 hover:text-samara-gold">Sign In</Link>
+                          <Link href="/auth/signup" onClick={() => setMobileMenuOpen(false)} className="text-sm font-sans tracking-widest uppercase text-samara-ivory/70 hover:text-samara-gold">Create Account</Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-6 border-t border-samara-gold/10">
+                    <p className="text-xs uppercase tracking-widest text-samara-gold mb-3">Currency</p>
+                    <CurrencySelector currency={urlCurrency} onChange={handleCurrencyChange} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              <nav className="hidden lg:flex items-center gap-8">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`text-[13px] font-sans tracking-[0.1em] uppercase ${textColorClass} hover:text-samara-gold transition-colors duration-300 relative group`}
+                  >
+                    {link.label}
+                    <span className="absolute -bottom-1 left-0 w-0 h-[1px] bg-samara-gold transition-all duration-300 group-hover:w-full"></span>
+                  </Link>
+                ))}
+              </nav>
             </div>
-            {/* Empty Right Side to prevent layout shift */}
-            <div className="flex items-center gap-4" />
+
+            {/* CENTER: Logo */}
+            <div className="flex-1 flex justify-center">
+              <Link href="/" className="relative flex items-center justify-center">
+                <div className={`relative transition-all duration-500 ease-out ${isScrolled ? 'h-10 w-32' : 'h-14 w-44'}`}>
+                  {!loading && (
+                    <Image
+                      src={logoSrc}
+                      alt="Samara"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  )}
+                </div>
+              </Link>
+            </div>
+
+            {/* RIGHT: Utilities */}
+            <div className="flex-1 flex items-center justify-end gap-3 sm:gap-5">
+              <div className="hidden xl:block">
+                <CurrencySelector currency={urlCurrency} onChange={handleCurrencyChange} />
+              </div>
+
+              <Link href="/search" className={`p-2 ${textColorClass} hover:text-samara-gold transition-colors`}>
+                <Search className="w-5 h-5 stroke-[1.5]" />
+              </Link>
+
+              {user ? (
+                <Link href="/profile" className={`hidden md:block p-2 ${textColorClass} hover:text-samara-gold transition-colors`}>
+                  <User className="w-5 h-5 stroke-[1.5]" />
+                </Link>
+              ) : (
+                <Link href="/auth/login" className={`hidden md:block text-[13px] font-sans tracking-[0.1em] uppercase ${textColorClass} hover:text-samara-gold transition-colors`}>
+                  Login
+                </Link>
+              )}
+
+              {user && (
+                <Link href="/wishlist" className={`hidden md:block p-2 ${textColorClass} hover:text-samara-gold transition-colors`}>
+                  <Heart className="w-5 h-5 stroke-[1.5]" />
+                </Link>
+              )}
+
+              <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+                <SheetTrigger asChild>
+                  <button className={`p-2 relative flex items-center ${textColorClass} hover:text-samara-gold transition-colors group`}>
+                    <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
+                    <span className="ml-1.5 text-[11px] font-sans tracking-widest pt-0.5 group-hover:text-samara-gold transition-colors">
+                      ({cartItemsCount})
+                    </span>
+                  </button>
+                </SheetTrigger>
+                
+                {/* CART DRAWER CONTENT */}
+                <SheetContent side="right" className="w-[100vw] sm:w-[450px] bg-samara-void border-l border-samara-gold/10 p-0 flex flex-col z-[1000]">
+                  <SheetHeader className="p-6 border-b border-samara-gold/10 flex flex-row items-center justify-between">
+                    <SheetTitle className="text-samara-gold font-serif text-2xl tracking-wide">Your Bag ({cartItemsCount})</SheetTitle>
+                  </SheetHeader>
+                  
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {items.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
+                        <ShoppingBag className="w-12 h-12 stroke-[1] text-samara-gold/50" />
+                        <div>
+                          <p className="font-serif text-xl text-samara-ivory mb-2">Your bag is empty.</p>
+                          <p className="text-sm font-sans text-samara-ivory/60 italic">Every story begins somewhere.</p>
+                        </div>
+                        <SheetClose asChild>
+                          <Button className="mt-4 bg-samara-gold hover:bg-samara-goldDeep text-samara-void font-sans tracking-widest uppercase rounded-none">
+                            Shop Best Sellers
+                          </Button>
+                        </SheetClose>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {items.map((item) => (
+                          <div key={item.id} className="flex gap-4 group">
+                            <div className="relative w-24 h-32 bg-samara-void1 shrink-0 overflow-hidden">
+                              {item.image_url ? (
+                                <Image src={item.image_url} alt={item.product.name} fill className="object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xs text-samara-gold/40">No Image</div>
+                              )}
+                            </div>
+                            <div className="flex-1 flex flex-col justify-between py-1">
+                              <div>
+                                <Link href={`/products/${item.product.slug}`} onClick={() => setCartOpen(false)}>
+                                  <h4 className="font-serif text-lg text-samara-ivory group-hover:text-samara-gold transition-colors line-clamp-2">{item.product.name}</h4>
+                                </Link>
+                                {item.variant?.size && (
+                                  <p className="text-xs font-sans text-samara-ivory/60 mt-1">Size: {item.variant.size}</p>
+                                )}
+                                <p className="text-sm font-sans tracking-wide text-samara-gold mt-2">
+                                  {formatPriceSync(item.unit_price, urlCurrency)}
+                                </p>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center border border-samara-ivory/20 rounded-none">
+                                  <button onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} className="px-3 py-1 text-samara-ivory hover:text-samara-gold transition-colors">-</button>
+                                  <span className="px-2 text-sm text-samara-ivory">{item.quantity}</span>
+                                  <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="px-3 py-1 text-samara-ivory hover:text-samara-gold transition-colors">+</button>
+                                </div>
+                                <button onClick={() => removeFromCart(item.id)} className="text-xs font-sans uppercase tracking-widest text-samara-ivory/50 hover:text-red-400 transition-colors underline underline-offset-4">
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {items.length > 0 && (
+                    <div className="p-6 border-t border-samara-gold/10 bg-samara-void1">
+                      <div className="flex justify-between items-center mb-6">
+                        <span className="font-sans text-sm tracking-widest uppercase text-samara-ivory/80">Subtotal</span>
+                        <span className="font-serif text-2xl text-samara-gold">{formatPriceSync(cartSubtotal, urlCurrency)}</span>
+                      </div>
+                      <SheetClose asChild>
+                        <Link href="/checkout" className="w-full">
+                          <Button className="w-full h-14 bg-samara-ivory hover:bg-samara-gold text-samara-void font-sans tracking-[0.2em] uppercase rounded-none transition-colors group flex items-center justify-center">
+                            Proceed to Checkout
+                            <ArrowRight className="w-4 h-4 ml-3 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
+                          </Button>
+                        </Link>
+                      </SheetClose>
+                      <SheetClose asChild>
+                         <Link href="/cart" className="w-full mt-3 flex justify-center text-[10px] tracking-widest uppercase text-samara-ivory/60 hover:text-samara-gold underline underline-offset-4">
+                            View Bag
+                         </Link>
+                      </SheetClose>
+                    </div>
+                  )}
+                </SheetContent>
+              </Sheet>
+
+            </div>
           </div>
         </div>
       </header>
-    );
-  }
-
-  return (
-    <header className="sticky top-0 z-[999] w-full bg-[#050505] border-b border-[#D4AF37]/20">
-      <div className="container mx-auto px-4 md:px-8">
-        <div className="flex h-[72px] items-center justify-between">
-          {/* LEFT: Logo */}
-          <div className="flex items-center gap-4 h-full">
-            <Link href="/" className="flex items-center group">
-              <div className="relative h-14 w-44 flex items-center">
-                <Image
-                  src="/samara-logo.png"
-                  alt="Samara - Woven for every woman"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-            </Link>
-          </div>
-
-          {/* CENTER: nav (desktop) */}
-          <nav className="hidden lg:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-[#F5F5F5] hover:text-[#F4D03F] transition-colors duration-300 tracking-wide hover:underline underline-offset-4"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* RIGHT: actions */}
-          <div className="flex items-center gap-4">
-            
-            {/* DESKTOP CURRENCY SELECTOR */}
-            <div className="hidden md:block">
-              <CurrencySelector 
-                currency={urlCurrency} 
-                onChange={handleCurrencyChange} 
-              />
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="hidden md:inline-flex text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-            >
-              <Link href="/search">
-                <Search className="h-5 w-5" />
-              </Link>
-            </Button>
-
-            {user && (
-              <Button
-                variant="ghost"
-                size="icon"
-                asChild
-                className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-              >
-                <Link href="/wishlist">
-                  <Heart className="h-5 w-5" />
-                </Link>
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="relative text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-            >
-              <Link href="/cart" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartItemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#D4AF37] text-xs text-black flex items-center justify-center font-semibold">
-                    {cartItemsCount}
-                  </span>
-                )}
-              </Link>
-            </Button>
-
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-                  >
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[1000] bg-[#111111] border-[#D4AF37]/20">
-                  <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                    <Link href="/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                    <Link href="/orders">Orders</Link>
-                  </DropdownMenuItem>
-                  {profile?.role === 'admin' && (
-                    <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                      <Link href="/admin">Admin Panel</Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={signOut} className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button asChild size="sm" className="bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold rounded-full px-6">
-                <Link href="/auth/login">Sign In</Link>
-              </Button>
-            )}
-
-            {/* MOBILE MENU SHEET */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              
-              {/* ✅ ISSUE FIX: Added overflow-y-auto for scrolling */}
-              <SheetContent 
-                side="left" 
-                className="fixed inset-y-0 left-0 z-[1000] bg-[#000000] border-[#D4AF37]/20 overflow-y-auto"
-              >
-                
-                {/* ✅ ISSUE FIX: Added pb-24 for safe bottom spacing */}
-                <nav className="flex flex-col gap-4 mt-8 pb-24">
-                  {navLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="text-lg font-medium text-[#F5F5F5] hover:text-[#D4AF37] transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
-
-                {/* MOBILE CURRENCY SELECTOR */}
-                <div className="mt-8 pt-6 border-t border-[#D4AF37]/20">
-                  <p className="text-sm font-medium text-[#D4AF37] mb-3">Currency</p>
-                  <div className="w-full">
-                    <CurrencySelector
-                      currency={urlCurrency}
-                      onChange={handleCurrencyChange}
-                    />
-                  </div>
-                </div>
-
-              </SheetContent>
-            </Sheet>
-          </div>
-        </div>
-      </div>
-    </header>
+      
+      {/* Ghost div to prevent content from jumping under fixed header on non-home pages */}
+      {!isHome && <div className="h-24 w-full" />}
+    </>
   );
 }
 

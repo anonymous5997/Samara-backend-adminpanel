@@ -209,7 +209,7 @@
     font-weight: 400;
   }
 
-  /* Headings use classic luxury serif stack */
+  /* Original global typography kept mostly unchanged to avoid breaking admin */
   h1, h2, h3, h4, h5 {
     font-family: var(--font-playfair), "Playfair Display", serif;
     font-weight: 800;
@@ -225,5 +225,57 @@
   @media (max-width: 768px) {
     h1 { font-size: 2.5rem; }
     h2 { font-size: 2rem; }
+  }
+}
+
+/* =====================================================
+   5. STOREFRONT SPECIFIC STYLES (Redesign)
+===================================================== */
+.storefront {
+  font-family: var(--font-manrope), "Manrope", sans-serif;
+  color: theme("colors.samara.ivory");
+}
+
+.storefront h1, .storefront h2, .storefront h3, .storefront h4, .storefront h5 {
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  color: theme("colors.samara.ivory");
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.storefront h1 { font-size: clamp(2.5rem, 5vw, 4.5rem); line-height: 1.1; }
+.storefront h2 { font-size: clamp(2rem, 4vw, 3.5rem); line-height: 1.15; }
+.storefront h3 { font-size: clamp(1.5rem, 3vw, 2.5rem); line-height: 1.2; }
+
+.storefront a {
+  transition: color 0.3s ease;
+}
+
+.storefront input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* =====================================================
+   6. SCROLLBAR UTILITIES
+===================================================== */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* =====================================================
+   7. REDUCED MOTION SUPPORT
+===================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

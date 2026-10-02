@@ -1,11 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
 
-// Define interface for the slide data
 export interface HeroSlide {
   id: string;
   title: string;
@@ -14,182 +12,206 @@ export interface HeroSlide {
   cta_url: string | null;
   media_url: string | null;
   media_type: 'image' | 'video';
-  // Allow flexible properties from DB
   [key: string]: any; 
 }
 
+const FALLBACK_SLIDES: HeroSlide[] = [
+  {
+    id: 'fallback-1',
+    title: 'Timeless',
+    subtitle: 'Woven for every woman',
+    cta_label: 'Explore Collection',
+    cta_url: '/collections',
+    media_url: '/img_2601.jpeg',
+    media_type: 'image',
+  }
+];
+
 export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
+  const activeSlides = slides && slides.length > 0 ? slides : FALLBACK_SLIDES;
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   
+  // Start the first animation trigger
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   // Auto rotate logic
   useEffect(() => {
-    if (slides.length === 0) return;
-
+    if (activeSlides.length <= 1) return;
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
-
+      goToSlide((currentSlide + 1) % activeSlides.length);
+    }, 7000); // Slower, more cinematic
     return () => clearInterval(timer);
-  }, [slides.length]);
+  }, [activeSlides.length, currentSlide]);
 
-  const nextSlide = (e?: React.MouseEvent) => {
-    e?.preventDefault(); // Prevent link navigation when clicking controls
-    e?.stopPropagation();
-    if (isAnimating || slides.length === 0) return;
+  const goToSlide = useCallback((index: number) => {
+    if (isAnimating || activeSlides.length <= 1) return;
     setIsAnimating(true);
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-    setTimeout(() => setIsAnimating(false), 600);
-  };
+    setCurrentSlide(index);
+    setTimeout(() => setIsAnimating(false), 1200); // 1.2s transition
+  }, [isAnimating, activeSlides.length]);
 
-  const prevSlide = (e?: React.MouseEvent) => {
-    e?.preventDefault(); // Prevent link navigation when clicking controls
+  const nextSlide = useCallback((e?: React.MouseEvent) => {
+    e?.preventDefault();
     e?.stopPropagation();
-    if (isAnimating || slides.length === 0) return;
-    setIsAnimating(true);
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-    setTimeout(() => setIsAnimating(false), 600);
-  };
+    goToSlide((currentSlide + 1) % activeSlides.length);
+  }, [currentSlide, activeSlides.length, goToSlide]);
 
-  // Safe Fallback
-  if (slides.length === 0) {
-    return (
-      <section className="h-[70vh] bg-black flex items-center justify-center">
-        <div className="text-[#D4AF37] font-serif text-xl">
-          Loading...
-        </div>
-      </section>
-    );
+  const prevSlide = useCallback((e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    goToSlide((currentSlide - 1 + activeSlides.length) % activeSlides.length);
+  }, [currentSlide, activeSlides.length, goToSlide]);
+
+  const slide = activeSlides[currentSlide];
+
+  // If we split title by space, we can italicize the last word
+  const splitTitle = slide.title ? slide.title.split(' ') : [];
+  let mainTitle = '';
+  let italicWord = '';
+  if (splitTitle.length > 1) {
+    italicWord = splitTitle.pop() || '';
+    mainTitle = splitTitle.join(' ');
+  } else {
+    mainTitle = slide.title || '';
   }
 
-  const slide = slides[currentSlide];
+  return (
+    <section className="relative h-[100svh] min-h-[600px] w-full overflow-hidden bg-samara-void">
+      {/* BACKGROUNDS */}
+      {activeSlides.map((s, index) => {
+        const isActive = index === currentSlide;
+        return (
+          <div
+            key={s.id}
+            className={`absolute inset-0 transition-all duration-[1200ms] cubic-bezier(0.22, 0.61, 0.21, 1) ${
+              isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
+            }`}
+          >
+            {s.media_url ? (
+              s.media_type === 'video' ? (
+                <video
+                  src={s.media_url}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className={`w-full h-full object-cover transition-transform duration-[1200ms] ${
+                    hasMounted && isActive ? 'scale-100' : 'scale-110'
+                  }`}
+                />
+              ) : (
+                <div className={`w-full h-full overflow-hidden ${hasMounted ? '' : '[clip-path:inset(10%)]'} transition-[clip-path] duration-[1500ms] cubic-bezier(0.22, 0.61, 0.21, 1)`}>
+                  <img
+                    src={s.media_url}
+                    alt={s.title}
+                    className={`w-full h-full object-cover object-top transition-transform duration-[10000ms] ease-out ${
+                      hasMounted && isActive ? 'scale-100' : 'scale-110'
+                    }`}
+                  />
+                </div>
+              )
+            ) : (
+              <div className="w-full h-full bg-samara-void flex items-center justify-center">
+                <ImageIcon className="w-16 h-16 text-samara-gold/20" />
+              </div>
+            )}
+            
+            {/* Soft gradient overlay for text readability only at bottom center */}
+            <div className="absolute inset-0 bg-gradient-to-t from-samara-void/80 via-transparent to-samara-void/30 pointer-events-none" />
+          </div>
+        );
+      })}
 
-  // Helper to render the inner content so we don't duplicate code
-  const HeroContent = () => (
-    <>
-      {/* LEFT: Text */}
-      <div
-        className="space-y-8 transition-opacity duration-700 ease-in-out lg:pl-24 lg:pt-20 lg:max-w-[540px]"
-      >
-        <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[#D4AF37] tracking-tight">
-          {slide.title}
-        </h1>
+      {/* TEXT CONTENT - Centered Editorial Layout */}
+      <div className="absolute inset-0 z-20 flex flex-col items-center justify-end md:justify-center text-center pb-24 md:pb-0 px-6">
+        
+        {/* SMALL LOGO OR IDENTIFIER (Optional) */}
+        <div className={`overflow-hidden mb-6 transition-all duration-[800ms] delay-300 ${hasMounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <span className="text-[10px] font-sans tracking-[0.4em] uppercase text-samara-gold">Samara</span>
+        </div>
 
+        {/* HERO TITLE */}
+        <div className="overflow-hidden mb-6">
+          <h1
+            key={`title-${currentSlide}`}
+            className={`font-serif text-5xl sm:text-7xl md:text-8xl lg:text-[8rem] text-samara-ivory leading-[0.9] tracking-tight transition-all duration-[1000ms] cubic-bezier(0.22, 0.61, 0.21, 1) ${
+              hasMounted && !isAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-[20%]'
+            }`}
+            style={{ transitionDelay: '400ms' }}
+          >
+            {mainTitle} <br className="hidden md:block" /><em className="italic font-light text-samara-gold pr-2">{italicWord}</em>
+          </h1>
+        </div>
+
+        {/* SUBTITLE */}
         {slide.subtitle && (
-          <p className="text-lg md:text-xl text-[#F5F5F5] leading-[150%] max-w-xl">
-            {slide.subtitle}
-          </p>
+          <div className="overflow-hidden mb-10 max-w-md mx-auto">
+            <p
+              key={`sub-${currentSlide}`}
+              className={`text-sm md:text-base font-sans text-samara-ivory/80 tracking-wide leading-relaxed transition-all duration-[800ms] cubic-bezier(0.22, 0.61, 0.21, 1) ${
+                hasMounted && !isAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+              }`}
+              style={{ transitionDelay: '600ms' }}
+            >
+              {slide.subtitle}
+            </p>
+          </div>
         )}
 
+        {/* CTA BUTTON */}
         {slide.cta_label && slide.cta_url && (
-          // We use a div here instead of a Link to avoid nested <a> tags if the parent is a Link
-          // The parent Link handles the navigation
-          <div className="inline-block">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold px-10 py-6 text-lg transition-all duration-300 hover:scale-105 pointer-events-none" // pointer-events-none allows clicks to pass through to parent Link
+          <div
+            key={`cta-${currentSlide}`}
+            className={`transition-all duration-[800ms] cubic-bezier(0.22, 0.61, 0.21, 1) ${
+              hasMounted && !isAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+            style={{ transitionDelay: '800ms' }}
+          >
+            <Link
+              href={slide.cta_url}
+              className="inline-block border-b border-samara-gold text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory hover:text-samara-gold pb-1 transition-colors"
             >
               {slide.cta_label}
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* RIGHT: Image / Video */}
-      <div className="relative flex justify-center lg:justify-end lg:ml-20">
-        {/* Added active:scale for touch feedback */}
-        <div className="w-full max-w-[420px] h-[420px] sm:h-[520px] md:h-[600px] rounded-2xl bg-gradient-to-br from-[#2a2a2a] via-[#1a1a1a] to-[#0a0a0a] border border-[#D4AF37] shadow-2xl shadow-[#D4AF37]/30 overflow-hidden flex items-center justify-center transition-transform active:scale-[0.98] duration-200">
-
-          {slide.media_url ? (
-            slide.media_type === 'video' ? (
-              <video
-                src={slide.media_url}
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="w-full h-full object-cover rounded-2xl"
-              />
-            ) : (
-              <img
-                src={slide.media_url}
-                alt={slide.title}
-                className="w-full h-full object-cover rounded-2xl"
-              />
-            )
-          ) : (
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-[#D4AF37]/20 to-[#D4AF37]/5 flex items-center justify-center">
-                <ImageIcon className="h-10 w-10 text-[#D4AF37]/60" />
-              </div>
-              <p className="text-[#D4AF37]/70 font-serif text-xl font-semibold">
-                Hero Media
-              </p>
-            </div>
-          )}
-
-        </div>
-      </div>
-    </>
-  );
-
-  return (
-    <section className="relative bg-[#000000] overflow-hidden pt-20 md:pt-24 lg:pt-28 pb-20">
-      <div className="container mx-auto px-4 md:px-8">
-        
-        {/* ✅ FIX: Wrap grid in Link if URL exists */}
-        {slide.cta_url ? (
-          <Link href={slide.cta_url} className="block group">
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.9fr] gap-12 lg:gap-24 items-center max-w-7xl mx-auto cursor-pointer">
-              <HeroContent />
-            </div>
-          </Link>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.9fr] gap-12 lg:gap-24 items-center max-w-7xl mx-auto">
-            <HeroContent />
+            </Link>
           </div>
         )}
 
-        {/* Controls - Added z-index to stay above the Link wrapper */}
-        <div className="relative z-10 flex items-center justify-between mt-12 max-w-7xl mx-auto px-4">
-          <button
-            onClick={prevSlide}
-            disabled={isAnimating}
-            className="w-12 h-12 rounded-full border-2 border-[#D4AF37]/40 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          >
-            <ChevronLeft className="h-6 w-6 text-[#D4AF37]" />
-          </button>
-
-          <div className="flex gap-2">
-            {slides.map((_, index) => (
-              <button
-                key={index}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (!isAnimating) {
-                    setIsAnimating(true);
-                    setCurrentSlide(index);
-                    setTimeout(() => setIsAnimating(false), 600);
-                  }
-                }}
-                className={`h-2 rounded-full transition-all ${
-                  index === currentSlide
-                    ? 'w-8 bg-[#D4AF37]'
-                    : 'w-2 bg-[#D4AF37]/30'
-                }`}
-              />
-            ))}
+        {/* SCROLL INDICATOR */}
+        <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 transition-all duration-1000 delay-1000 ${hasMounted ? 'opacity-100' : 'opacity-0'}`}>
+          <span className="text-[9px] font-sans tracking-[0.3em] uppercase text-samara-ivory/40">Scroll</span>
+          <div className="w-[1px] h-8 bg-samara-ivory/20 overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-full bg-samara-gold animate-[scrollDown_2s_ease-in-out_infinite]" />
           </div>
-
-          <button
-            onClick={nextSlide}
-            disabled={isAnimating}
-            className="w-12 h-12 rounded-full border-2 border-[#D4AF37]/40 hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          >
-            <ChevronRight className="h-6 w-6 text-[#D4AF37]" />
-          </button>
         </div>
       </div>
+
+      {/* NAVIGATION INDICATORS - Side dots if more than 1 slide */}
+      {activeSlides.length > 1 && (
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3">
+          {activeSlides.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-[2px] transition-all duration-500 ${
+                index === currentSlide ? 'h-8 bg-samara-gold' : 'h-3 bg-samara-ivory/20 hover:bg-samara-ivory/50'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes scrollDown {
+          0% { transform: translateY(-100%); }
+          50% { transform: translateY(0); }
+          100% { transform: translateY(100%); }
+        }
+      `}} />
     </section>
   );
 }

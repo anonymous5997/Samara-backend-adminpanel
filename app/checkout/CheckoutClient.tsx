@@ -12,10 +12,7 @@ import { supabase } from '@/lib/supabase/client';
 import { formatPriceSync } from '@/lib/currency-utils';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
-// ✅ Step 1: Import Analytics Tracker
 import { trackAnalyticsEvent } from '@/lib/analytics.client';
-
-// ✅ Step 4 Import Helpers
 import { getCountries, getStatesByCountry } from '@/lib/location';
 
 declare global {
@@ -28,28 +25,31 @@ declare global {
 const selectStyles = {
   control: (base: any) => ({
     ...base,
-    backgroundColor: '#000',
-    borderColor: '#374151', // gray-700
-    color: 'white',
-    minHeight: '2.5rem',
-    borderRadius: '0.375rem', // rounded-md
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 230, 0.2)', // samara-ivory/20
+    color: 'rgba(255, 255, 230, 1)',
+    minHeight: '3rem',
+    borderRadius: '0', // rounded-none
+    fontSize: '0.875rem',
+    fontFamily: 'Manrope, sans-serif',
   }),
   menu: (base: any) => ({
     ...base,
-    backgroundColor: '#111',
-    color: 'white',
-    border: '1px solid #333',
+    backgroundColor: '#0a0a0a', // samara-void1
+    color: 'rgba(255, 255, 230, 1)',
+    border: '1px solid rgba(255, 255, 230, 0.1)',
     zIndex: 50,
   }),
   option: (base: any, state: any) => ({
     ...base,
-    backgroundColor: state.isFocused ? '#333' : '#111',
-    color: 'white',
+    backgroundColor: state.isFocused ? 'rgba(212,175,55,0.1)' : 'transparent',
+    color: state.isFocused ? '#D4AF37' : 'rgba(255, 255, 230, 1)',
     cursor: 'pointer',
+    fontSize: '0.875rem',
   }),
-  singleValue: (base: any) => ({ ...base, color: 'white' }),
-  input: (base: any) => ({ ...base, color: 'white' }),
-  placeholder: (base: any) => ({ ...base, color: '#6b7280' }), // gray-500
+  singleValue: (base: any) => ({ ...base, color: 'rgba(255, 255, 230, 1)' }),
+  input: (base: any) => ({ ...base, color: 'rgba(255, 255, 230, 1)' }),
+  placeholder: (base: any) => ({ ...base, color: 'rgba(255, 255, 230, 0.4)' }),
 };
 
 export default function CheckoutClient() {
@@ -141,14 +141,12 @@ export default function CheckoutClient() {
       city: profile.city || '',
       state: profile.state || '',
       pincode: profile.pin || '',
-      // Ensure country defaults to IN if not present, or use profile country code
       country: 'IN', 
     }));
   }, [profile]);
 
   /* ---------------- PIN CODE AUTO-FETCH (Step 8) ---------------- */
   const fetchAddressFromPincode = async (pincode: string) => {
-    // Only fetch for India and valid length
     if (formData.country !== 'IN' || pincode.length !== 6) return;
   
     try {
@@ -162,7 +160,7 @@ export default function CheckoutClient() {
           ...prev,
           city: po.Block || po.Name,
           district: po.District,
-          state: po.State, // This should match a label in stateOptions
+          state: po.State,
         }));
         toast.success("Address details fetched!");
       } else {
@@ -319,7 +317,6 @@ export default function CheckoutClient() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
       if (itemsError) throw itemsError;
 
-      // ✅ Step 3: Track Checkout Started (Correctly placed)
       await trackAnalyticsEvent('checkout_started', undefined, order.id, auth.user.id);
 
       const razorpay = new window.Razorpay({
@@ -329,13 +326,7 @@ export default function CheckoutClient() {
         name: 'Samara',
         description: `Order #${order.id}`,
         
-        // ----------------------------------------------------
-        // ✅ UPDATED HANDLER with Analytics & Sales Count
-        // ----------------------------------------------------
         handler: async (response: any) => {
-          console.log("✅ Razorpay payment success triggered");
-
-          // 1. Update order payment
           await supabase
             .from('orders')
             .update({
@@ -344,7 +335,6 @@ export default function CheckoutClient() {
             })
             .eq('id', order.id);
 
-          // 2. Track Checkout Completed Event
           await trackAnalyticsEvent(
             'checkout_completed',
             undefined,
@@ -352,16 +342,13 @@ export default function CheckoutClient() {
             auth.user.id
           );
 
-          // 3. Increment Saree Sales Stats
           await supabase.rpc('increment_saree_sales_today', {
             quantity: items.reduce((sum, i) => sum + i.quantity, 0)
           });
 
-          // 4. Clean up
           if (!isBuyNow) await clearCart();
           sessionStorage.removeItem('buynow_product');
 
-          // 5. Redirect with slight delay
           setTimeout(() => {
             router.replace(`/orders/${order.id}`);
           }, 800);
@@ -392,254 +379,269 @@ export default function CheckoutClient() {
   return (
     <>
       <Toaster />
-      <div className="min-h-screen bg-black text-white px-4 py-10">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-extrabold tracking-widest font-serif text-[#D4AF37]">
-            CHECKOUT
-          </h1>
-        </div>
+      <div className="bg-samara-void text-samara-ivory min-h-screen pt-32 pb-24 md:pb-32">
+        <div className="container mx-auto px-6 md:px-12 lg:px-16 max-w-7xl">
+          <div className="flex flex-col items-center justify-center mb-16 text-center">
+            <span className="text-[10px] font-sans tracking-[0.3em] uppercase text-samara-gold mb-4 block">
+              Secure Payment
+            </span>
+            <h1 className="text-4xl md:text-5xl font-serif text-samara-ivory">
+              <em className="italic text-samara-gold">Checkout</em>
+            </h1>
+          </div>
 
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Shipping Form */}
-          <form
-            onSubmit={handleSubmit}
-            className="lg:col-span-2 space-y-4 border border-[#D4AF37]/30 rounded-xl p-6 bg-[#0b0b0b]"
-          >
-            <h2 className="text-xl font-bold text-[#D4AF37] mb-4 font-serif">
-              Shipping Details
-            </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16">
+            
+            {/* Shipping Form */}
+            <form
+              onSubmit={handleSubmit}
+              className="lg:col-span-2 space-y-8 bg-samara-void1 border border-samara-ivory/10 p-8 md:p-12"
+            >
+              <h2 className="text-xl md:text-2xl font-serif text-samara-gold border-b border-samara-ivory/10 pb-4">
+                Shipping Details
+              </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Name */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Name</label>
-                <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
-                  placeholder="Full Name"
-                  required
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Email</label>
-                <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
-                  placeholder="Email Address"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={e => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Phone</label>
-                <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
-                  placeholder="Phone Number"
-                  required
-                  value={formData.phone}
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-
-              {/* ✅ STEP 6: Country Dropdown */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">
-                  Country
-                </label>
-                <Select
-                  options={countryOptions}
-                  value={countryOptions.find(c => c.value === formData.country)}
-                  onChange={(option: any) =>
-                    setFormData({
-                      ...formData,
-                      country: option.value,
-                      state: '',
-                      city: '',
-                      district: '',
-                      pincode: '',
-                    })
-                  }
-                  isSearchable
-                  styles={selectStyles}
-                />
-              </div>
-
-              {/* Address (Full width) */}
-              <div className="md:col-span-2">
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Address</label>
-                <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
-                  placeholder="Street Address, Apt, Suite, etc."
-                  required
-                  value={formData.address}
-                  onChange={e => setFormData({ ...formData, address: e.target.value })}
-                />
-              </div>
-
-              {/* ✅ STEP 8: Pincode */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Pincode / Zip</label>
-                <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
-                  placeholder="PINCODE"
-                  value={formData.pincode}
-                  onChange={e => {
-                    const value = e.target.value;
-                    setFormData({ ...formData, pincode: value });
-                    // Trigger fetch for India only
-                    if (formData.country === 'IN' && value.length === 6) {
-                      fetchAddressFromPincode(value);
-                    }
-                  }}
-                  required={formData.country === 'IN'}
-                />
-              </div>
-
-              {/* ✅ STEP 7: State Dropdown */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">
-                  State / Province
-                </label>
-                <Select
-                  options={stateOptions}
-                  // We store the Label (Name) in formData.state, so we find by label for display
-                  value={stateOptions.find(s => s.label === formData.state)}
-                  onChange={(option: any) =>
-                    setFormData({ ...formData, state: option.label })
-                  }
-                  isSearchable
-                  isDisabled={stateOptions.length === 0}
-                  placeholder={stateOptions.length === 0 ? "Select Country First" : "Select State"}
-                  styles={selectStyles}
-                />
-              </div>
-
-              {/* ✅ STEP 9: City Input */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">City</label>
-                <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37] disabled:opacity-50"
-                  placeholder="City"
-                  required
-                  value={formData.city}
-                  onChange={e => setFormData({ ...formData, city: e.target.value })}
-                  disabled={formData.country === 'IN'}
-                />
-              </div>
-
-              {/* ✅ STEP 9: Optional District for IN */}
-              {formData.country === 'IN' && (
-                <div className="md:col-span-2">
-                  <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">District</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Name */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">Name</label>
                   <Input
-                    className="bg-black text-white border-gray-700 focus:border-[#D4AF37] disabled:opacity-50"
-                    placeholder="District"
-                    value={formData.district}
-                    disabled
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
+                    placeholder="Full Name"
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
-              )}
-            </div>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black font-bold py-6 text-lg mt-6 hover:shadow-lg hover:shadow-[#D4AF37]/20 transition-all"
-            >
-              {loading ? 'PROCESSING...' : `PAY ${formatPriceSync(total, displayCurrency)}`}
-            </Button>
-            
-            {displayCurrency !== 'INR' && (
-              <p className="text-xs text-center text-gray-500 mt-2">
-                *Your card will be charged in INR equivalent (≈ {formatPriceSync(totalINR, 'INR')})
-              </p>
-            )}
-          </form>
+                {/* Email */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">Email</label>
+                  <Input
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
+                    placeholder="Email Address"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
 
-          {/* Order Summary */}
-          <div className="border border-[#D4AF37]/30 rounded-xl p-6 h-fit bg-[#0b0b0b] sticky top-24">
-            <h2 className="text-xl font-bold mb-6 font-serif text-[#D4AF37]">Order Summary</h2>
+                {/* Phone */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">Phone</label>
+                  <Input
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
+                    placeholder="Phone Number"
+                    required
+                    value={formData.phone}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
 
-            <div className="space-y-4 mb-6 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-              {items.map(item => (
-                <div key={item.id} className="flex gap-3 border-b border-gray-800 pb-4 last:border-0">
-                  <div className="relative w-16 h-20 flex-shrink-0 bg-gray-900 rounded overflow-hidden">
-                    {item.image_url ? (
-                      <Image
-                        src={item.image_url}
-                        alt={item.product.name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">Img</div>
-                    )}
+                {/* Country */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">
+                    Country
+                  </label>
+                  <Select
+                    options={countryOptions}
+                    value={countryOptions.find(c => c.value === formData.country)}
+                    onChange={(option: any) =>
+                      setFormData({
+                        ...formData,
+                        country: option.value,
+                        state: '',
+                        city: '',
+                        district: '',
+                        pincode: '',
+                      })
+                    }
+                    isSearchable
+                    styles={selectStyles}
+                  />
+                </div>
+
+                {/* Address (Full width) */}
+                <div className="md:col-span-2 space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">Address</label>
+                  <Input
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
+                    placeholder="Street Address, Apt, Suite, etc."
+                    required
+                    value={formData.address}
+                    onChange={e => setFormData({ ...formData, address: e.target.value })}
+                  />
+                </div>
+
+                {/* Pincode */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">Pincode / Zip</label>
+                  <Input
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors"
+                    placeholder="PINCODE"
+                    value={formData.pincode}
+                    onChange={e => {
+                      const value = e.target.value;
+                      setFormData({ ...formData, pincode: value });
+                      if (formData.country === 'IN' && value.length === 6) {
+                        fetchAddressFromPincode(value);
+                      }
+                    }}
+                    required={formData.country === 'IN'}
+                  />
+                </div>
+
+                {/* State */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">
+                    State / Province
+                  </label>
+                  <Select
+                    options={stateOptions}
+                    value={stateOptions.find(s => s.label === formData.state)}
+                    onChange={(option: any) =>
+                      setFormData({ ...formData, state: option.label })
+                    }
+                    isSearchable
+                    isDisabled={stateOptions.length === 0}
+                    placeholder={stateOptions.length === 0 ? "Select Country First" : "Select State"}
+                    styles={selectStyles}
+                  />
+                </div>
+
+                {/* City */}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">City</label>
+                  <Input
+                    className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors disabled:opacity-50"
+                    placeholder="City"
+                    required
+                    value={formData.city}
+                    onChange={e => setFormData({ ...formData, city: e.target.value })}
+                    disabled={formData.country === 'IN'}
+                  />
+                </div>
+
+                {/* District */}
+                {formData.country === 'IN' && (
+                  <div className="md:col-span-2 space-y-4">
+                    <label className="text-[10px] font-sans tracking-widest uppercase text-samara-ivory/60 block">District</label>
+                    <Input
+                      className="bg-transparent text-samara-ivory border-samara-ivory/20 focus:border-samara-gold focus:ring-0 rounded-none h-12 text-sm font-sans placeholder:text-samara-ivory/40 transition-colors disabled:opacity-50"
+                      placeholder="District"
+                      value={formData.district}
+                      disabled
+                    />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium line-clamp-2">{item.product.name}</p>
-                    <div className="flex justify-between items-center mt-2">
-                      <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
-                      <p className="text-[#D4AF37] font-semibold">
-                        {formatPriceSync(item.product.final_price, displayCurrency)}
-                      </p>
+                )}
+              </div>
+
+              <div className="pt-8 flex flex-col items-center">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-14 bg-samara-gold hover:bg-samara-goldDeep text-samara-void rounded-none font-sans text-[11px] tracking-[0.2em] uppercase transition-colors"
+                >
+                  {loading ? 'Processing...' : `Pay ${formatPriceSync(total, displayCurrency)}`}
+                </Button>
+                
+                {displayCurrency !== 'INR' && (
+                  <p className="text-[10px] font-sans tracking-widest text-samara-ivory/40 uppercase mt-4 text-center">
+                    *Your card will be charged in INR equivalent (≈ {formatPriceSync(totalINR, 'INR')})
+                  </p>
+                )}
+              </div>
+            </form>
+
+            {/* Order Summary */}
+            <div className="h-fit sticky top-32">
+              <div className="bg-samara-void1 border border-samara-ivory/10 p-6 lg:p-8">
+                <h2 className="text-xl md:text-2xl font-serif text-samara-gold mb-8 border-b border-samara-ivory/10 pb-4">Order Summary</h2>
+
+                <div className="space-y-6 mb-8 max-h-[40vh] overflow-y-auto pr-4 custom-scrollbar">
+                  {items.map(item => (
+                    <div key={item.id} className="flex gap-4 border-b border-samara-ivory/10 pb-6 last:border-0">
+                      <div className="relative w-20 h-28 flex-shrink-0 bg-samara-void">
+                        {item.image_url ? (
+                          <Image
+                            src={item.image_url}
+                            alt={item.product.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] font-sans tracking-widest text-samara-ivory/40 uppercase">Img</div>
+                        )}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between">
+                        <p className="font-serif text-lg text-samara-ivory line-clamp-2 leading-tight">{item.product.name}</p>
+                        <div className="flex justify-between items-end mt-4">
+                          <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-samara-ivory/60">Qty: {item.quantity}</p>
+                          <p className="text-samara-gold font-serif text-xl">
+                            {formatPriceSync(item.product.final_price, displayCurrency)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* COUPON INPUT */}
+                <div className="mb-8">
+                  <div className="flex">
+                    <Input
+                      placeholder="Coupon code"
+                      value={couponCode}
+                      onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                      className="bg-transparent rounded-none text-samara-ivory placeholder-samara-ivory/40 border-samara-ivory/20 focus:border-samara-gold focus:ring-0 h-12 text-sm font-sans"
+                    />
+                    <button
+                      onClick={applyCoupon}
+                      disabled={couponLoading || !couponCode}
+                      className="bg-samara-ivory/10 hover:bg-samara-gold text-samara-ivory hover:text-samara-void px-6 font-sans text-[11px] tracking-[0.2em] uppercase transition-colors disabled:opacity-50 h-12 flex items-center justify-center"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t border-samara-ivory/10 pt-6 space-y-4">
+                  <div className="flex justify-between text-sm font-sans text-samara-ivory/80">
+                    <span>Subtotal</span>
+                    <span>{formatPriceSync(subtotal, displayCurrency)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm font-sans text-samara-ivory/80">
+                    <span>Shipping</span>
+                    <span className="text-samara-gold/80">Free</span>
+                  </div>
+
+                  {couponApplied && (
+                    <div className="flex justify-between text-sm font-sans text-samara-gold">
+                      <span>Discount</span>
+                      <span>-{formatPriceSync(discountDisplay, displayCurrency)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-end pt-6 border-t border-samara-ivory/10 mt-6">
+                    <span className="text-sm font-sans tracking-widest uppercase text-samara-ivory/80">Total</span>
+                    <div className="text-right">
+                        <span className="text-3xl font-serif text-samara-gold">
+                          {formatPriceSync(total, displayCurrency)}
+                        </span>
+                        <p className="text-[10px] font-sans text-samara-ivory/40 mt-1 uppercase tracking-wide">
+                            Inclusive of all taxes
+                        </p>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2 mb-6">
-              <Input
-                placeholder="Coupon code"
-                value={couponCode}
-                onChange={e => setCouponCode(e.target.value)}
-                className="bg-white/10 text-white placeholder:text-gray-500 border-gray-700"
-              />
-              <Button
-                onClick={applyCoupon}
-                disabled={couponLoading || !couponCode}
-                className="bg-[#D4AF37] text-black hover:bg-[#F4D03F]"
-              >
-                Apply
-              </Button>
-            </div>
-
-            <div className="border-t border-gray-700 pt-4 space-y-3 text-sm">
-              <div className="flex justify-between text-gray-400">
-                <span>Subtotal</span>
-                <span>{formatPriceSync(subtotal, displayCurrency)}</span>
-              </div>
-              
-              <div className="flex justify-between text-gray-400">
-                <span>Shipping</span>
-                <span className="text-green-400">Free</span>
-              </div>
-
-              {couponApplied && (
-                <div className="flex justify-between text-green-400">
-                  <span>Discount</span>
-                  <span>-{formatPriceSync(discountDisplay, displayCurrency)}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-700">
-                <span>Total</span>
-                <span className="text-[#D4AF37]">
-                  {formatPriceSync(total, displayCurrency)}
-                </span>
+                
+                <p className="text-[10px] font-sans tracking-[0.2em] uppercase text-center text-samara-ivory/40 mt-8">
+                  Secure payments powered by Razorpay
+                </p>
               </div>
             </div>
-            
-            <p className="text-xs text-center text-gray-500 mt-4">
-              Secure payments powered by Razorpay
-            </p>
           </div>
         </div>
       </div>
