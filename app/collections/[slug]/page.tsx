@@ -13,9 +13,10 @@ import { ArchOrnament } from '@/components/listing/Ornaments';
 export default async function CollectionDetailPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slug = params.slug;
+  // Next.js 15+: params is a Promise and must be awaited.
+  const { slug } = await params;
 
   // ---------------------------------------------------------
   // 1. FETCH DATA (Parallel)

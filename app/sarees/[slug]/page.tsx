@@ -16,8 +16,10 @@ import { formatPriceSync, type SupportedCurrency } from "@/lib/currency-utils";
 export default async function SareePage({
   params,
 }: {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }) {
+  // Next.js 15+: params is a Promise and must be awaited.
+  const { slug } = await params;
   const supabase = await createClient();
 
   // ---------------------------------------------------------
@@ -46,7 +48,7 @@ export default async function SareePage({
         mrp
       )
     `)
-    .eq("slug", params.slug)
+    .eq("slug", slug)
     .single();
 
   if (error || !product) {
