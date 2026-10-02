@@ -435,6 +435,30 @@ html.sm-img-reveal-ready [data-img-reveal][data-inview] > * {
   clip-path: inset(0 0 0 0);
 }
 
+/* Lenis smooth scroll (components/motion/SmoothScroll.tsx) */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* Image parallax inside card/panel frames: the photo drifts within its
+   frame. Uses the individual translate/scale properties so the existing
+   hover zoom (transform) keeps working on top. */
+html.sm-parallax [data-img-reveal] img {
+  translate: 0 var(--sm-py, 0px);
+  scale: var(--sm-ps, 1);
+  will-change: translate;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-reveal],
   [data-reveal]:not([data-revealed]) {

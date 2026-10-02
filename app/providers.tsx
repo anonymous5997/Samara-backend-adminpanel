@@ -9,6 +9,7 @@ import { Footer } from "@/components/footer";
 import { ShellProvider } from "@/components/shell/ShellProvider";
 import { StorefrontToaster } from "@/components/shell/StorefrontToaster";
 import { ImageRevealObserver } from "@/components/motion/ImageRevealObserver";
+import { SmoothScroll } from "@/components/motion/SmoothScroll";
 
 export default function Providers({
   children,
@@ -48,6 +49,7 @@ export default function Providers({
           </div>
           {!isAdmin && <StorefrontToaster />}
           {!isAdmin && <ImageRevealObserver />}
+          {!isAdmin && <SmoothScroll />}
         </ShellProvider>
       </CartProvider>
     </AuthProvider>
