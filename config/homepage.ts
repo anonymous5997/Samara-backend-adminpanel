@@ -33,8 +33,8 @@ export const HOME_COPY = {
   /** From the About page. */
   story: {
     eyebrow: 'Our Story',
-    titleLead: 'Woven',
-    titleAccent: 'luxury.',
+    titleLead: 'Indian heritage,',
+    titleAccent: 'modern elegance.',
     body: [
       'At Samara, we celebrate the timeless art of saree weaving. Each piece in our collection is a testament to generations of skilled craftsmanship.',
       'Our sarees are more than garments — they are wearable art, designed to make every woman feel like royalty.',

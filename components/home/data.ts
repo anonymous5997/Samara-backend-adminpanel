@@ -68,22 +68,37 @@ async function getCategoriesWithImages(): Promise<HomeCategory[]> {
   const categories = cats ?? [];
   const products = prods ?? [];
 
-  const primaryImage = (p: any): string | null => {
+  // Real product photos only (no placeholder services), primary first.
+  const productImages = (p: any): string[] => {
     const imgs = (p.product_images ?? []).filter(
-      (i: any) => typeof i.image_url === 'string' && /^https?:\/\//.test(i.image_url) && !i.image_url.includes('placeholder.com'),
+      (i: any) =>
+        typeof i.image_url === 'string' &&
+        /^https?:\/\//.test(i.image_url) &&
+        !i.image_url.includes('placeholder.com'),
     );
-    const img =
-      imgs.find((i: any) => i.is_primary) ??
-      [...imgs].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))[0];
-    return img?.image_url ?? null;
+    return [...imgs]
+      .sort(
+        (a: any, b: any) =>
+          Number(!!b.is_primary) - Number(!!a.is_primary) ||
+          (a.display_order ?? 0) - (b.display_order ?? 0),
+      )
+      .map((i: any) => i.image_url as string);
   };
+
+  // Prefer products with fuller galleries (better-photographed pieces), and
+  // give each category a different photo where one exists.
+  const used = new Set<string>();
 
   return categories.map((c: any) => {
     // A parent category also covers its direct children.
     const ids = new Set([c.id, ...categories.filter((x: any) => x.parent_id === c.id).map((x: any) => x.id)]);
     const inCat = products.filter((p: any) => ids.has(p.category_id));
-    const productImage = inCat.map(primaryImage).find(Boolean) ?? null;
+    const candidates = [...inCat]
+      .sort((a: any, b: any) => productImages(b).length - productImages(a).length)
+      .flatMap(productImages);
     const own = clean(c.image_url);
+    const productImage = own ? null : candidates.find((u) => !used.has(u)) ?? candidates[0] ?? null;
+    if (productImage) used.add(productImage);
     return {
       id: c.id,
       name: c.name,
