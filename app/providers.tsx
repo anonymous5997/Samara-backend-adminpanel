@@ -29,7 +29,7 @@ export default function Providers({
       <CartProvider>
         <ShellProvider>
           <div
-            className={`flex min-h-screen flex-col bg-black ${isAdmin ? "" : "storefront"}`}
+            className={`flex min-h-screen flex-col ${isAdmin ? "bg-black" : "storefront bg-samara-black"}`}
           >
           
             {/* ✅ Suspense wraps ONLY the Header (for search params) */}

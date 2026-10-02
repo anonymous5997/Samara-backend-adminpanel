@@ -53,15 +53,22 @@
   --color-text-body: #F5F5F5;
   --color-text-body-secondary: #CFCFCF;
 
-  /* Storefront palette — gold is an accent, ivory carries text */
-  --sm-black: #000000;
-  --sm-ink: #080808;
-  --sm-char: #111111;
-  --sm-ivory: #F5F5F0;
-  --sm-mute: #A3A3A3;
+  /* Storefront palette (Phase 4 direction: deep forest, warm cream, gold accent).
+     Gold is an accent; ivory carries text on dark, cream-ink on cream. */
+  --sm-black: #0B110D;      /* page base */
+  --sm-ink: #101914;        /* solid header, drawers */
+  --sm-char: #17221A;       /* raised surfaces, image placeholders */
+  --sm-forest: #1B2A1F;     /* editorial section surface */
+  --sm-forest-2: #22362A;   /* lighter forest for layering */
+  --sm-ivory: #F3EBDB;      /* primary text on dark */
+  --sm-mute: #A8A290;       /* secondary text on dark */
+  --sm-cream: #F4ECDD;      /* light editorial bands */
+  --sm-cream-2: #EADFCB;    /* lines/fills on cream */
+  --sm-cream-ink: #2B2218;  /* text on cream */
+  --sm-cream-mute: #6E6253; /* secondary text on cream */
   --sm-gold: #C9A35F;
   --sm-gold-deep: #8A6420;
-  --sm-line: rgba(245, 245, 240, 0.12);
+  --sm-line: rgba(243, 235, 219, 0.14);
 
   /* Layout */
   --sm-gutter: clamp(1rem, 4vw, 4rem);
