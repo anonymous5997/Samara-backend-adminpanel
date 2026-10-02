@@ -9,6 +9,7 @@ import {
   Folder,
   Users,
   DollarSign,
+  Layers,
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -24,6 +25,7 @@ export default function AdminLayout({
     { name: 'Products', href: '/admin/products', icon: Package },
     { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
     { name: 'Categories', href: '/admin/categories', icon: Folder },
+    { name: 'Collections', href: '/admin/collections', icon: Layers },
     { name: 'Coupons', href: '/admin/coupons', icon: Tag },
     { name: 'Currency', href: '/admin/currency', icon: DollarSign },
     { name: 'Users', href: '/admin/users', icon: Users },
