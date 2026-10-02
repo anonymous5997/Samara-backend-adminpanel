@@ -23,13 +23,14 @@ import { Slider } from '@/components/ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Sheet, SheetClose, SheetOverlay, SheetPortal, SheetTitle } from '@/components/ui/sheet';
 import { CatalogHeader, AccentTitle } from '@/components/catalog/CatalogHeader';
+import type { SiteImage } from '@/lib/site-images/slots';
 import { CatalogGrid, CatalogGridSkeleton, CATALOG_CARD_SIZES } from '@/components/catalog/CatalogGrid';
 
 // IMPORT PRICING ENGINE
 import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
 import { getUserRegion } from '@/lib/region/client';
 
-export default function ShopPage() {
+export default function ShopPage({ headerImage = null }: { headerImage?: SiteImage | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -326,6 +327,7 @@ export default function ShopPage() {
         eyebrow="Shop"
         title={activeCategory ? <AccentTitle text={activeCategory.name} /> : <>All <span className="sm-accent">products</span></>}
         intro={activeCategory?.description || 'Every piece in the house, gathered in one place.'}
+        image={headerImage}
       />
 
       {/* ------------------------------------------------------------------ */}

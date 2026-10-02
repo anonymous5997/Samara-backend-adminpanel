@@ -2,6 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Reveal } from '@/components/motion/Reveal';
 import { cn } from '@/lib/utils';
+import type { SiteImage } from '@/lib/site-images/slots';
+import { HEADER_BAND_OVERLAY, SiteImageBackdrop } from '@/components/site-images/SiteImageBackdrop';
 
 interface Crumb {
   label: string;
@@ -21,6 +23,11 @@ interface ListingHeroProps {
   /** Small decorative mark above the eyebrow. */
   kicker?: ReactNode;
   tone?: 'forest' | 'black';
+  /**
+   * Optional full-bleed photo behind the copy (Admin → Site Images). With an
+   * image the band gets a dark forest gradient; without one it is unchanged.
+   */
+  image?: SiteImage | null;
   className?: string;
 }
 
@@ -38,6 +45,7 @@ export function ListingHero({
   ornament,
   kicker,
   tone = 'forest',
+  image,
   className,
 }: ListingHeroProps) {
   return (
@@ -48,7 +56,11 @@ export function ListingHero({
         className,
       )}
     >
-      {ornament}
+      {image ? (
+        <SiteImageBackdrop image={image} sizes="100vw" priority overlayClassName={HEADER_BAND_OVERLAY} />
+      ) : (
+        ornament
+      )}
       <div className="sm-container relative pb-10 pt-8 md:pb-14 md:pt-12 lg:pb-16 lg:pt-14">
         {crumbs && crumbs.length > 0 && (
           <nav aria-label="Breadcrumb" className="mb-10 md:mb-16">

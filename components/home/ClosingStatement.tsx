@@ -1,5 +1,8 @@
 import { Reveal } from '@/components/motion/Reveal';
+import { cn } from '@/lib/utils';
 import { HOME_COPY } from '@/config/homepage';
+import { getSiteImage } from '@/lib/site-images';
+import { SiteImageBackdrop } from '@/components/site-images/SiteImageBackdrop';
 
 /** Original ornament: a fine diamond between two small lozenges and hairlines. */
 function Ornament() {
@@ -22,16 +25,30 @@ function Ornament() {
   );
 }
 
-/** Quiet closing line before the footer. */
-export function ClosingStatement() {
+/**
+ * Quiet closing line before the footer. Optional background photo from the
+ * `closing` Site Images slot, under a strong dark overlay.
+ */
+export async function ClosingStatement() {
   const { lead, accent } = HOME_COPY.closing;
+  const image = await getSiteImage('closing');
 
   return (
     <section
       aria-label="Closing statement"
-      className="bg-gradient-to-b from-samara-forest to-samara-black py-[clamp(6rem,14vw,13rem)]"
+      className={cn(
+        'bg-gradient-to-b from-samara-forest to-samara-black py-[clamp(6rem,14vw,13rem)]',
+        image && 'relative overflow-hidden',
+      )}
     >
-      <div className="sm-container flex flex-col items-center text-center">
+      {image && (
+        <SiteImageBackdrop
+          image={image}
+          sizes="100vw"
+          overlayClassName="bg-gradient-to-b from-samara-forest/85 via-samara-black/75 to-samara-black/95"
+        />
+      )}
+      <div className={cn('sm-container flex flex-col items-center text-center', image && 'relative')}>
         <Reveal variant="fade">
           <Ornament />
         </Reveal>
