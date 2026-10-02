@@ -10,9 +10,11 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', 'sans-serif'],
-        serif: ['var(--font-playfair)', 'serif'],
-        display: ['var(--font-cormorant)', 'serif'],
+        // Stacks resolve per scope: admin keeps the old fonts, .storefront
+        // uses Manrope / Cormorant Garamond (see globals.css).
+        sans: ['var(--font-sans-stack)'],
+        serif: ['var(--font-serif-stack)'],
+        display: ['var(--font-cormorant)', 'Georgia', 'serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -20,7 +22,16 @@ const config: Config = {
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
         'gold-gradient': 'linear-gradient(135deg, #D4AF37 0%, #F4D03F 50%, #D4AF37 100%)',
       },
+      transitionTimingFunction: {
+        editorial: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+      transitionDuration: {
+        '900': '900ms',
+        '1200': '1200ms',
+        '1600': '1600ms',
+      },
       letterSpacing: {
+        eyebrow: '0.28em',
         'tighter': '-0.05em',
         'luxury': '-0.02em',
       },
@@ -29,6 +40,17 @@ const config: Config = {
           DEFAULT: '#D4AF37',
           light: '#F4D03F',
           dark: '#B8942F',
+        },
+        // Storefront redesign palette. Gold is an accent, not a theme.
+        samara: {
+          black: '#000000',
+          ink: '#080808',
+          char: '#111111',
+          ivory: '#F5F5F0',
+          mute: '#A3A3A3',
+          gold: '#C9A35F',
+          'gold-deep': '#8A6420',
+          line: 'rgba(245, 245, 240, 0.12)',
         },
         luxury: {
           black: '#0A0A0A',

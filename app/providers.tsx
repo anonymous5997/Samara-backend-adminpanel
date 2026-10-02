@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/lib/auth-context";
 import { CartProvider } from "@/lib/cart-context";
 import { Header } from "@/components/header"; 
@@ -11,10 +12,23 @@ export default function Providers({
 }: {
   children: React.ReactNode;
 }) {
+  // The storefront design system (fonts, tokens, base type) is scoped to
+  // `.storefront` so the admin panel keeps its current appearance.
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith("/admin") ?? false;
+
+  // Radix portals (drawers, menus, toasts) mount on <body>, outside the
+  // wrapper below, so mirror the scope class there too.
+  useEffect(() => {
+    document.body.classList.toggle("storefront", !isAdmin);
+  }, [isAdmin]);
+
   return (
     <AuthProvider>
       <CartProvider>
-        <div className="flex min-h-screen flex-col bg-black">
+        <div
+          className={`flex min-h-screen flex-col bg-black ${isAdmin ? "" : "storefront"}`}
+        >
           
           {/* ✅ Suspense wraps ONLY the Header (for search params) */}
           {/* It is INSIDE CartProvider, so Cart state is safe */}

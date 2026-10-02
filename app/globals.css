@@ -38,9 +38,12 @@
 @tailwind utilities;
 
 /* =====================================================
-   1. CUSTOM COLOR PALETTE
+   1. DESIGN TOKENS
+   Legacy tokens (--color-*) stay for pages not yet migrated.
+   Storefront tokens (--sm-*) are the redesign palette.
 ===================================================== */
 :root {
+  /* Legacy */
   --color-bg: #000000;
   --color-dark: #050505;
   --color-darker: #111111;
@@ -49,88 +52,307 @@
   --color-text-heading: #E6C35C;
   --color-text-body: #F5F5F5;
   --color-text-body-secondary: #CFCFCF;
+
+  /* Storefront palette — gold is an accent, ivory carries text */
+  --sm-black: #000000;
+  --sm-ink: #080808;
+  --sm-char: #111111;
+  --sm-ivory: #F5F5F0;
+  --sm-mute: #A3A3A3;
+  --sm-gold: #C9A35F;
+  --sm-gold-deep: #8A6420;
+  --sm-line: rgba(245, 245, 240, 0.12);
+
+  /* Layout */
+  --sm-gutter: clamp(1rem, 4vw, 4rem);
+  --sm-section: clamp(5rem, 11vw, 11rem);
+  --sm-header-h: 72px;
+
+  /* Motion — one easing language for the whole storefront */
+  --sm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --sm-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --sm-dur-fast: 300ms;
+  --sm-dur: 700ms;
+  --sm-dur-slow: 1200ms;
+
+  /* Font stacks. Admin keeps the previous fonts; .storefront swaps them. */
+  --font-serif-stack: var(--font-playfair), "Playfair Display", Georgia, serif;
+  --font-sans-stack: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+.storefront {
+  --font-serif-stack: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --font-sans-stack: var(--font-manrope), system-ui, -apple-system,
+    "Segoe UI", Arial, sans-serif;
 }
 
 /* =====================================================
-   2. UTILITIES LAYER (Animations & Custom Classes)
+   2. UTILITIES LAYER
 ===================================================== */
 @layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 1.2s ease-out;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .luxury-heading {
-    text-shadow:
-      0 1px 0 rgba(212,175,55,0.25),
-      0 6px 20px rgba(212,175,55,0.35);
-  }
-
-  .text-body {
-    @apply text-[#F5F5F5];
-    line-height: 150%;
-  }
-
-  .text-body-secondary {
-    @apply text-[#CFCFCF];
-    line-height: 150%;
-  }
-
+  /* Used by AITryOn */
   .heading-line-height {
     line-height: 120%;
   }
 
-  .gold-glow {
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* =====================================================
+   2b. STOREFRONT EDITORIAL COMPONENTS
+===================================================== */
+@layer components {
+  .sm-container {
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+    padding-inline: var(--sm-gutter);
   }
 
-  .gold-glow-hover:hover {
-    box-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
+  .sm-section {
+    padding-block: var(--sm-section);
   }
 
-  /* --- NEW PREMIUM TYPOGRAPHY UTILITIES --- */
-
-  /* Product Titles */
-  .product-title {
-    font-family: "Georgia", "Times New Roman", serif;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    text-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
-  }
-
-  /* Prices */
-  .price {
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    text-shadow: 0 0 16px rgba(212, 175, 55, 0.25);
-  }
-
-  /* Discount badges */
-  .discount-badge {
-    font-weight: 700;
-    letter-spacing: 0.05em;
-  }
-
-  /* Navigation links */
-  .nav-link {
-    font-weight: 600;
-    letter-spacing: 0.08em;
+  /* Small uppercase label above headings / metadata */
+  .sm-eyebrow {
+    font-family: var(--font-sans-stack);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.28em;
     text-transform: uppercase;
+    line-height: 1.4;
+    color: var(--sm-mute);
   }
 
-  /* Luxury heading glow */
-  .luxury-glow {
-    text-shadow: 0 0 25px rgba(212, 175, 55, 0.35);
+  /* Display type scale — fluid from 390px to 1440px */
+  .sm-display-xl,
+  .sm-display-l,
+  .sm-display-m,
+  .sm-display-s {
+    font-family: var(--font-serif-stack);
+    font-weight: 400;
+    color: var(--sm-ivory);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  .sm-display-xl { font-size: clamp(3.25rem, 10.5vw, 10rem); line-height: 0.9; }
+  .sm-display-l  { font-size: clamp(2.5rem, 6.5vw, 6rem);   line-height: 0.95; }
+  .sm-display-m  { font-size: clamp(2rem, 4.2vw, 3.75rem);  line-height: 1.02; }
+  .sm-display-s  { font-size: clamp(1.5rem, 2.4vw, 2.25rem); line-height: 1.1; }
+
+  /* Italic accent word inside a display line */
+  .sm-accent {
+    font-family: var(--font-serif-stack);
+    font-style: italic;
+    font-weight: 300;
+    color: var(--sm-gold);
+  }
+
+  .sm-body {
+    font-family: var(--font-sans-stack);
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--sm-mute);
+  }
+
+  .sm-hairline {
+    height: 1px;
+    width: 100%;
+    background: var(--sm-line);
+  }
+
+  /* Underline that draws in on hover / focus */
+  .sm-link {
+    position: relative;
+    display: inline-block;
+  }
+  .sm-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.25em;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform var(--sm-dur) var(--sm-ease);
+  }
+  .sm-link:hover::after,
+  .sm-link:focus-visible::after,
+  .sm-link[aria-current="page"]::after {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+
+  /* Buttons — square, typographic, no glows */
+  .sm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 3.25rem;
+    padding: 0 2rem;
+    font-family: var(--font-sans-stack);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    transition:
+      background-color var(--sm-dur-fast) var(--sm-ease),
+      color var(--sm-dur-fast) var(--sm-ease),
+      border-color var(--sm-dur-fast) var(--sm-ease);
+  }
+  .sm-btn:focus-visible {
+    outline: 1px solid var(--sm-gold);
+    outline-offset: 3px;
+  }
+  .sm-btn:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .sm-btn-solid {
+    background: var(--sm-ivory);
+    color: var(--sm-black);
+  }
+  .sm-btn-solid:hover {
+    background: var(--sm-gold);
+  }
+  .sm-btn-ghost {
+    border-color: rgba(245, 245, 240, 0.4);
+    color: var(--sm-ivory);
+  }
+  .sm-btn-ghost:hover {
+    border-color: var(--sm-ivory);
+    background: var(--sm-ivory);
+    color: var(--sm-black);
+  }
+
+  /* Image frame: slow scale on hover (desktop pointers only) */
+  .sm-zoom {
+    overflow: hidden;
+  }
+  .sm-zoom img,
+  .sm-zoom video {
+    transition: transform 1600ms var(--sm-ease);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .group:hover .sm-zoom img,
+    .sm-zoom:hover img {
+      transform: scale(1.045);
+    }
+  }
+}
+
+/* =====================================================
+   2c. MOTION SYSTEM
+   [data-reveal] elements start hidden and animate in when
+   <Reveal> marks them [data-revealed]. Variants:
+   up (default) | fade | mask | scale. Delay via --reveal-delay.
+===================================================== */
+[data-reveal] {
+  --reveal-delay: 0ms;
+  transition:
+    opacity var(--sm-dur) var(--sm-ease) var(--reveal-delay),
+    transform var(--sm-dur-slow) var(--sm-ease) var(--reveal-delay),
+    clip-path var(--sm-dur-slow) var(--sm-ease) var(--reveal-delay);
+}
+[data-reveal]:not([data-revealed]) {
+  opacity: 0;
+}
+[data-reveal="up"]:not([data-revealed]) {
+  transform: translate3d(0, 28px, 0);
+}
+[data-reveal="scale"]:not([data-revealed]) {
+  transform: scale(1.06);
+}
+/* Mask clips the child, not the observed element: a fully clipped target
+   never reports as intersecting, so it would never reveal. */
+[data-reveal="mask"],
+[data-reveal="mask"]:not([data-revealed]) {
+  opacity: 1;
+}
+[data-reveal="mask"] > * {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path var(--sm-dur-slow) var(--sm-ease) var(--reveal-delay);
+}
+[data-reveal="mask"]:not([data-revealed]) > * {
+  clip-path: inset(100% 0 0 0);
+}
+
+/* Continuous marquee. Track holds content twice; -50% loops seamlessly. */
+@keyframes sm-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+.sm-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: sm-marquee var(--marquee-duration, 40s) linear infinite;
+}
+.sm-marquee:hover .sm-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Hero entrance (used by the homepage hero) */
+@keyframes sm-hero-image {
+  from { transform: scale(1.08); clip-path: inset(6% 6% 6% 6%); opacity: 0.4; }
+  to   { transform: scale(1);    clip-path: inset(0 0 0 0);     opacity: 1; }
+}
+@keyframes sm-rise {
+  from { transform: translate3d(0, 105%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+@keyframes sm-fade-up {
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.sm-anim-hero-image {
+  animation: sm-hero-image 1400ms var(--sm-ease) both;
+}
+/* Wrap a line in .sm-line-mask and the child in .sm-anim-rise */
+.sm-line-mask {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+.sm-anim-rise {
+  display: block;
+  animation: sm-rise 1100ms var(--sm-ease) both;
+  animation-delay: var(--anim-delay, 0ms);
+}
+.sm-anim-fade-up {
+  animation: sm-fade-up 900ms var(--sm-ease) both;
+  animation-delay: var(--anim-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal],
+  [data-reveal]:not([data-revealed]) {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+    transition: none !important;
+  }
+  [data-reveal] > * {
+    clip-path: none !important;
+    transition: none !important;
+  }
+  .sm-marquee-track,
+  .sm-anim-hero-image,
+  .sm-anim-rise,
+  .sm-anim-fade-up {
+    animation: none !important;
+  }
+  .sm-zoom img,
+  .sm-zoom video,
+  .sm-link::after,
+  .sm-btn {
+    transition: none !important;
   }
 }
 
@@ -203,19 +425,42 @@
   
   body {
     @apply bg-background text-foreground;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-      "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans-stack);
     letter-spacing: 0.01em;
     font-weight: 400;
   }
 
-  /* Headings use classic luxury serif stack */
+  /* Headings: Playfair for admin (unchanged), Cormorant on the storefront */
   h1, h2, h3, h4, h5 {
-    font-family: var(--font-playfair), "Playfair Display", serif;
+    font-family: var(--font-serif-stack);
     font-weight: 800;
     letter-spacing: -0.04em;
     line-height: 1.05;
     color: var(--color-text-heading);
+  }
+
+  .storefront {
+    font-family: var(--font-sans-stack);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Default text colour only on the page shell, not on portalled overlays */
+  div.storefront {
+    color: var(--sm-ivory);
+  }
+
+  .storefront h1,
+  .storefront h2,
+  .storefront h3,
+  .storefront h4,
+  .storefront h5 {
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .storefront ::selection {
+    background: var(--sm-gold);
+    color: var(--sm-black);
   }
 
   h1 { font-size: 3.5rem; }
