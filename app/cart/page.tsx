@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
 import { formatPriceSync } from '@/lib/currency-utils';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ShieldCheck, User, Loader2 } from 'lucide-react';
+import { Minus, Plus, ArrowRight, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Coupon } from '@/lib/types';
 import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
 import { trackAnalyticsEvent } from '@/lib/analytics.client';
+import { cn } from '@/lib/utils';
+import { AccountHero, BTN_GOLD, BTN_INK, Eyebrow, FIELD_LIGHT, FOCUS, TEXT_LINK } from '@/components/account/ui';
 
 
 export default function CartPage() {
@@ -142,8 +142,8 @@ export default function CartPage() {
   // ✅ 2. HYDRATION GUARD
   if (!hydrated) {
     return (
-      <div className="bg-black min-h-screen flex items-center justify-center">
-         <div className="animate-pulse text-gray-800">Loading bag...</div>
+      <div className="flex min-h-[70vh] items-center justify-center bg-samara-ink">
+         <div className="sm-eyebrow animate-pulse motion-reduce:animate-none">Loading bag...</div>
       </div>
     );
   }
@@ -151,22 +151,26 @@ export default function CartPage() {
   // ✅ 3. SAFE EMPTY CHECK
   if (items.length === 0) {
     return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center px-4">
-        <Toaster />
-        <div className="text-center max-w-md">
-          <div className="w-24 h-24 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6 border border-gray-800">
-            <ShoppingBag className="h-10 w-10 text-gray-500" />
+      <div className="bg-samara-ink">
+        <div className="sm-container grid min-h-[72vh] items-center py-20 md:py-28">
+          <div className="max-w-2xl">
+            <Eyebrow className="sm-anim-fade-up">Shopping Bag</Eyebrow>
+            <h1 className="sm-display-l sm-anim-fade-up mt-6 font-light [--anim-delay:80ms]">
+              Your cart is <span className="sm-accent">empty</span>
+            </h1>
+            <p className="sm-body sm-anim-fade-up mt-6 max-w-[40ch] [--anim-delay:160ms]">
+              Looks like you haven&apos;t added anything to your bag yet.
+            </p>
+            <div className="sm-anim-fade-up mt-10 flex flex-wrap items-center gap-x-10 gap-y-6 [--anim-delay:240ms]">
+              <Link href="/sarees" className={cn(BTN_GOLD, 'w-full sm:w-auto')}>
+                Start Shopping
+                <ArrowRight className="h-4 w-4" strokeWidth={1.25} />
+              </Link>
+              <Link href="/collections" className={cn(TEXT_LINK, FOCUS, 'text-samara-ivory hover:text-samara-gold')}>
+                Explore collections
+              </Link>
+            </div>
           </div>
-          <h1 className="text-3xl font-serif font-bold mb-2 text-white">Your cart is empty</h1>
-          <p className="text-gray-400 mb-8">
-            Looks like you haven't added anything to your bag yet.
-          </p>
-          <Button 
-            asChild 
-            className="w-full sm:w-auto px-8 py-6 rounded-md bg-[#111] border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all font-semibold tracking-wide"
-          >
-            <Link href="/sarees">Start Shopping</Link>
-          </Button>
         </div>
       </div>
     );
@@ -177,236 +181,278 @@ export default function CartPage() {
   /* -------------------------------------------------------------------------- */
   return (
     <>
-      <Toaster />
-
-      <div className="bg-black text-white min-h-screen pt-12 pb-24">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8 border-b border-gray-800 pb-6">
-            <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#D4AF37]">
-              Shopping Bag <span className="text-gray-500 text-lg font-sans font-normal ml-2">({items.length} Items)</span>
-            </h1>
-            <Link href="/sarees" className="hidden md:block text-gray-400 hover:text-white transition-colors text-sm underline underline-offset-4">
+      <div className="bg-samara-ink pb-32 text-samara-ivory lg:pb-0">
+        <AccountHero
+          eyebrow={<>{items.length} {items.length === 1 ? 'Item' : 'Items'}</>}
+          title={<>Shopping <span className="sm-accent">Bag</span></>}
+          aside={
+            <Link href="/sarees" className={cn(TEXT_LINK, FOCUS, 'hidden text-samara-mute hover:text-samara-ivory md:inline-block')}>
               Continue Shopping
             </Link>
-          </div>
+          }
+        />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            
+        <div className="sm-container grid grid-cols-1 gap-12 pb-16 pt-4 md:pb-24 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16 lg:pt-8 xl:grid-cols-[minmax(0,1fr)_440px] xl:gap-24">
+
             {/* LEFT SIDE: PRODUCT LIST */}
-            <div className="lg:col-span-2 space-y-6">
-              {items.map((item) => (
-                <div
+            <div className="min-w-0">
+              <div className="hidden grid-cols-[minmax(0,1fr)_140px_120px] border-b border-samara-line pb-4 pt-6 md:grid">
+                <span className="sm-eyebrow">Piece</span>
+                <span className="sm-eyebrow text-center">Quantity</span>
+                <span className="sm-eyebrow text-right">Total</span>
+              </div>
+              <ul aria-label="Items in your bag">
+              {items.map((item, index) => (
+                <li
                   key={item.id}
-                  // ✅ STEP 4: Reduced padding (p-4)
-                  className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-6 border border-[#2a2a2a] bg-[#0b0b0b] rounded-xl hover:border-[#D4AF37]/30 transition-colors"
-
+                  className="sm-stagger grid grid-cols-[96px_minmax(0,1fr)] gap-x-5 border-b border-samara-line py-7 sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-x-7 md:grid-cols-[132px_minmax(0,1fr)_140px_120px] md:items-start md:py-9"
+                  style={{ ['--i' as string]: index }}
                 >
-                  {/* IMAGE - ✅ STEP 3: Reduced height (h-28 sm:h-32) */}
-                  <div className="relative w-20 h-20 sm:w-32 sm:h-32 rounded-md overflow-hidden bg-gray-900 flex-shrink-0 border border-gray-800">
-
+                  {/* IMAGE */}
+                  <Link
+                    href={`/products/${item.product.slug}`}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="sm-zoom group relative block aspect-[3/4] w-full bg-samara-char md:row-span-1"
+                  >
                     {item.image_url ? (
                       <Image
                         src={item.image_url}
                         alt={item.product.name}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        sizes="(min-width: 768px) 132px, 120px"
+                        className="object-cover"
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-full text-gray-600 text-xs">
+                      <span className="sm-eyebrow absolute inset-0 flex items-center justify-center text-center text-[0.5625rem]">
                         No Image
-                      </div>
+                      </span>
                     )}
-                  </div>
+                  </Link>
 
                   {/* DETAILS */}
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start">
-                          <Link
-                              href={`/products/${item.product.slug}`}
-                              // ✅ STEP 5: Refined text size
-                              className="font-serif text-sm sm:text-lg font-semibold leading-tight hover:text-[#D4AF37] transition-colors line-clamp-2"
+                  <div className="flex min-w-0 flex-col md:pr-6">
+                    <p className="font-sans text-[0.6875rem] tabular-nums tracking-[0.18em] text-samara-mute">
+                      {String(index + 1).padStart(2, '0')}
+                    </p>
+                    <Link
+                      href={`/products/${item.product.slug}`}
+                      className={cn('mt-1.5 line-clamp-2 font-serif text-[1.25rem] font-normal leading-snug text-samara-ivory transition-colors duration-300 hover:text-samara-gold sm:text-[1.4375rem]', FOCUS)}
+                    >
+                      {item.product.name}
+                    </Link>
 
-                          >
-                              {item.product.name}
-                          </Link>
-                          {/* Mobile Trash Icon */}
-                          <button 
-                              onClick={() => removeFromCart(item.id)}
-                              className="sm:hidden text-gray-500 hover:text-red-500"
-                          >
-                              <Trash2 className="h-4 w-4" />
-                          </button>
-                      </div>
-
-                      {/* Variant Info */}
-                      {(item.variant?.size || item.variant?.color) && (
-                        <div className="flex gap-3 mt-1.5 text-sm text-gray-400">
-                            {item.variant.size && <span className="bg-[#1a1a1a] px-2 py-0.5 rounded text-xs border border-gray-800">Size: {item.variant.size}</span>}
-                            {item.variant.color && <span className="bg-[#1a1a1a] px-2 py-0.5 rounded text-xs border border-gray-800">Color: {item.variant.color}</span>}
-                        </div>
-                      )}
-                      
-                      {/* Price per unit - ✅ STEP 6: Reduced spacing/size */}
-                      <p className="text-gray-400 text-xs sm:text-sm mt-1">
-                          {formatPriceSync(item.unit_price, item.currency)} / unit
+                    {/* Variant Info */}
+                    {(item.variant?.size || item.variant?.color) && (
+                      <p className="mt-2 flex flex-wrap gap-x-4 font-sans text-[0.625rem] font-medium uppercase tracking-[0.2em] text-samara-mute">
+                        {item.variant.size && <span>Size: {item.variant.size}</span>}
+                        {item.variant.color && <span>Color: {item.variant.color}</span>}
                       </p>
-                    </div>
+                    )}
 
-                    <div className="flex items-end justify-between mt-3 sm:mt-4">
-                      {/* QUANTITY CONTROLS */}
-                      <div className="flex items-center gap-3 bg-[#1a1a1a] rounded-full p-1 border border-gray-800">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 sm:h-8 sm:w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
+                    {/* Price per unit */}
+                    <p className="mt-2 font-sans text-xs tabular-nums text-samara-mute">
+                      {formatPriceSync(item.unit_price, item.currency)} / unit
+                    </p>
+
+                    {/* Mobile: quantity + total + remove */}
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-4 md:hidden">
+                      <div className="-ml-3 flex items-center" role="group" aria-label={`Quantity for ${item.product.name}`}>
+                        <button
+                          type="button"
+                          className={cn('flex h-11 w-11 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory disabled:pointer-events-none disabled:opacity-30', FOCUS)}
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 1}
+                          aria-label={`Decrease quantity of ${item.product.name}`}
                         >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-
-                        <span className="w-4 text-center text-sm font-medium">{item.quantity}</span>
-
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 sm:h-8 sm:w-8 rounded-full hover:bg-black text-gray-400 hover:text-white"
+                          <Minus className="h-3.5 w-3.5" strokeWidth={1.25} />
+                        </button>
+                        <span className="w-6 text-center font-sans text-sm tabular-nums">{item.quantity}</span>
+                        <button
+                          type="button"
+                          className={cn('flex h-11 w-11 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory', FOCUS)}
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          aria-label={`Increase quantity of ${item.product.name}`}
                         >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                          <Plus className="h-3.5 w-3.5" strokeWidth={1.25} />
+                        </button>
                       </div>
+                      <p className="font-sans text-[0.9375rem] tabular-nums text-samara-ivory">
+                        {formatPriceSync(item.unit_price * item.quantity, item.currency)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(item.id)}
+                      aria-label={`Remove ${item.product.name} from bag`}
+                      className={cn('-ml-1 mt-1 flex min-h-[44px] w-fit items-center px-1 font-sans text-[0.625rem] font-medium uppercase tracking-[0.2em] text-samara-mute transition-colors hover:text-samara-ivory md:mt-6', FOCUS)}
+                    >
+                      <span className="sm-link">Remove</span>
+                    </button>
+                  </div>
 
-                      {/* ROW TOTAL PRICE */}
-                      <div className="text-right">
-                          <p className="text-lg font-bold text-[#D4AF37]">
-                              {formatPriceSync(item.unit_price * item.quantity, item.currency)}
-                          </p>
-                      </div>
+                  {/* Desktop: quantity */}
+                  <div className="hidden justify-center md:flex">
+                    <div className="flex items-center border border-samara-ivory/20" role="group" aria-label={`Quantity for ${item.product.name}`}>
+                      <button
+                        type="button"
+                        className={cn('flex h-11 w-11 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory disabled:pointer-events-none disabled:opacity-30', FOCUS)}
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                        aria-label={`Decrease quantity of ${item.product.name}`}
+                      >
+                        <Minus className="h-3.5 w-3.5" strokeWidth={1.25} />
+                      </button>
+                      <span className="w-6 text-center font-sans text-sm tabular-nums">{item.quantity}</span>
+                      <button
+                        type="button"
+                        className={cn('flex h-11 w-11 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory', FOCUS)}
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        aria-label={`Increase quantity of ${item.product.name}`}
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={1.25} />
+                      </button>
                     </div>
                   </div>
-                  
-                  {/* Desktop Trash Icon */}
-                  <div className="hidden sm:block">
-                      <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-full"
-                      >
-                          <Trash2 className="h-5 w-5" />
-                      </Button>
-                  </div>
-                </div>
+
+                  {/* Desktop: row total */}
+                  <p className="hidden pt-3 text-right font-sans text-[0.9375rem] tabular-nums text-samara-ivory md:block">
+                    {formatPriceSync(item.unit_price * item.quantity, item.currency)}
+                  </p>
+                </li>
               ))}
-              
-              <div className="flex items-center gap-2 text-gray-500 text-xs sm:text-sm bg-[#111] p-4 rounded-lg border border-gray-800">
-                <ShieldCheck className="h-5 w-5 text-green-500 flex-shrink-0" />
-                <p>Safe and secure checkout. 100% Authentic products.</p>
-              </div>
+              </ul>
+
+              <p className="mt-8 flex items-center gap-3 font-sans text-xs text-samara-mute">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-samara-gold" strokeWidth={1.25} />
+                Safe and secure checkout. 100% Authentic products.
+              </p>
             </div>
 
             {/* RIGHT SIDE: ORDER SUMMARY */}
-            <div className="h-fit sticky top-24">
-                <div className="border border-[#D4AF37]/30 bg-[#0b0b0b] rounded-xl p-6 shadow-2xl shadow-black/50">
-                <h2 className="text-xl font-serif font-bold mb-6 text-[#D4AF37] border-b border-gray-800 pb-4">
-                    Order Summary
+            <aside className="h-fit lg:sticky lg:top-[calc(var(--sm-header-h)+2rem)]" aria-labelledby="cart-summary-title">
+                <div className="bg-samara-cream px-6 py-8 text-samara-cream-ink sm:px-9 sm:py-10">
+                <h2 id="cart-summary-title" className="font-serif text-[1.875rem] font-light leading-tight text-samara-cream-ink">
+                    Order <span className="font-light italic text-samara-gold-deep">Summary</span>
                 </h2>
 
+                <dl className="mt-8 space-y-4 border-t border-samara-cream-ink/15 pt-6 font-sans text-sm">
                 {/* Subtotal */}
-                <div className="flex justify-between text-gray-300 mb-3 text-sm">
-                    <span>Subtotal</span>
-                    <span className="font-medium text-white">
+                <div className="flex justify-between gap-4">
+                    <dt className="text-samara-cream-mute">Subtotal</dt>
+                    <dd className="tabular-nums">
                         {formatPriceSync(subtotal, cartCurrency)}
-                    </span>
+                    </dd>
                 </div>
 
                 {/* Shipping */}
-                <div className="flex justify-between text-gray-300 mb-3 text-sm">
-                    <span>Shipping</span>
-                    <span className="text-green-400">Calculated at Checkout</span>
+                <div className="flex justify-between gap-4">
+                    <dt className="text-samara-cream-mute">Shipping</dt>
+                    <dd className="text-right">Calculated at Checkout</dd>
                 </div>
 
                 {/* Discount */}
                 {appliedCoupon && (
-                    <div className="flex justify-between text-green-400 mb-3 text-sm">
-                        <span>Coupon ({appliedCoupon.code})</span>
-                        <span>-{formatPriceSync(discount, cartCurrency)}</span>
+                    <div className="flex justify-between gap-4 text-samara-gold-deep">
+                        <dt>Coupon ({appliedCoupon.code})</dt>
+                        <dd className="tabular-nums">-{formatPriceSync(discount, cartCurrency)}</dd>
                     </div>
                 )}
+                </dl>
 
                 {/* COUPON INPUT */}
-                <div className="mt-6 mb-6">
+                <div className="mt-8">
                     {appliedCoupon ? (
-                        <div className="flex justify-between items-center bg-green-900/20 border border-green-500/30 p-3 rounded">
-                            <span className="text-green-400 text-sm font-medium">Code <b>{appliedCoupon.code}</b> applied</span>
-                            <button onClick={handleRemoveCoupon} className="text-xs text-red-400 hover:text-red-300 underline">
-                                Remove
+                        <div className="flex min-h-[48px] items-center justify-between gap-4 border border-samara-gold-deep/40 px-4">
+                            <span className="font-sans text-xs uppercase tracking-[0.18em]">Code <b className="font-semibold">{appliedCoupon.code}</b> applied</span>
+                            <button onClick={handleRemoveCoupon} className="flex min-h-[44px] items-center font-sans text-[0.625rem] font-medium uppercase tracking-[0.2em] text-samara-cream-mute transition-colors hover:text-samara-cream-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-cream-ink">
+                                <span className="sm-link">Remove</span>
                             </button>
                         </div>
                     ) : (
-                        <div className="flex gap-2">
+                        <div>
+                            <label htmlFor="cart-coupon" className="mb-2.5 block font-sans text-[0.625rem] font-medium uppercase tracking-[0.24em] text-samara-cream-mute">
+                              Coupon code
+                            </label>
+                            <div className="flex">
                             <Input
+                            id="cart-coupon"
                             placeholder="Coupon code"
                             value={couponCode}
                             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            className="bg-[#1a1a1a] text-white placeholder-gray-500 border-gray-700 focus:border-[#D4AF37]"
+                            className={cn(FIELD_LIGHT, 'border-r-0')}
                             />
-                            <Button
+                            <button
+                            type="button"
                             onClick={handleApplyCoupon}
                             disabled={loading || !couponCode}
-                            className="bg-white text-black hover:bg-gray-200"
+                            className="flex h-12 min-w-[96px] shrink-0 items-center justify-center border border-samara-cream-ink bg-samara-cream-ink px-5 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-samara-cream transition-colors hover:bg-samara-gold-deep hover:border-samara-gold-deep disabled:opacity-40 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-cream-ink"
                             >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                            </Button>
+                            </button>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="border-t border-dashed border-gray-700 my-4"></div>
-
                 {/* TOTAL */}
-                <div className="flex justify-between items-end mb-8">
-                    <span className="text-lg font-bold text-white">Total Amount</span>
+                <div className="mt-8 flex items-end justify-between gap-4 border-t border-samara-cream-ink/15 pt-6">
+                    <span className="sm-eyebrow text-samara-cream-ink">Total Amount</span>
                     <div className="text-right">
-                        <span className="text-2xl font-serif font-bold text-[#D4AF37]">
+                        <span className="font-serif text-[2rem] font-normal leading-none tabular-nums">
                             {formatPriceSync(total, cartCurrency)}
                         </span>
-                        <p className="text-[10px] text-gray-500 mt-1">
+                        <p className="mt-2 font-sans text-[0.6875rem] text-samara-cream-mute">
                             (Inclusive of all taxes)
                         </p>
                     </div>
                 </div>
 
                 {/* CHECKOUT BUTTON */}
-                <Button
-                    className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black hover:shadow-lg hover:shadow-[#D4AF37]/20 font-bold py-6 text-lg transition-all"
-                    asChild
-                >
                     <Link
                     href={user 
                         ? `/checkout${appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''}`
                         : `/auth/login?redirect=/checkout${appliedCoupon ? `&coupon=${appliedCoupon.code}` : ''}`
                     }
-                    className="flex items-center justify-center gap-2"
+                    className={cn(BTN_INK, 'mt-8 hidden w-full lg:flex')}
                     >
                         {user ? (
-                            <>Checkout <ArrowRight className="h-5 w-5" /></>
+                            <>Checkout <ArrowRight className="h-4 w-4" strokeWidth={1.25} /></>
                         ) : (
-                            <>Sign in to Checkout <User className="h-5 w-5" /></>
+                            <>Sign in to Checkout <User className="h-4 w-4" strokeWidth={1.25} /></>
                         )}
                     </Link>
-                </Button>
-                
-                <div className="mt-4 text-center">
-                    <Link href="/sarees" className="text-xs text-gray-500 hover:text-[#D4AF37] underline">
+
+                <div className="mt-6 text-center">
+                    <Link href="/sarees" className={cn(TEXT_LINK, 'text-samara-cream-mute hover:text-samara-cream-ink focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-cream-ink')}>
                         Continue Shopping
                     </Link>
                 </div>
                 </div>
-            </div>
+            </aside>
+        </div>
+      </div>
+
+      {/* MOBILE / TABLET CHECKOUT BAR */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-samara-line bg-samara-ink/95 backdrop-blur-sm lg:hidden">
+        <div className="sm-container flex items-center gap-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="min-w-0">
+            <p className="sm-eyebrow text-[0.5625rem]">Total</p>
+            <p className="mt-1 font-sans text-base tabular-nums text-samara-ivory">{formatPriceSync(total, cartCurrency)}</p>
           </div>
+          <Link
+            href={user 
+                ? `/checkout${appliedCoupon ? `?coupon=${appliedCoupon.code}` : ''}`
+                : `/auth/login?redirect=/checkout${appliedCoupon ? `&coupon=${appliedCoupon.code}` : ''}`
+            }
+            className={cn(BTN_GOLD, 'ml-auto min-h-[3rem] flex-1 px-4 sm:max-w-[320px]')}
+          >
+            {user ? (
+                <>Checkout <ArrowRight className="h-4 w-4" strokeWidth={1.25} /></>
+            ) : (
+                <>Sign in to Checkout <User className="h-4 w-4" strokeWidth={1.25} /></>
+            )}
+          </Link>
         </div>
       </div>
     </>

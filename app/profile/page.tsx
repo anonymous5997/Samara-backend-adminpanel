@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
+import { cn } from '@/lib/utils';
+import { AccountHero, BTN_GHOST, BTN_GOLD, FIELD, FIELD_LABEL, FOCUS, StepHeading } from '@/components/account/ui';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -160,7 +162,7 @@ export default function ProfilePage() {
   /* ---------------- RENDER GUARDS ---------------- */
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
+      <div className="flex min-h-[70vh] items-center justify-center bg-samara-ink sm-eyebrow animate-pulse motion-reduce:animate-none">
         Loading session...
       </div>
     );
@@ -168,7 +170,7 @@ export default function ProfilePage() {
   if (!user) return null;
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37] font-serif tracking-wider animate-pulse">
+      <div className="flex min-h-[70vh] items-center justify-center bg-samara-ink sm-eyebrow animate-pulse motion-reduce:animate-none">
         Creating profile...
       </div>
     );
@@ -176,76 +178,105 @@ export default function ProfilePage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <>
-      <Toaster />
-      
-      <div className="min-h-screen bg-black flex justify-center px-4 py-20">
-        <div className="w-full max-w-4xl">
+      <div className="bg-samara-ink text-samara-ivory">
           {/* HEADER */}
-          <div className="mb-12 text-center md:text-left">
-            <h1 className="text-4xl font-serif text-[#D4AF37] mb-3">
-              My Profile
-            </h1>
-            <p className="text-gray-400">
-              Manage your personal information and delivery address
-            </p>
-          </div>
+          <AccountHero
+            eyebrow="Account"
+            title={<>My <span className="sm-accent">Profile</span></>}
+            intro="Manage your personal information and delivery address"
+          />
+
+        <div className="sm-container grid grid-cols-1 gap-12 pb-20 pt-10 md:pb-28 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-16 lg:pt-14 xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-24">
+          {/* ACCOUNT NAV */}
+          <aside className="h-fit lg:sticky lg:top-[calc(var(--sm-header-h)+2rem)]">
+            <div className="border-b border-samara-line pb-6">
+              <p className="font-serif text-[1.625rem] font-light leading-tight text-samara-ivory">{formData.name || profile.email}</p>
+              <p className="mt-2 break-all font-sans text-xs text-samara-mute">{profile.email}</p>
+            </div>
+            <nav aria-label="Account" className="mt-2">
+              <ul className="grid grid-cols-1 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-1">
+                {[
+                  { href: '/orders', label: 'My Orders' },
+                  { href: '/wishlist', label: 'My Wishlist' },
+                  { href: '/track-order', label: 'Track Order' },
+                ].map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className={cn('group flex min-h-[52px] items-center justify-between border-b border-samara-line font-sans text-[0.6875rem] font-medium uppercase tracking-[0.22em] text-samara-mute transition-colors duration-300 hover:text-samara-ivory', FOCUS)}
+                    >
+                      {link.label}
+                      <ArrowRight aria-hidden className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" strokeWidth={1.25} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </aside>
 
           <form
             onSubmit={handleSubmit}
-            className="bg-[#0b0b0b] border border-[#D4AF37]/30 rounded-3xl p-8 md:p-12 space-y-12 shadow-[0_0_80px_rgba(212,175,55,0.08)]"
+            className="min-w-0 space-y-14 md:space-y-16"
           >
             {/* BASIC INFO */}
-            <section className="space-y-6">
-              <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
-                Personal Information
-              </h2>
+            <section className="space-y-8">
+              <StepHeading n="01" title="Personal Information" />
               
-              <div className="space-y-2">
-                <Label className="text-gray-300">Email</Label>
+              <div>
+                <Label htmlFor="profile-email" className={FIELD_LABEL}>Email</Label>
                 <Input
+                  id="profile-email"
                   value={profile.email}
                   disabled
-                  className="bg-[#111] text-gray-500 cursor-not-allowed border-gray-800 focus-visible:ring-0"
+                  className={FIELD}
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-gray-300">Full Name</Label>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-7 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="profile-name" className={FIELD_LABEL}>Full Name</Label>
                   <Input
+                    id="profile-name"
+                    autoComplete="name"
                     value={formData.name}
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
                     placeholder="Your full name"
-                    className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
+                    className={FIELD}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300">Phone</Label>
+                <div>
+                  <Label htmlFor="profile-phone" className={FIELD_LABEL}>Phone</Label>
                   <Input
+                    id="profile-phone"
+                    type="tel"
+                    autoComplete="tel"
                     value={formData.phone}
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
                     }
                     placeholder="+91XXXXXXXXXX"
-                    className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] transition-colors"
+                    className={FIELD}
                   />
                 </div>
               </div>
 
               {/* CHANGE PASSWORD UI (Hidden for social logins) */}
               {canChangePassword && (
-                <div className="space-y-4 pt-6 mt-4 border-t border-gray-800/50">
-                  <h3 className="text-lg font-serif text-[#D4AF37]">
+                <div className="space-y-6 border border-samara-line bg-samara-char px-6 py-7 sm:px-8">
+                  <h3 className="font-serif text-[1.375rem] font-light text-samara-ivory">
                     Change Password
                   </h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-7 md:grid-cols-2">
                     {/* Current Password */}
+                    <div>
+                    <Label htmlFor="profile-current-password" className={FIELD_LABEL}>Current Password</Label>
                     <Input
+                      id="profile-current-password"
                       type="password"
+                      autoComplete="current-password"
                       placeholder="Current Password"
                       value={passwordData.currentPassword}
                       onChange={(e) =>
@@ -256,13 +287,17 @@ export default function ProfilePage() {
                       }
                       // ✅ Prevent accidental form submission
                       onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                      className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                      className={FIELD}
                     />
+                    </div>
 
                     {/* New Password & Hint */}
-                    <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="profile-new-password" className={FIELD_LABEL}>New Password</Label>
                       <Input
+                        id="profile-new-password"
                         type="password"
+                        autoComplete="new-password"
                         placeholder="New Password"
                         value={passwordData.newPassword}
                         onChange={(e) =>
@@ -273,119 +308,144 @@ export default function ProfilePage() {
                         }
                         // ✅ Prevent accidental form submission
                         onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                        className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                        className={FIELD}
                       />
                       {/* ✅ Password Hint */}
-                      <p className="text-xs text-gray-500">
+                      <p className="mt-2 font-sans text-xs text-samara-mute">
                         Minimum 8 characters recommended
                       </p>
                     </div>
                   </div>
 
                   <div className="flex justify-start">
-                    <Button
+                    <button
                       type="button"
                       onClick={handleChangePassword}
                       disabled={changingPassword}
-                      className="bg-[#1a1a1a] text-[#D4AF37] border border-[#D4AF37]/40 hover:bg-[#D4AF37] hover:text-black transition"
+                      className={cn(BTN_GHOST, 'w-full sm:w-auto')}
                     >
                       {changingPassword ? 'Updating...' : 'Update Password'}
-                    </Button>
+                    </button>
                   </div>
                 </div>
               )}
             </section>
 
             {/* ADDRESS */}
-            <section className="space-y-6">
-              <h2 className="text-xl font-serif text-[#D4AF37] border-b border-gray-800 pb-2">
-                Delivery Address
-              </h2>
-              <div className="grid grid-cols-1 gap-6">
+            <section className="space-y-8">
+              <StepHeading n="02" title="Delivery Address" />
+              <div className="grid grid-cols-1 gap-x-6 gap-y-7 md:grid-cols-2">
+                <div>
+                <Label htmlFor="profile-house" className={FIELD_LABEL}>House / Flat Number</Label>
                 <Input
+                  id="profile-house"
                   placeholder="House / Flat Number"
                   value={formData.house}
                   onChange={(e) =>
                     setFormData({ ...formData, house: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
+                </div>
+                <div>
+                <Label htmlFor="profile-building" className={FIELD_LABEL}>Building / Apartment Name</Label>
                 <Input
+                  id="profile-building"
                   placeholder="Building / Apartment Name"
                   value={formData.building}
                   onChange={(e) =>
                     setFormData({ ...formData, building: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
+                </div>
+                <div className="md:col-span-2">
+                <Label htmlFor="profile-locality" className={FIELD_LABEL}>Locality / Area</Label>
                 <Input
+                  id="profile-locality"
                   placeholder="Locality / Area"
                   value={formData.locality}
                   onChange={(e) =>
                     setFormData({ ...formData, locality: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                </div>
+                <div>
+                <Label htmlFor="profile-city" className={FIELD_LABEL}>City</Label>
                 <Input
+                  id="profile-city"
                   placeholder="City"
                   value={formData.city}
                   onChange={(e) =>
                     setFormData({ ...formData, city: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
+                </div>
+                <div>
+                <Label htmlFor="profile-district" className={FIELD_LABEL}>District</Label>
                 <Input
+                  id="profile-district"
                   placeholder="District"
                   value={formData.district}
                   onChange={(e) =>
                     setFormData({ ...formData, district: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                </div>
+                <div>
+                <Label htmlFor="profile-state" className={FIELD_LABEL}>State</Label>
                 <Input
+                  id="profile-state"
                   placeholder="State"
                   value={formData.state}
                   onChange={(e) =>
                     setFormData({ ...formData, state: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
+                </div>
+                <div>
+                <Label htmlFor="profile-country" className={FIELD_LABEL}>Country</Label>
                 <Input
+                  id="profile-country"
                   placeholder="Country"
                   value={formData.country}
                   onChange={(e) =>
                     setFormData({ ...formData, country: e.target.value })
                   }
-                  className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37]"
+                  className={FIELD}
                 />
-              </div>
+                </div>
+                <div>
+              <Label htmlFor="profile-pin" className={FIELD_LABEL}>PIN / ZIP Code</Label>
               <Input
+                id="profile-pin"
                 placeholder="PIN / ZIP Code"
                 value={formData.pin}
                 onChange={(e) =>
                   setFormData({ ...formData, pin: e.target.value })
                 }
-                className="bg-[#1a1a1a] text-white border-gray-800 focus:border-[#D4AF37] md:w-1/2"
+                className={cn(FIELD, 'tabular-nums')}
               />
+                </div>
+              </div>
             </section>
 
             {/* ACTION */}
-            <div className="pt-6 flex justify-end">
-              <Button
+            <div className="flex justify-end border-t border-samara-line pt-8">
+              <button
                 type="submit"
                 disabled={saving}
-                className="bg-[#D4AF37] text-black font-bold px-10 py-6 rounded-xl hover:bg-[#E6C75A] transition shadow-lg shadow-[#D4AF37]/20 w-full md:w-auto text-lg"
+                className={cn(BTN_GOLD, 'w-full md:w-auto md:min-w-[240px]')}
               >
                 {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
+              </button>
             </div>
           </form>
         </div>
       </div>
-    </>
   );
 }
