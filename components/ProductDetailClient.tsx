@@ -1,20 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Heart,
-  ShoppingCart,
-  Check,
+  Loader2,
   Share2,
-  Truck,
-  ShieldCheck,
-  Sparkles,
-  Zap,
   Star,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
+import { useShell } from '@/components/shell/ShellProvider';
+import { Reveal } from '@/components/motion/Reveal';
+import { ProductGallery } from '@/components/pdp/ProductGallery';
+import { ProductDetailsAccordion } from '@/components/pdp/ProductDetailsAccordion';
+import { MobileBuyBar } from '@/components/pdp/MobileBuyBar';
+import { StickyColumn } from '@/components/pdp/StickyColumn';
+import { circleBtn, goldBtn, isGalleryImage } from '@/components/pdp/pdp-utils';
+import { cn } from '@/lib/utils';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
@@ -47,6 +49,11 @@ interface Product {
   care_instructions?: string | null;
   shipping_time?: string | null;
   why_women_love?: string | null;
+  // Presentation-only fields (already in the `select *` row)
+  work?: string | null;
+  color?: string | null;
+  is_handcrafted?: boolean | null;
+  is_perfect_for_special_occasions?: boolean | null;
   product_prices?: ProductPriceRow[]; 
 }
 
@@ -80,7 +87,7 @@ interface ProductDetailClientProps {
 
 export default function ProductDetailClient({
   product,
-  images,
+  images: allImages,
   priceData,
   similarProducts,
   reviews,
@@ -90,8 +97,12 @@ export default function ProductDetailClient({
   // ✅ STEP 3: Destructure hasUserReviewed
   hasUserReviewed,
 }: ProductDetailClientProps) {
+  // Presentation filter: stock placeholder.com rows are not product photos.
+  const images = allImages.filter((img) => isGalleryImage(img.image_url));
+
   const { user } = useAuth();
   const { addToCart } = useCart();
+  const { openCart } = useShell();
   const { preview } = usePricePreview(); 
   
   // STATE MANAGEMENT
@@ -103,12 +114,17 @@ export default function ProductDetailClient({
   const [buyNowModalOpen, setBuyNowModalOpen] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
+  // Presentation: the mobile buy bar watches these.
+  const ctaRef = useRef<HTMLDivElement | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
+
   const handleAddToCart = async () => {
     if (!product) return;
     setAddingToCart(true);
     try {
       await addToCart(String(product.id), undefined, 1);
       toast.success('Added to cart');
+      openCart();
     } catch (err) {
       console.error(err);
       toast.error('Failed to add to bag');
@@ -213,283 +229,249 @@ export default function ProductDetailClient({
 
   const finalHighlights = highlights.length ? highlights : ['Premium quality saree'];
 
+  // Presentation-only derived labels
+  const metaLine = [product.fabric, product.color, product.occasion].filter(Boolean).join(' · ');
+  const flags = [
+    product.is_handcrafted ? 'Handcrafted' : '',
+    product.is_perfect_for_special_occasions ? 'Perfect for special occasions' : '',
+  ].filter(Boolean);
+  const showMrp = Boolean(mrpLabel && discount > 0);
+  const roundedRating = avgRating !== null ? Math.round(avgRating) : 0;
+
   return (
-    <div className="bg-black text-white min-h-screen">
-      <Toaster />
-      <section className="py-12 bg-gradient-to-b from-black to-luxury-charcoal">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="grid md:grid-cols-2 gap-12 max-w-7xl mx-auto">
-            
-            {/* LEFT COLUMN: IMAGES */}
-            <div>
-              <div className="sticky top-24 space-y-4">
-                <div className="relative aspect-[3/4] bg-luxury-charcoal rounded-lg border-2 border-gold/20 overflow-hidden shadow-2xl shadow-gold/10">
-                  {selectedImage ? (
-                    <img
-                      src={selectedImage}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-600 font-serif">
-                      Product Image
-                    </div>
-                  )}
+    <div className="bg-samara-black text-samara-ivory">
+      {/* PRODUCT */}
+      <section className="sm-container pb-16 pt-0 lg:pb-24 lg:pt-10">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14 xl:gap-20">
+          {/* LEFT: GALLERY */}
+          <div className="min-w-0">
+            <ProductGallery
+              images={images}
+              productName={product.name}
+              selectedIndex={selectedIndex}
+              onSelect={setSelectedIndex}
+              highlights={finalHighlights}
+            />
+          </div>
 
-                  {finalHighlights.length > 0 && images.length > 1 && selectedIndex === 1 && (
-                    <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/80 via-black/50 to-transparent px-4 sm:px-8 py-6 sm:py-10">
-                      <div className="max-w-xs space-y-4 text-left">
-                        <h3 className="text-xl sm:text-2xl font-bold leading-tight">
-                          Key Highlights
-                        </h3>
-                        <ul className="space-y-3 text-xs sm:text-sm">
-                          {finalHighlights.slice(0, 4).map((text, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-gray-100">
-                              <span className="mt-0.5 sm:mt-1">
-                                <Check className="h-4 w-4 text-gold" />
-                              </span>
-                              <span>{text}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-                </div>
+          {/* RIGHT: DETAILS */}
+          <div className="min-w-0">
+            <StickyColumn className="lg:top-[calc(var(--sm-header-h)+2.5rem)]">
+              <nav aria-label="Breadcrumb">
+                <ol className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-sans text-[0.625rem] font-medium uppercase tracking-[0.24em] text-samara-mute">
+                  <li>
+                    <Link href="/" className="transition-colors hover:text-samara-ivory">Home</Link>
+                  </li>
+                  <li aria-hidden>/</li>
+                  <li>
+                    <Link href="/sarees" className="transition-colors hover:text-samara-ivory">Sarees</Link>
+                  </li>
+                  <li aria-hidden>/</li>
+                  <li aria-current="page" className="min-w-0 truncate text-samara-ivory/80">{product.name}</li>
+                </ol>
+              </nav>
 
-                {images.length > 1 && (
-                  <div className="flex gap-3 overflow-x-auto pb-2">
-                    {images.map((image, index) => (
-                      <button
-                        key={image.id}
-                        onClick={() => setSelectedIndex(index)}
-                        className={`flex-shrink-0 w-20 h-20 rounded border-2 overflow-hidden transition-all ${
-                          index === selectedIndex
-                            ? 'border-gold shadow-lg shadow-gold/30'
-                            : 'border-gold/20 hover:border-gold/50'
-                        }`}
-                      >
-                        <img
-                          src={image.image_url}
-                          alt={`${product.name} thumbnail`}
-                          className="w-full h-full object-cover"
-                        />
-                      </button>
+              <h1 className="mt-6 font-serif text-[2.5rem] font-light leading-[1.02] tracking-[-0.01em] text-samara-ivory [text-wrap:balance] sm:text-[3rem] xl:text-[3.5rem]">
+                {product.name}
+              </h1>
+
+              {product.brand && (
+                <p className="mt-3 font-serif text-lg font-light italic text-samara-gold">
+                  by {product.brand}
+                </p>
+              )}
+
+              {metaLine && (
+                <p className="mt-5 font-sans text-[0.6875rem] uppercase tracking-[0.2em] text-samara-mute">
+                  {metaLine}
+                </p>
+              )}
+
+              {/* Rating Display */}
+              {avgRating !== null && (
+                <a href="#reviews" className="mt-3 inline-flex min-h-[44px] items-center gap-3 font-sans text-[0.75rem] text-samara-mute transition-colors hover:text-samara-ivory">
+                  <span className="flex gap-0.5" aria-hidden>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Star
+                        key={i}
+                        className={cn('h-3.5 w-3.5', i <= roundedRating ? 'text-samara-gold' : 'text-samara-mute/50')}
+                        fill={i <= roundedRating ? 'currentColor' : 'none'}
+                        strokeWidth={1.25}
+                      />
                     ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: DETAILS */}
-            <div className="space-y-6">
-              <div>
-                <h1 className="font-serif text-4xl md:text-5xl font-bold text-gold mb-3 tracking-tighter">
-                  {product.name}
-                </h1>
-
-                {/* Rating Display */}
-                {avgRating !== null && (
-                  <div className="flex items-center gap-2 mt-3 mb-4">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <Star
-                          key={i}
-                          className={`h-4 w-4 ${
-                            i <= Math.round(avgRating)
-                              ? 'text-[#D4AF37]'
-                              : 'text-gray-600'
-                          }`}
-                          fill={i <= Math.round(avgRating) ? '#D4AF37' : 'none'}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-400">
-                      {avgRating.toFixed(1)} ({reviewCount} reviews)
-                    </span>
-                  </div>
-                )}
-
-                {product.brand && (
-                  <p className="text-gray-400 text-lg mb-6">
-                    by {product.brand}
-                  </p>
-                )}
-              </div>
+                  </span>
+                  <span className="tabular-nums">
+                    {avgRating.toFixed(1)} ({reviewCount} reviews)
+                  </span>
+                </a>
+              )}
 
               {/* PRICE DISPLAY */}
-              <div className="border-t border-b border-gold/20 py-6">
-                <div className="flex items-baseline gap-4 mb-2">
-                  <span className="font-serif text-4xl font-bold text-gold">
-                    {priceLabel}
-                  </span>
-                  
-                  {mrpLabel && discount > 0 && (
-                    <span className="text-xl text-gray-500 line-through">
+              <div className="mt-6">
+                {flags.length > 0 && (
+                  <p className="mb-3 font-sans text-[0.625rem] font-medium uppercase tracking-[0.24em] text-samara-gold">
+                    {flags.join(' · ')}
+                  </p>
+                )}
+                <p className="flex flex-wrap items-baseline gap-x-3 font-sans tabular-nums">
+                  <span className="text-[1.5rem] font-normal text-samara-ivory">{priceLabel}</span>
+                  {showMrp && (
+                    <s className="text-[0.9375rem] text-samara-mute">
+                      <span className="sr-only">MRP </span>
                       {mrpLabel}
-                    </span>
+                    </s>
                   )}
-                  
-                  {discount > 0 && (
-                    <span className="bg-gold text-black px-3 py-1 rounded-full text-sm font-bold">
-                      {discount}% OFF
-                    </span>
-                  )}
-                </div>
+                </p>
 
                 {/* Mandatory Price Disclaimer */}
-                <p className="text-xs text-gray-500 mt-1 max-w-md leading-relaxed">
+                <p className="mt-3 max-w-md font-sans text-[0.75rem] leading-relaxed text-samara-mute">
                   Price includes applicable taxes. Shipping charges, import duties,
                   and international taxes may vary based on delivery location and
                   will be calculated at checkout.
                 </p>
               </div>
 
-              {/* Description */}
-              {product.description && (
-                <div>
-                  <h3 className="font-serif text-xl font-semibold text-gold mb-3">
-                    Description
-                  </h3>
-                  <p className="text-gray-400 leading-relaxed">
-                    {product.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Details Grid */}
-              <div className="space-y-4">
-                <h3 className="font-serif text-xl font-semibold text-gold">
-                  Product Details
-                </h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
-                    <p className="text-gray-500 mb-1">Fabric</p>
-                    <p className="text-white font-medium">
-                      {product.fabric || '—'}
-                    </p>
-                  </div>
-                  <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
-                    <p className="text-gray-500 mb-1">Occasion</p>
-                    <p className="text-white font-medium">
-                      {product.occasion || '—'}
-                    </p>
-                  </div>
-                  <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
-                    <p className="text-gray-500 mb-1">Wash Care</p>
-                    <p className="text-white font-medium">
-                      {product.care_instructions || '—'}
-                    </p>
-                  </div>
-                  <div className="bg-luxury-charcoal p-4 rounded border border-gold/10">
-                    <p className="text-gray-500 mb-1">Shipping</p>
-                    <p className="text-white font-medium">
-                      {product.shipping_time || '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <div className="sm-hairline my-7" />
 
               {/* ACTION BUTTONS */}
-              <div className="space-y-3 pt-4">
-                <Button
-                  onClick={() => setBuyNowModalOpen(true)}
-                  disabled={!canBuyNow}
-                  className="w-full bg-gradient-to-r from-[#D4AF37] via-[#F4D03F] to-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/60 text-black font-bold py-7 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              <div ref={ctaRef} className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={addingToCart}
+                  className={cn(goldBtn, 'w-full')}
                 >
-                  <Zap className="h-5 w-5 mr-2" />
-                  Buy Now
-                </Button>
+                  {addingToCart && <Loader2 aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" strokeWidth={1.5} />}
+                  {addingToCart ? 'Adding...' : 'Add to Bag'}
+                </button>
 
                 <div className="flex gap-3">
-                  <Button
-                    onClick={handleAddToCart}
-                    disabled={addingToCart}
-                    variant="outline"
-                    className="flex-1 border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 font-semibold py-6 text-lg"
+                  <button
+                    type="button"
+                    onClick={() => setBuyNowModalOpen(true)}
+                    disabled={!canBuyNow}
+                    className="sm-btn sm-btn-ghost min-w-0 flex-1 px-4"
                   >
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    {addingToCart ? 'Adding...' : 'Add to Bag'}
-                  </Button>
+                    Buy Now
+                  </button>
 
-                  <Button
-                    variant="outline"
-                    className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
-                    size="icon"
+                  <button
+                    type="button"
+                    className={circleBtn}
                     onClick={toggleWishlist}
+                    aria-label="Save to wishlist"
                   >
-                    <Heart className="h-5 w-5" />
-                  </Button>
+                    <Heart aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+                  </button>
 
-                  <Button
-                    variant="outline"
-                    className="border-2 border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10 py-6"
-                    size="icon"
+                  <button
+                    type="button"
+                    className={circleBtn}
                     onClick={handleShare}
+                    aria-label="Share this product"
                   >
-                    <Share2 className="h-5 w-5" />
-                  </Button>
+                    <Share2 aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+                  </button>
                 </div>
               </div>
 
               {/* Trust Badges */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gold/20">
-                <div className="text-center">
-                  <Truck className="h-6 w-6 text-gold mx-auto mb-2" />
-                  <p className="text-xs text-gray-400">Free Shipping</p>
-                </div>
-                <div className="text-center">
-                  <ShieldCheck className="h-6 w-6 text-gold mx-auto mb-2" />
-                  <p className="text-xs text-gray-400">Authentic</p>
-                </div>
-                <div className="text-center">
-                  <Sparkles className="h-6 w-6 text-gold mx-auto mb-2" />
-                  <p className="text-xs text-gray-400">Handcrafted</p>
-                </div>
+              <ul className="mt-7 grid grid-cols-3 border-y border-samara-line">
+                {['Free Shipping', 'Authentic', 'Handcrafted'].map((label, i) => (
+                  <li
+                    key={label}
+                    className={cn(
+                      'py-4 text-center font-sans text-[0.625rem] font-medium uppercase tracking-[0.2em] text-samara-mute',
+                      i > 0 && 'border-l border-samara-line',
+                    )}
+                  >
+                    {label}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Details */}
+              <div className="mt-8">
+                <ProductDetailsAccordion
+                  description={product.description}
+                  fabric={product.fabric}
+                  work={product.work}
+                  occasion={product.occasion}
+                  careInstructions={product.care_instructions}
+                  shippingTime={product.shipping_time}
+                  whyWomenLove={product.why_women_love}
+                />
               </div>
-
-            </div>
-          </div>
-
-          {/* REVIEWS SECTION */}
-          <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-[#D4AF37]/20">
-            <h2 className="font-serif text-3xl text-[#D4AF37] mb-6">
-              Customer Reviews
-            </h2>
-            
-            <ProductReviewsSection reviews={reviews} />
-
-            {/* If NOT verified buyer */}
-            {!isVerifiedBuyer && (
-              <p className="text-sm text-gray-500 mt-6 italic">
-                Only verified buyers can leave a review.
-              </p>
-            )}
-
-            {/* ✅ STEP 4: Render Button only if Verified + Has NOT Reviewed */}
-            {isVerifiedBuyer && !hasUserReviewed && (
-              <button
-                className="mt-6 px-6 py-2 border border-[#D4AF37] text-[#D4AF37] rounded-lg hover:bg-[#D4AF37]/10 transition text-sm font-medium"
-                onClick={() => setReviewModalOpen(true)}
-              >
-                Write a Review
-              </button>
-            )}
-
-            {/* ✅ STEP 4: Show message if already reviewed */}
-            {hasUserReviewed && (
-              <p className="mt-6 text-sm text-gray-500 italic">
-                You’ve already reviewed this product.
-              </p>
-            )}
-          </div>
-
-          {/* Similar Products */}
-          <div className="max-w-7xl mx-auto mt-20 pt-12 border-t border-[#D4AF37]/20">
-            <SimilarProductsSection products={similarProducts} />
+            </StickyColumn>
           </div>
         </div>
       </section>
+
+      {/* REVIEWS SECTION */}
+      <section id="reviews" aria-labelledby="reviews-title" className="scroll-mt-[var(--sm-header-h)] border-t border-samara-line bg-samara-forest">
+        <div className="sm-container grid gap-10 py-16 sm:py-20 lg:grid-cols-[minmax(14rem,22rem)_1fr] lg:gap-16 lg:py-24 xl:gap-24">
+          <Reveal>
+            <p className="sm-eyebrow">Reviews</p>
+            <h2 id="reviews-title" className="mt-4 font-serif text-[2.25rem] font-light leading-[1.02] text-samara-ivory sm:text-[2.75rem]">
+              Customer <span className="sm-accent">Reviews</span>
+            </h2>
+
+            {avgRating !== null && (
+              <p className="mt-6 flex items-baseline gap-3 font-sans tabular-nums">
+                <span className="font-serif text-[2.5rem] font-light leading-none text-samara-ivory">{avgRating.toFixed(1)}</span>
+                <span className="text-[0.6875rem] uppercase tracking-[0.18em] text-samara-mute">
+                  out of 5 · {reviewCount} reviews
+                </span>
+              </p>
+            )}
+
+            <div className="mt-8">
+              {/* If NOT verified buyer */}
+              {!isVerifiedBuyer && (
+                <p className="font-sans text-[0.8125rem] italic text-samara-mute">
+                  Only verified buyers can leave a review.
+                </p>
+              )}
+
+              {/* ✅ STEP 4: Render Button only if Verified + Has NOT Reviewed */}
+              {isVerifiedBuyer && !hasUserReviewed && (
+                <button
+                  type="button"
+                  className="sm-btn sm-btn-ghost"
+                  onClick={() => setReviewModalOpen(true)}
+                >
+                  Write a Review
+                </button>
+              )}
+
+              {/* ✅ STEP 4: Show message if already reviewed */}
+              {hasUserReviewed && (
+                <p className="mt-4 font-sans text-[0.8125rem] italic text-samara-mute">
+                  You’ve already reviewed this product.
+                </p>
+              )}
+            </div>
+          </Reveal>
+
+          <ProductReviewsSection reviews={reviews} />
+        </div>
+      </section>
+
+      {/* Similar Products */}
+      <SimilarProductsSection products={similarProducts} />
+
+      {/* End of product content — the mobile bar hides from here on. */}
+      <div ref={endRef} aria-hidden className="h-px" />
+
+      <MobileBuyBar
+        productName={product.name}
+        priceLabel={priceLabel}
+        mrpLabel={showMrp ? mrpLabel : null}
+        adding={addingToCart}
+        onAdd={handleAddToCart}
+        ctaRef={ctaRef}
+        endRef={endRef}
+      />
 
       {/* MODALS */}
       <ProductTryOnModal
@@ -498,7 +480,7 @@ export default function ProductDetailClient({
         productImage={selectedImage}
         productName={product.name}
       />
-      
+
       <BuyNowModal
         isOpen={buyNowModalOpen}
         onClose={() => setBuyNowModalOpen(false)}
