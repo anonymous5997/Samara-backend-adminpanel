@@ -40,12 +40,19 @@ const menuItem =
   'cursor-pointer rounded-none px-5 py-2.5 font-sans text-[11px] font-medium uppercase tracking-eyebrow text-samara-ivory/80 transition-colors focus:bg-transparent focus:text-samara-ivory data-[highlighted]:bg-transparent data-[highlighted]:text-samara-ivory';
 
 const eyebrowLink =
-  'font-sans text-[11px] font-medium uppercase tracking-[0.14em] text-samara-ivory xl:tracking-eyebrow';
+  'font-sans text-[10.5px] font-medium uppercase tracking-[0.14em] text-samara-ivory xl:text-[11px] xl:tracking-[0.18em]';
+
+/** Desktop nav: Home first, then the shared storefront links. */
+const desktopNav = [{ href: '/', label: 'Home' }, ...primaryNav];
+
+/** Compact "INR ▾": the shared skin, minus the currency symbol. */
+const compactCurrency =
+  '[&>div>button]:px-1.5 [&>div>button_span_span:last-child]:hidden';
 
 function HeaderCurrency({ className }: { className?: string }) {
   const { currency, changeCurrency } = useCurrencySwitch();
   return (
-    <div className={cn(currencySkin, className)}>
+    <div className={cn(currencySkin, compactCurrency, className)}>
       <CurrencySelector currency={currency} onChange={changeCurrency} />
     </div>
   );
@@ -53,7 +60,7 @@ function HeaderCurrency({ className }: { className?: string }) {
 
 /** Same footprint as HeaderCurrency while search params resolve. */
 function CurrencyPlaceholder() {
-  return <div className="h-11 w-[84px]" aria-hidden />;
+  return <div className="h-11 w-[60px]" aria-hidden />;
 }
 
 export function Header() {
@@ -108,17 +115,6 @@ export function Header() {
             'motion-safe:animate-[sm-overlay-in_900ms_cubic-bezier(0.22,1,0.36,1)_900ms_both]',
         )}
       >
-        {/* The logo PNG ships on an opaque black ground; this keys black to
-            transparent (alpha from brightness) so it sits cleanly on imagery. */}
-        <svg aria-hidden width="0" height="0" className="absolute">
-          <filter id="samara-logo-key" colorInterpolationFilters="sRGB">
-            <feColorMatrix
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  1.3 1.3 0.4 0 0"
-            />
-          </filter>
-        </svg>
-
         {/* Legibility scrim over imagery; fades out once the bar turns solid. */}
         {isOverlay && (
           <div
@@ -131,66 +127,68 @@ export function Header() {
           />
         )}
 
-        <div className="sm-container grid h-[60px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center lg:h-[72px]">
-          {/* LEFT */}
-          <div className="flex min-w-0 items-center">
+        {/* Mobile: menu · logo · search+bag. Desktop: logo · nav · utilities. */}
+        <div className="sm-container grid h-[60px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center lg:h-[72px] lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-6 xl:gap-10">
+          {/* LEFT (mobile) */}
+          <div className="order-1 flex min-w-0 items-center lg:hidden">
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className={cn(iconBtn, '-ml-3 lg:hidden')}
+              className={cn(iconBtn, '-ml-3')}
               aria-label="Open menu"
               aria-expanded={menuOpen}
               aria-haspopup="dialog"
             >
               <Menu className="h-5 w-5" strokeWidth={1.25} />
             </button>
-
-            <nav aria-label="Primary" className="hidden lg:block">
-              <ul className="flex items-center gap-5 xl:gap-9">
-                {primaryNav.map((link) => {
-                  const active = isActiveRoute(pathname, link.href);
-                  return (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        aria-current={active ? 'page' : undefined}
-                        className={cn(
-                          eyebrowLink,
-                          'sm-link whitespace-nowrap py-2 transition-opacity duration-300 hover:opacity-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold',
-                          active ? 'opacity-100' : 'opacity-80',
-                        )}
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
           </div>
 
-          {/* CENTRE: logo — always full opacity, including while auth loads */}
+          {/* LOGO — centre on mobile, left on desktop; full opacity while auth loads */}
           <Link
             href="/"
             aria-label="Samara, home"
-            className="flex items-center justify-center px-2 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold"
+            className="order-2 flex items-center justify-center px-2 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold lg:order-1 lg:justify-start lg:px-0"
           >
             <Image
-              src="/samara-logo.png"
+              src="/brand/samara-logo-transparent.png"
               alt="Samara"
-              width={794}
-              height={290}
-              sizes="(min-width: 1280px) 132px, (min-width: 1024px) 121px, 104px"
+              width={717}
+              height={214}
+              sizes="(min-width: 1280px) 168px, (min-width: 1024px) 148px, 121px"
               priority
-              className="h-[38px] w-auto [filter:url(#samara-logo-key)] lg:h-[44px] xl:h-[48px]"
+              className="h-9 w-auto lg:h-[44px] xl:h-[50px]"
             />
           </Link>
 
+          {/* NAV (desktop) */}
+          <nav aria-label="Primary" className="order-2 hidden min-w-0 justify-center lg:flex">
+            <ul className="flex items-center gap-4 xl:gap-8">
+              {desktopNav.map((link) => {
+                const active = isActiveRoute(pathname, link.href);
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        eyebrowLink,
+                        'sm-link whitespace-nowrap py-2 transition-[opacity,color] duration-300 hover:opacity-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold',
+                        active ? 'text-samara-gold opacity-100' : 'opacity-80',
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
           {/* RIGHT */}
-          <div className="flex min-w-0 items-center justify-end">
+          <div className="order-3 flex min-w-0 items-center justify-end">
             <div className="hidden lg:block">
               <Suspense fallback={<CurrencyPlaceholder />}>
-                <HeaderCurrency className="mr-2 min-w-[84px]" />
+                <HeaderCurrency className="mr-1 min-w-[60px] xl:mr-2" />
               </Suspense>
             </div>
 
@@ -204,7 +202,7 @@ export function Header() {
             </button>
 
             {/* Account — fixed footprint so the auth-loading state never shifts */}
-            <div className="hidden h-11 w-[64px] items-center justify-center lg:flex">
+            <div className="hidden h-11 w-11 items-center justify-center lg:flex">
               {loading ? null : user ? (
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger className={iconBtn} aria-label="Account">
@@ -245,14 +243,8 @@ export function Header() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Link
-                  href="/auth/login"
-                  className={cn(
-                    eyebrowLink,
-                    'sm-link py-2 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold',
-                  )}
-                >
-                  Login
+                <Link href="/auth/login" className={iconBtn} aria-label="Login">
+                  <User className="h-5 w-5" strokeWidth={1.25} />
                 </Link>
               )}
             </div>

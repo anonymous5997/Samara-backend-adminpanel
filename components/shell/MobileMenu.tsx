@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -15,12 +16,14 @@ import { cn } from '@/lib/utils';
 export const primaryNav = [
   { href: '/sarees', label: 'Sarees' },
   { href: '/collections', label: 'Collections' },
-  { href: '/festive-edit', label: 'Festive Edit' },
+  { href: '/#new-arrivals', label: 'New Arrivals' },
+  { href: '/#best-sellers', label: 'Best Sellers' },
   { href: '/about', label: 'Our Story' },
 ];
 
 export function isActiveRoute(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
+  if (href.includes('#')) return false; // in-page anchors are never "the current page"
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -51,7 +54,7 @@ const menuNav = [
 ];
 
 const utilityLink =
-  'flex min-h-[44px] items-center font-sans text-[11px] font-medium uppercase tracking-eyebrow text-samara-ivory/85 transition-colors duration-300 hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold';
+  'flex min-h-[44px] items-center font-sans text-[11px] font-medium uppercase tracking-eyebrow text-samara-ivory/[0.85] transition-colors duration-300 hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold';
 
 function MenuCurrency() {
   const { currency, changeCurrency } = useCurrencySwitch();
@@ -106,7 +109,22 @@ export function MobileMenu({ open, onOpenChange }: MobileMenuProps) {
             >
               <X className="h-5 w-5" strokeWidth={1.25} />
             </DialogPrimitive.Close>
-            <DialogPrimitive.Title className="sm-eyebrow text-samara-mute">Menu</DialogPrimitive.Title>
+            <DialogPrimitive.Title className="sr-only">Menu</DialogPrimitive.Title>
+            <Link
+              href="/"
+              onClick={() => onOpenChange(false)}
+              aria-label="Samara, home"
+              className="flex items-center focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold"
+            >
+              <Image
+                src="/brand/samara-logo-transparent.png"
+                alt="Samara"
+                width={717}
+                height={214}
+                sizes="121px"
+                className="h-9 w-auto"
+              />
+            </Link>
             <span className="w-11" aria-hidden />
           </div>
           <div className="sm-hairline shrink-0" />
