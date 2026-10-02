@@ -152,6 +152,44 @@ export function HomeHero({ slides }: { slides: HomeHeroSlide[] }) {
   const reduced = usePrefersReducedMotion();
   const sectionRef = useRef<HTMLElement>(null);
   const touch = useRef<{ x: number; y: number } | null>(null);
+  const parallaxRef = useRef<HTMLDivElement>(null);
+
+  // Subtle desktop-only parallax: the photo drifts at ~15% of scroll speed,
+  // capped by the layer's 8% overhang. Off on touch/small screens and with
+  // reduced motion (parallax on phones tends to stutter).
+  useEffect(() => {
+    const layer = parallaxRef.current;
+    const hero = sectionRef.current;
+    if (!layer || !hero || reduced) return;
+    const mq = window.matchMedia('(min-width: 1024px) and (pointer: fine)');
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const h = hero.offsetHeight;
+      const y = Math.min(Math.max(window.scrollY, 0), h);
+      layer.style.transform = `translate3d(0, ${Math.min(y * 0.15, h * 0.08).toFixed(1)}px, 0)`;
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    const start = () => {
+      if (mq.matches) {
+        window.addEventListener('scroll', onScroll, { passive: true });
+        apply();
+      } else {
+        window.removeEventListener('scroll', onScroll);
+        layer.style.transform = '';
+      }
+    };
+    start();
+    mq.addEventListener('change', start);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      mq.removeEventListener('change', start);
+      if (raf) cancelAnimationFrame(raf);
+      layer.style.transform = '';
+    };
+  }, [reduced]);
 
   const go = useCallback(
     (to: number) => {
@@ -236,6 +274,8 @@ export function HomeHero({ slides }: { slides: HomeHeroSlide[] }) {
     >
       {/* ---- Media layers (crossfade) ---- */}
       <div className="sm-anim-hero-image absolute inset-0 -z-10">
+        {/* Parallax layer: 8% overhang top and bottom so the drift never shows an edge. */}
+        <div ref={parallaxRef} className="absolute inset-x-0 -bottom-[8%] -top-[8%] will-change-transform">
         {items.map((s, i) => {
           const active = i === index;
           return (
@@ -260,6 +300,7 @@ export function HomeHero({ slides }: { slides: HomeHeroSlide[] }) {
             </div>
           );
         })}
+        </div>
 
         {/* Legibility: forest wash from the left + a floor; mobile reads bottom-up */}
         <div

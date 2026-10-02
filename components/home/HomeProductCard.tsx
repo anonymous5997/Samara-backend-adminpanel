@@ -149,6 +149,7 @@ export function HomeProductCard({ product, index, price, tone = 'light' }: HomeP
         href={href}
         tabIndex={-1}
         aria-hidden
+        data-img-reveal=""
         className={cn('sm-zoom relative block aspect-[4/5] w-full', dark ? 'bg-samara-forest-2' : 'bg-samara-cream-2')}
       >
         {primary ? (

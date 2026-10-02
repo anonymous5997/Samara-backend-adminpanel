@@ -56,7 +56,7 @@ export function CategoryArch({ href, name, description, index, imageUrl }: Categ
         </span>
 
         {imageUrl && (
-          <span aria-hidden className="sm-zoom absolute inset-0">
+          <span aria-hidden data-img-reveal="" className="sm-zoom absolute inset-0">
             <Image
               src={imageUrl}
               alt=""

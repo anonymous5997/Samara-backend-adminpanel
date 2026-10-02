@@ -125,6 +125,7 @@ function CategoryPanel({ category: c, crop, wide }: { category: HomeCategory; cr
   return (
     <Link
       href={c.href}
+      data-img-reveal=""
       className={cn(
         'group sm-zoom relative block aspect-[4/5] h-full w-full overflow-hidden bg-samara-forest focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-samara-gold lg:aspect-auto lg:min-h-[clamp(520px,42vw,680px)]',
         wide && 'md:aspect-[16/9]',

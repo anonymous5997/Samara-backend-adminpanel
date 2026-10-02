@@ -191,7 +191,7 @@ function ArchCard({ collection: c, index }: { collection: HomeCollection; index:
         )}
       />
 
-      <span className={cn('sm-zoom relative block h-full w-full overflow-hidden', ARCH)}>
+      <span data-img-reveal="" className={cn('sm-zoom relative block h-full w-full overflow-hidden', ARCH)}>
         {c.imageUrl ? (
           <Image
             src={c.imageUrl}

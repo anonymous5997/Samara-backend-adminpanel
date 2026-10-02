@@ -129,6 +129,7 @@ export function ProductCard({ product, image, price, hoverImage, sizes = DEFAULT
           href={href}
           tabIndex={-1}
           aria-hidden
+          data-img-reveal=""
           className="sm-zoom relative block aspect-[4/5] w-full bg-samara-char"
         >
           {primary ? (

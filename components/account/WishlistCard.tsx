@@ -25,7 +25,7 @@ export function WishlistCard({ index, name, href, imageUrl, price, onAddToBag, o
   return (
     <article className="group relative">
       <div className="relative">
-        <Link href={href} tabIndex={-1} aria-hidden className="sm-zoom relative block aspect-[4/5] w-full bg-samara-cream-2">
+        <Link href={href} tabIndex={-1} aria-hidden data-img-reveal="" className="sm-zoom relative block aspect-[4/5] w-full bg-samara-cream-2">
           {imageUrl ? (
             <Image
               src={imageUrl}

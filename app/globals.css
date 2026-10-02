@@ -422,6 +422,19 @@ html[data-intro="play"] .sm-intro {
   animation-delay: calc(200ms + var(--i, 0) * 60ms);
 }
 
+/* Card image unveil (components/motion/ImageRevealObserver.tsx).
+   The clip goes on the frame's children, not the observed frame itself:
+   a fully clipped target never reports as intersecting. */
+html.sm-img-reveal-ready [data-img-reveal] > * {
+  transition: clip-path 900ms var(--sm-ease);
+}
+html.sm-img-reveal-ready [data-img-reveal]:not([data-inview]) > * {
+  clip-path: inset(100% 0 0 0);
+}
+html.sm-img-reveal-ready [data-img-reveal][data-inview] > * {
+  clip-path: inset(0 0 0 0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-reveal],
   [data-reveal]:not([data-revealed]) {
@@ -436,6 +449,10 @@ html[data-intro="play"] .sm-intro {
   }
   .sm-intro {
     display: none !important;
+  }
+  html.sm-img-reveal-ready [data-img-reveal] > * {
+    clip-path: none !important;
+    transition: none !important;
   }
   .sm-header-enter,
   .sm-marquee-track,

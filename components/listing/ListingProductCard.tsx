@@ -69,7 +69,7 @@ export function ListingProductCard({
       href={`/products/${product.slug}`}
       className="group block focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold"
     >
-      <span className="sm-zoom relative block aspect-[4/5] w-full bg-samara-forest-2">
+      <span data-img-reveal="" className="sm-zoom relative block aspect-[4/5] w-full bg-samara-forest-2">
         {primary ? (
           <>
             <Image
