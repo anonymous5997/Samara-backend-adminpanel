@@ -30,13 +30,13 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
     try {
       if (isWishlisted) {
         await supabase
-          .from('wishlists')
+          .from('wishlist_items')
           .delete()
           .eq('user_id', user.id)
           .eq('product_id', product.id);
         setIsWishlisted(false);
       } else {
-        await supabase.from('wishlists').insert({
+        await supabase.from('wishlist_items').insert({
           user_id: user.id,
           product_id: product.id,
         });
