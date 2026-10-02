@@ -1,21 +1,33 @@
 import type { ReactNode } from 'react';
 import { Reveal } from '@/components/motion/Reveal';
 import { cn } from '@/lib/utils';
+import type { SiteImage } from '@/lib/site-images/slots';
+import { HEADER_BAND_OVERLAY, SiteImageBackdrop } from '@/components/site-images/SiteImageBackdrop';
 
 interface CatalogHeaderProps {
   eyebrow: string;
   /** Title with the italic accent already marked up (see AccentTitle). */
   title: ReactNode;
   intro?: ReactNode;
+  /**
+   * Optional full-bleed photo behind the title (Admin → Site Images). With an
+   * image the band gets a dark forest gradient; without one it is unchanged.
+   */
+  image?: SiteImage | null;
   className?: string;
   children?: ReactNode;
 }
 
 /** Editorial page band: eyebrow, large serif title, one muted line. */
-export function CatalogHeader({ eyebrow, title, intro, className, children }: CatalogHeaderProps) {
+export function CatalogHeader({ eyebrow, title, intro, image, className, children }: CatalogHeaderProps) {
   return (
-    <section className={cn('border-b border-samara-line', className)}>
-      <div className="sm-container pb-10 pt-12 md:pb-14 md:pt-20 lg:pb-16 lg:pt-24">
+    <section
+      className={cn('border-b border-samara-line', image && 'relative overflow-hidden', className)}
+    >
+      {image && (
+        <SiteImageBackdrop image={image} sizes="100vw" priority overlayClassName={HEADER_BAND_OVERLAY} />
+      )}
+      <div className={cn('sm-container pb-10 pt-12 md:pb-14 md:pt-20 lg:pb-16 lg:pt-24', image && 'relative')}>
         <Reveal className="lg:flex lg:items-end lg:justify-between lg:gap-16">
           <div className="min-w-0">
             <p className="sm-eyebrow flex items-center gap-4">

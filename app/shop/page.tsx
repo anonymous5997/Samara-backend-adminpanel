@@ -1,6 +1,10 @@
 import { Suspense } from 'react'
 import ShopClient from './ShopClient'
 import { CatalogGridSkeleton } from '@/components/catalog/CatalogGrid'
+import { getSiteImage } from '@/lib/site-images'
+
+// Re-check the Site Images header band at most once a minute.
+export const revalidate = 60
 
 function ShopFallback() {
   return (
@@ -20,10 +24,12 @@ function ShopFallback() {
   )
 }
 
-export default function ShopPage() {
+export default async function ShopPage() {
+  const headerImage = await getSiteImage('shop-header')
+
   return (
     <Suspense fallback={<ShopFallback />}>
-      <ShopClient />
+      <ShopClient headerImage={headerImage} />
     </Suspense>
   )
 }
