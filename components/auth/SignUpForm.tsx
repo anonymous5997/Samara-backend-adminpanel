@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
+import { fieldClass, goldButtonClass, labelClass, outlineButtonClass } from '@/components/content/formStyles';
 
 export default function SignUpForm() {
   const [email, setEmail] = useState('');
@@ -80,29 +81,29 @@ export default function SignUpForm() {
   };
 
   return (
-    <div style={{ maxWidth: 520 }}>
-      <form onSubmit={handleSignup}>
+    <div className="w-full max-w-[520px] text-samara-ivory">
+      <form onSubmit={handleSignup} className="space-y-6">
         <div>
-          <label>Email</label>
-          <input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" required />
+          <label className={labelClass}>Email</label>
+          <input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" required className={fieldClass} />
         </div>
         <div>
-          <label>Password</label>
-          <input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" required />
+          <label className={labelClass}>Password</label>
+          <input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" required className={fieldClass} />
         </div>
         <div>
-          <label>Phone (digits only, include country code)</label>
-          <input value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+9199..." />
+          <label className={labelClass}>Phone (digits only, include country code)</label>
+          <input value={phone} onChange={(e)=>setPhone(e.target.value)} placeholder="+9199..." className={fieldClass} />
         </div>
 
-        <button type="submit" disabled={loading}>{loading ? 'Please wait...' : 'Sign up'}</button>
+        <button type="submit" disabled={loading} className={goldButtonClass}>{loading ? 'Please wait...' : 'Sign up'}</button>
       </form>
 
       {sessionId && (
-        <div style={{ marginTop: 20 }}>
-          <label>Enter SMS OTP</label>
-          <input value={smsOtp} onChange={(e)=>setSmsOtp(e.target.value)} />
-          <button onClick={verifySms} disabled={loading}>Verify SMS</button>
+        <div className="mt-8 space-y-4 border-t border-samara-line pt-8">
+          <label className={labelClass}>Enter SMS OTP</label>
+          <input value={smsOtp} onChange={(e)=>setSmsOtp(e.target.value)} className={`${fieldClass} h-16 text-center indent-[0.5em] font-sans text-2xl font-light tabular-nums tracking-[0.5em]`} />
+          <button onClick={verifySms} disabled={loading} className={outlineButtonClass}>Verify SMS</button>
         </div>
       )}
     </div>

@@ -96,11 +96,11 @@ export default function SupabasePhoneAuth() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-samara-ivory">
       {step === 'phone' ? (
         <>
           <div className="space-y-2">
-            <Label htmlFor="phone" className="text-sm font-medium">
+            <Label htmlFor="phone" className="mb-2.5 block font-sans text-[0.6875rem] font-medium uppercase tracking-eyebrow text-samara-mute">
               Phone Number
             </Label>
             <Input
@@ -109,7 +109,7 @@ export default function SupabasePhoneAuth() {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+91 1234567890"
-              className="w-full"
+              className="h-12 w-full rounded-none border border-samara-line bg-transparent px-4 font-sans text-sm text-samara-ivory placeholder:text-samara-mute/70 focus:border-samara-gold focus-visible:ring-1 focus-visible:ring-samara-gold focus-visible:ring-offset-0"
               disabled={loading}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -117,14 +117,14 @@ export default function SupabasePhoneAuth() {
                 }
               }}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-2 font-sans text-xs text-samara-mute">
               Include country code (e.g., +91 for India)
             </p>
           </div>
 
           <Button
             onClick={sendOtp}
-            className="w-full"
+            className="sm-btn h-auto w-full rounded-none bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
             disabled={loading}
             size="lg"
           >
@@ -134,7 +134,7 @@ export default function SupabasePhoneAuth() {
       ) : (
         <>
           <div className="space-y-2">
-            <Label htmlFor="otp" className="text-sm font-medium">
+            <Label htmlFor="otp" className="mb-2.5 block font-sans text-[0.6875rem] font-medium uppercase tracking-eyebrow text-samara-mute">
               Enter OTP
             </Label>
             <Input
@@ -143,7 +143,7 @@ export default function SupabasePhoneAuth() {
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="123456"
-              className="w-full text-center text-2xl tracking-widest"
+              className="h-12 w-full rounded-none border border-samara-line bg-transparent px-4 font-sans text-sm text-samara-ivory placeholder:text-samara-mute/70 focus:border-samara-gold focus-visible:ring-1 focus-visible:ring-samara-gold focus-visible:ring-offset-0 h-16 text-center indent-[0.5em] font-sans text-2xl font-light tabular-nums tracking-[0.5em]"
               disabled={loading}
               maxLength={6}
               onKeyDown={(e) => {
@@ -152,14 +152,14 @@ export default function SupabasePhoneAuth() {
                 }
               }}
             />
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="mt-2 font-sans text-xs text-samara-mute text-center">
               Sent to {phone}
             </p>
           </div>
 
           <Button
             onClick={verifyOtp}
-            className="w-full"
+            className="sm-btn h-auto w-full rounded-none bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
             disabled={loading || otp.length !== 6}
             size="lg"
           >
@@ -170,7 +170,7 @@ export default function SupabasePhoneAuth() {
             <Button
               onClick={handleBack}
               variant="outline"
-              className="flex-1"
+              className="sm-btn h-auto rounded-none border-samara-line bg-transparent px-4 text-samara-ivory hover:border-samara-ivory hover:bg-transparent hover:text-samara-ivory flex-1"
               disabled={loading}
             >
               Change Number
@@ -178,7 +178,7 @@ export default function SupabasePhoneAuth() {
             <Button
               onClick={handleResendOtp}
               variant="outline"
-              className="flex-1"
+              className="sm-btn h-auto rounded-none border-samara-line bg-transparent px-4 text-samara-ivory hover:border-samara-ivory hover:bg-transparent hover:text-samara-ivory flex-1"
               disabled={loading}
             >
               Resend OTP
