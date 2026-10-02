@@ -69,7 +69,14 @@ export function Header() {
   const { items } = useCart();
   const { openSearch, openWishlist, openCart } = useShell();
   const [menuOpen, setMenuOpen] = useState(false);
-  const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  // Auth and the guest cart resolve in the browser, and the header can hydrate
+  // after they do (it sits in a Suspense boundary). Render auth/cart-dependent
+  // bits only after mount so server and first client render always match.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const cartItemsCount = mounted
+    ? items.reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
 
   const isOverlay = OVERLAY_ROUTES.includes(pathname);
   // Entrance plays once, only when the first page loaded is an overlay route.
@@ -203,7 +210,7 @@ export function Header() {
 
             {/* Account — fixed footprint so the auth-loading state never shifts */}
             <div className="hidden h-11 w-11 items-center justify-center lg:flex">
-              {loading ? null : user ? (
+              {!mounted || loading ? null : user ? (
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger className={iconBtn} aria-label="Account">
                     <User className="h-5 w-5" strokeWidth={1.25} />
