@@ -1,181 +1,146 @@
 import { Metadata } from 'next';
-import { Package, Camera, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { AlertCircle, ArrowRight } from 'lucide-react';
+import { LegalLayout } from '@/components/content/LegalLayout';
 
 export const metadata: Metadata = {
   title: 'Return Policy | Samara',
   description: 'Learn about our return policy for handcrafted Sambalpuri sarees. 14-day return window with proof requirements.',
 };
 
+const RETURN_STEPS = [
+  'Contact our customer support within 14 days of delivery',
+  'Provide your order number and reason for return',
+  'Submit unboxing video and clear photos of the defect/damage',
+  'Wait for return authorization and instructions',
+  'Ship the product back in original packaging',
+  'Receive refund after quality check approval',
+];
+
 export default function ReturnPolicyPage() {
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="container mx-auto px-4 py-16 max-w-4xl">
-        <div className="text-center mb-12">
-          <h1 className="font-serif text-4xl md:text-5xl font-bold text-[#D4AF37] mb-4">
-            Return Policy
-          </h1>
-          <p className="text-gray-400 text-lg">
-            Please read our return policy carefully before placing your order
-          </p>
-        </div>
-
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#D4AF37]/20 rounded-lg p-8 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <AlertCircle className="h-6 w-6 text-[#D4AF37]" />
-            <h2 className="font-serif text-2xl font-semibold text-[#D4AF37]">
-              Important Notice
-            </h2>
-          </div>
-          <p className="text-gray-300 text-lg leading-relaxed">
-            At Samara, we take pride in our handcrafted products. To ensure a fair return process
-            for both our customers and artisans, we have established the following policy.
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="bg-[#D4AF37]/10 p-3 rounded-lg">
-                <Clock className="h-6 w-6 text-[#D4AF37]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-serif text-xl font-semibold text-[#D4AF37] mb-2">
-                  14 Days Return Window
-                </h3>
-                <p className="text-gray-300 leading-relaxed">
-                  Returns must be initiated within 14 days from the date of delivery. After this period,
-                  we cannot accept any return requests.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="bg-[#D4AF37]/10 p-3 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-[#D4AF37]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-serif text-xl font-semibold text-[#D4AF37] mb-2">
-                  Eligible Products Only
-                </h3>
-                <p className="text-gray-300 leading-relaxed">
-                  Only defective or damaged products are eligible for return. Products must be unused,
-                  unworn, and in their original packaging with all tags attached.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-red-500/20 rounded-lg p-6 hover:border-red-500/40 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="bg-red-500/10 p-3 rounded-lg">
-                <Camera className="h-6 w-6 text-red-500" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-serif text-xl font-semibold text-red-500 mb-3">
-                  Unboxing Video & Photos MANDATORY
-                </h3>
-                <div className="space-y-2 text-gray-300">
-                  <p className="leading-relaxed">
-                    To claim a defect or damage, you <span className="font-bold text-red-500">MUST</span> provide:
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 ml-4">
-                    <li>Complete unboxing video showing the package opening process</li>
-                    <li>Clear photos of the defect or damage from multiple angles</li>
-                    <li>Photos of the product packaging and shipping label</li>
-                  </ul>
-                  <p className="font-bold text-red-500 mt-3">
-                    ⚠ Returns without proper unboxing proof will NOT be accepted
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="bg-[#D4AF37]/10 p-3 rounded-lg">
-                <Package className="h-6 w-6 text-[#D4AF37]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-serif text-xl font-semibold text-[#D4AF37] mb-2">
-                  Original Packaging Required
-                </h3>
-                <p className="text-gray-300 leading-relaxed">
-                  Products must be returned in their original packaging. This includes the product box,
-                  protective wrapping, tags, and any accessories that came with the product.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#D4AF37]/20 rounded-lg p-6 hover:border-[#D4AF37]/40 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="bg-[#D4AF37]/10 p-3 rounded-lg">
-                <CheckCircle2 className="h-6 w-6 text-[#D4AF37]" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-serif text-xl font-semibold text-[#D4AF37] mb-2">
-                  Refund Processing
-                </h3>
-                <p className="text-gray-300 leading-relaxed">
-                  Once your return is received and inspected, we will send you an email notification.
-                  If approved, refunds will be processed to your original payment method within 7-10
-                  business days after quality check completion.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-[#D4AF37]/10 to-transparent border border-[#D4AF37]/30 rounded-lg p-8 mt-10">
-          <h2 className="font-serif text-2xl font-semibold text-[#D4AF37] mb-4">
-            How to Initiate a Return
-          </h2>
-          <ol className="space-y-3 text-gray-300">
-            <li className="flex items-start gap-3">
-              <span className="font-bold text-[#D4AF37] mt-1">1.</span>
-              <span>Contact our customer support within 14 days of delivery</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold text-[#D4AF37] mt-1">2.</span>
-              <span>Provide your order number and reason for return</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold text-[#D4AF37] mt-1">3.</span>
-              <span>Submit unboxing video and clear photos of the defect/damage</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold text-[#D4AF37] mt-1">4.</span>
-              <span>Wait for return authorization and instructions</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold text-[#D4AF37] mt-1">5.</span>
-              <span>Ship the product back in original packaging</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="font-bold text-[#D4AF37] mt-1">6.</span>
-              <span>Receive refund after quality check approval</span>
-            </li>
-          </ol>
-        </div>
-
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#D4AF37]/20 rounded-lg p-8 mt-8 text-center">
-          <h3 className="font-serif text-xl font-semibold text-[#D4AF37] mb-3">
-            Questions About Our Return Policy?
+    <LegalLayout
+      eyebrow="Customer care"
+      title="Return"
+      accent="Policy"
+      intro="Please read our return policy carefully before placing your order"
+      sections={[
+        {
+          id: 'important-notice',
+          title: 'Important Notice',
+          body: (
+            <p className="font-serif text-xl font-light leading-relaxed text-samara-cream-ink sm:text-[1.375rem]">
+              At Samara, we take pride in our handcrafted products. To ensure a fair return process
+              for both our customers and artisans, we have established the following policy.
+            </p>
+          ),
+        },
+        {
+          id: 'return-window',
+          title: '14 Days Return Window',
+          body: (
+            <p>
+              Returns must be initiated within 14 days from the date of delivery. After this period,
+              we cannot accept any return requests.
+            </p>
+          ),
+        },
+        {
+          id: 'eligible-products',
+          title: 'Eligible Products Only',
+          body: (
+            <p>
+              Only defective or damaged products are eligible for return. Products must be unused,
+              unworn, and in their original packaging with all tags attached.
+            </p>
+          ),
+        },
+        {
+          id: 'unboxing-proof',
+          title: 'Unboxing Video & Photos MANDATORY',
+          tone: 'warning',
+          body: (
+            <>
+              <p>
+                To claim a defect or damage, you{' '}
+                <span className="font-semibold text-[#9E3F2A]">MUST</span> provide:
+              </p>
+              <ul className="space-y-2 border-l border-samara-cream-2 pl-5">
+                <li className="relative before:absolute before:-left-5 before:top-[0.85em] before:h-px before:w-3 before:bg-samara-gold-deep">
+                  Complete unboxing video showing the package opening process
+                </li>
+                <li className="relative before:absolute before:-left-5 before:top-[0.85em] before:h-px before:w-3 before:bg-samara-gold-deep">
+                  Clear photos of the defect or damage from multiple angles
+                </li>
+                <li className="relative before:absolute before:-left-5 before:top-[0.85em] before:h-px before:w-3 before:bg-samara-gold-deep">
+                  Photos of the product packaging and shipping label
+                </li>
+              </ul>
+              <p className="flex items-start gap-3 border border-[#9E3F2A]/30 px-4 py-3.5 font-semibold text-[#9E3F2A]">
+                <AlertCircle aria-hidden className="mt-[0.2em] h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
+                Returns without proper unboxing proof will NOT be accepted
+              </p>
+            </>
+          ),
+        },
+        {
+          id: 'original-packaging',
+          title: 'Original Packaging Required',
+          body: (
+            <p>
+              Products must be returned in their original packaging. This includes the product box,
+              protective wrapping, tags, and any accessories that came with the product.
+            </p>
+          ),
+        },
+        {
+          id: 'refund-processing',
+          title: 'Refund Processing',
+          body: (
+            <p>
+              Once your return is received and inspected, we will send you an email notification.
+              If approved, refunds will be processed to your original payment method within 7-10
+              business days after quality check completion.
+            </p>
+          ),
+        },
+        {
+          id: 'how-to-return',
+          title: 'How to Initiate a Return',
+          body: (
+            <ol className="!mt-2">
+              {RETURN_STEPS.map((step, i) => (
+                <li
+                  key={step}
+                  className="flex items-baseline gap-5 border-b border-samara-cream-2 py-3.5 last:border-b-0"
+                >
+                  <span className="w-6 flex-shrink-0 font-serif text-lg italic text-samara-gold-deep">
+                    {i + 1}.
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          ),
+        },
+      ]}
+      footer={
+        <div className="mt-14 bg-samara-forest px-6 py-10 text-samara-ivory sm:px-10 sm:py-12">
+          <h3 className="font-serif text-[1.75rem] font-light leading-tight">
+            Questions About Our <span className="sm-accent">Return Policy?</span>
           </h3>
-          <p className="text-gray-300 mb-6">
+          <p className="sm-body mt-4 max-w-md">
             If you have any questions or need clarification, please contact our customer support team.
           </p>
-          <a
+          <Link
             href="/contact"
-            className="inline-block px-8 py-3 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-bold rounded-lg transition-all duration-300 hover:scale-105"
+            className="sm-btn mt-8 bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
           >
             Contact Support
-          </a>
+            <ArrowRight aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+          </Link>
         </div>
-      </div>
-    </div>
+      }
+    />
   );
 }

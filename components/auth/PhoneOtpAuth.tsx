@@ -166,10 +166,10 @@ export function PhoneOtpAuth({ mode, name, onNameChange }: PhoneOtpAuthProps) {
       <div id="recaptcha-container"></div>
 
       {!otpSent ? (
-        <form onSubmit={handleSendOtp} className="space-y-4">
+        <form onSubmit={handleSendOtp} className="space-y-6 text-samara-ivory">
           {mode === 'signup' && (
             <div>
-              <Label htmlFor="name-phone" className="text-[#F5F5F5]">
+              <Label htmlFor="name-phone" className="mb-2.5 block font-sans text-[0.6875rem] font-medium uppercase tracking-eyebrow text-samara-mute">
                 Full Name
               </Label>
               <Input
@@ -179,13 +179,13 @@ export function PhoneOtpAuth({ mode, name, onNameChange }: PhoneOtpAuthProps) {
                 value={name || ''}
                 onChange={(e) => onNameChange?.(e.target.value)}
                 placeholder="Your name"
-                className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
+                className="h-12 w-full rounded-none border border-samara-line bg-transparent px-4 font-sans text-sm text-samara-ivory placeholder:text-samara-mute/70 focus:border-samara-gold focus-visible:ring-1 focus-visible:ring-samara-gold focus-visible:ring-offset-0"
               />
             </div>
           )}
 
           <div>
-            <Label htmlFor="phone" className="text-[#F5F5F5]">
+            <Label htmlFor="phone" className="mb-2.5 block font-sans text-[0.6875rem] font-medium uppercase tracking-eyebrow text-samara-mute">
               Phone Number
             </Label>
             <Input
@@ -195,25 +195,25 @@ export function PhoneOtpAuth({ mode, name, onNameChange }: PhoneOtpAuthProps) {
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+91 1234567890"
-              className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
+              className="h-12 w-full rounded-none border border-samara-line bg-transparent px-4 font-sans text-sm text-samara-ivory placeholder:text-samara-mute/70 focus:border-samara-gold focus-visible:ring-1 focus-visible:ring-samara-gold focus-visible:ring-offset-0"
             />
-            <p className="text-sm text-[#666] mt-1">
+            <p className="mt-2 font-sans text-xs text-samara-mute">
               Include country code (e.g., +91 for India)
             </p>
           </div>
 
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
+            className="sm-btn h-auto w-full rounded-none bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
             disabled={loading}
           >
             {loading ? 'Sending...' : 'Send OTP'}
           </Button>
         </form>
       ) : (
-        <form onSubmit={handleVerifyOtp} className="space-y-4">
+        <form onSubmit={handleVerifyOtp} className="space-y-6 text-samara-ivory">
           <div>
-            <Label htmlFor="otp" className="text-[#F5F5F5]">
+            <Label htmlFor="otp" className="mb-2.5 block font-sans text-[0.6875rem] font-medium uppercase tracking-eyebrow text-samara-mute">
               Enter OTP
             </Label>
             <Input
@@ -224,14 +224,14 @@ export function PhoneOtpAuth({ mode, name, onNameChange }: PhoneOtpAuthProps) {
               onChange={(e) => setOtp(e.target.value)}
               placeholder="000000"
               maxLength={6}
-              className="bg-[#1a1a1a] border-[#D4AF37]/30 text-[#F5F5F5] focus:border-[#D4AF37]"
+              className="h-12 w-full rounded-none border border-samara-line bg-transparent px-4 font-sans text-sm text-samara-ivory placeholder:text-samara-mute/70 focus:border-samara-gold focus-visible:ring-1 focus-visible:ring-samara-gold focus-visible:ring-offset-0"
             />
-            <p className="text-sm text-[#888] mt-2">OTP sent to {phone}</p>
+            <p className="mt-2 font-sans text-xs text-samara-mute">OTP sent to {phone}</p>
           </div>
 
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
+            className="sm-btn h-auto w-full rounded-none bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
             disabled={loading}
           >
             {loading ? 'Verifying...' : 'Verify OTP'}
@@ -240,7 +240,7 @@ export function PhoneOtpAuth({ mode, name, onNameChange }: PhoneOtpAuthProps) {
           <Button
             type="button"
             variant="ghost"
-            className="w-full text-[#D4AF37] hover:text-[#F4D03F]"
+            className="sm-btn h-auto w-full rounded-none text-samara-gold hover:bg-transparent hover:text-samara-ivory"
             onClick={() => {
               setOtpSent(false);
               setOtp('');
