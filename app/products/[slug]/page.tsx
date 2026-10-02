@@ -43,7 +43,6 @@ export default async function ProductDetailPage({
   }
 
   // ✅ DEBUG: Print Product ID to Server Terminal (Optional, can remove later)
-  console.log('PAGE PRODUCT ID ===>', product.id);
 
   // Sort images: Primary first, then by display_order
   const sortedImages = (product.product_images || []).sort((a: any, b: any) => {

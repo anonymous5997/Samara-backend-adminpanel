@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Heart,
@@ -160,6 +160,28 @@ export default function ProductDetailClient({
     }
   };
 
+  // Display-only: whether this product is already in the user's wishlist.
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (!user) {
+      setSaved(false);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('wishlist_items')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('product_id', product.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setSaved(!!data);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, product.id]);
+
   // Wishlist Logic
   const toggleWishlist = async () => {
     if (!user) {
@@ -181,6 +203,7 @@ export default function ProductDetailClient({
         .eq('id', existing.id);
   
       toast.info('Removed from wishlist');
+      setSaved(false);
     } else {
       await supabase
         .from('wishlist_items')
@@ -190,6 +213,7 @@ export default function ProductDetailClient({
         });
   
       toast.success('Added to wishlist');
+      setSaved(true);
     }
   };
 
@@ -359,9 +383,14 @@ export default function ProductDetailClient({
                     type="button"
                     className={circleBtn}
                     onClick={toggleWishlist}
-                    aria-label="Save to wishlist"
+                    aria-label={saved ? 'Remove from wishlist' : 'Save to wishlist'}
+                    aria-pressed={saved}
                   >
-                    <Heart aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+                    <Heart
+                      aria-hidden
+                      className={`h-4 w-4 ${saved ? 'fill-samara-gold text-samara-gold' : ''}`}
+                      strokeWidth={1.25}
+                    />
                   </button>
 
                   <button
