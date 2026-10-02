@@ -91,16 +91,55 @@ export default function ProductDetailClient({
   priceData,
   similarProducts,
   reviews,
-  isVerifiedBuyer,
+  isVerifiedBuyer: serverVerifiedBuyer,
   avgRating,
   reviewCount,
   // ✅ STEP 3: Destructure hasUserReviewed
-  hasUserReviewed,
+  hasUserReviewed: serverHasReviewed,
 }: ProductDetailClientProps) {
   // Presentation filter: stock placeholder.com rows are not product photos.
   const images = allImages.filter((img) => isGalleryImage(img.image_url));
 
   const { user } = useAuth();
+
+  // Verified-buyer / already-reviewed: the server render has no session, so
+  // re-check in the browser (where the signed-in session lives) with the same
+  // queries the product page uses: paid orders containing this product.
+  const [isVerifiedBuyer, setIsVerifiedBuyer] = useState(serverVerifiedBuyer);
+  const [hasUserReviewed, setHasUserReviewed] = useState(serverHasReviewed);
+  useEffect(() => {
+    if (!user) {
+      setIsVerifiedBuyer(serverVerifiedBuyer);
+      setHasUserReviewed(serverHasReviewed);
+      return;
+    }
+    let cancelled = false;
+    setHasUserReviewed(reviews.some((r: { user_id?: string }) => r.user_id === user.id));
+    (async () => {
+      const { data: paidOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('payment_status', 'paid');
+      const orderIds = paidOrders?.map((o: { id: string }) => o.id) ?? [];
+      if (orderIds.length === 0) {
+        if (!cancelled) setIsVerifiedBuyer(false);
+        return;
+      }
+      const { data: purchase } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('product_id', product.id)
+        .in('order_id', orderIds)
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setIsVerifiedBuyer(Boolean(purchase));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, product.id, reviews, serverVerifiedBuyer, serverHasReviewed]);
+
   const { addToCart } = useCart();
   const { openCart } = useShell();
   const { preview } = usePricePreview(); 
