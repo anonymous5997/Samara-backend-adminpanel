@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Reveal } from '@/components/motion/Reveal';
 import { HOME_COPY, HOME_IMAGES } from '@/config/homepage';
+import { getSiteImage } from '@/lib/site-images';
 
-/** Type-set stand-in for the story photo while HOME_IMAGES.story is null. */
+/** Type-set stand-in for the story photo when no image is set. */
 function StoryMonogram() {
   return (
     <div
@@ -28,12 +29,14 @@ function StoryMonogram() {
 }
 
 /**
- * "Our Story" split panel. The image comes from HOME_IMAGES.story in
- * config/homepage.ts; while it is null the left half is a type-set monogram.
+ * "Our Story" split panel. The image comes from the `story` Site Images slot
+ * (Admin → Site Images), then HOME_IMAGES.story in config/homepage.ts; with
+ * neither, the left half is a type-set monogram.
  */
-export function StoryBlock() {
+export async function StoryBlock() {
   const { story } = HOME_COPY;
-  const image = HOME_IMAGES.story;
+  const slot = await getSiteImage('story');
+  const image = slot ? { src: slot.url, alt: HOME_IMAGES.story?.alt ?? '' } : HOME_IMAGES.story;
 
   return (
     <section aria-labelledby="home-story-title" className="bg-samara-forest">

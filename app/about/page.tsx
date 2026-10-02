@@ -1,6 +1,13 @@
 import { Reveal } from '@/components/motion/Reveal';
-import { Monogram } from '@/components/content/Monogram';
+import Image from 'next/image';
 import { PageHero } from '@/components/content/PageHero';
+import { getSiteImage } from '@/lib/site-images';
+
+// Re-check the Site Images "about" photo at most once a minute.
+export const revalidate = 60;
+
+const WOVEN_PANEL =
+  'relative min-h-[22rem] overflow-hidden border-b border-samara-line sm:min-h-[28rem] lg:min-h-[44rem] lg:border-b-0 lg:border-r';
 
 const VALUES = [
   {
@@ -17,7 +24,9 @@ const VALUES = [
   },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const wovenImage = await getSiteImage('about');
+
   return (
     <div className="bg-samara-black text-samara-ivory">
       {/* Hero band */}
@@ -28,10 +37,36 @@ export default function AboutPage() {
         intro="Where heritage meets modern elegance"
       />
 
-      {/* Woven Luxury — monogram + story */}
+      {/* Woven Luxury — photo (Admin → Site Images) or beige logo panel + story */}
       <section aria-labelledby="about-woven" className="bg-samara-forest">
         <div className="grid lg:grid-cols-2">
-          <Monogram className="min-h-[22rem] border-b border-samara-line sm:min-h-[28rem] lg:min-h-[44rem] lg:border-b-0 lg:border-r" />
+          {wovenImage ? (
+            <div className={`${WOVEN_PANEL} bg-samara-char`}>
+              <Image
+                src={wovenImage.url}
+                alt=""
+                fill
+                loading="lazy"
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-cover"
+              />
+            </div>
+          ) : (
+            <div aria-hidden className={`${WOVEN_PANEL} flex items-center justify-center bg-samara-cream`}>
+              <div className="absolute inset-5 border border-samara-gold-deep/30 sm:inset-10 lg:inset-14" />
+              <div className="absolute inset-7 border border-samara-gold-deep/10 sm:inset-12 lg:inset-16" />
+              <Reveal variant="fade" className="relative flex w-full items-center justify-center">
+                <Image
+                  src="/brand/samara-logo-beige.png"
+                  alt=""
+                  width={1200}
+                  height={1200}
+                  sizes="(min-width: 1024px) 35vw, 70vw"
+                  className="h-auto w-[70%]"
+                />
+              </Reveal>
+            </div>
+          )}
 
           <div className="flex items-center">
             <Reveal className="w-full px-[var(--sm-gutter)] py-16 sm:py-20 lg:px-[clamp(3rem,6vw,7rem)] lg:py-24">
