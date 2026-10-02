@@ -12,6 +12,7 @@ interface CollectionCategory {
   name: string;
   slug: string;
   description: string | null;
+  imageUrl: string | null;
 }
 
 const ITEM = 'w-full max-w-[380px] sm:w-[calc(50%-0.75rem)] sm:max-w-none lg:w-[calc((100%-3rem)/3)]';
@@ -26,7 +27,7 @@ export default function CollectionsPage() {
 
       const { data, error } = await supabase
         .from('categories')
-        .select('id, name, slug, description, is_active')
+        .select('id, name, slug, description, is_active, image_url')
         .eq('is_active', true)
         .order('name');
 
@@ -37,6 +38,7 @@ export default function CollectionsPage() {
             name: c.name,
             slug: c.slug,
             description: c.description ?? '',
+            imageUrl: c.image_url ?? null,
           }))
         );
       }
@@ -91,6 +93,7 @@ export default function CollectionsPage() {
                       name={collection.name}
                       description={collection.description}
                       index={index}
+                      imageUrl={collection.imageUrl}
                     />
                   </Reveal>
                 </li>

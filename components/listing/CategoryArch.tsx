@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,8 @@ interface CategoryArchProps {
   name: string;
   description?: string | null;
   index: number;
+  /** categories.image_url (set in Admin → Categories); ornament when null. */
+  imageUrl?: string | null;
 }
 
 /**
@@ -17,7 +20,7 @@ interface CategoryArchProps {
  * outline arch, forest fill, typographic numeral ornament (no imagery is
  * queried for categories on /collections), name + one line + arrow.
  */
-export function CategoryArch({ href, name, description, index }: CategoryArchProps) {
+export function CategoryArch({ href, name, description, index, imageUrl }: CategoryArchProps) {
   const numeral = String(index + 1).padStart(2, '0');
 
   return (
@@ -52,7 +55,25 @@ export function CategoryArch({ href, name, description, index }: CategoryArchPro
           </span>
         </span>
 
-        <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-samara-black/40 to-transparent" />
+        {imageUrl && (
+          <span aria-hidden className="sm-zoom absolute inset-0">
+            <Image
+              src={imageUrl}
+              alt=""
+              fill
+              sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 90vw"
+              className="object-cover"
+            />
+          </span>
+        )}
+
+        <span
+          aria-hidden
+          className={cn(
+            'absolute inset-x-0 bottom-0 bg-gradient-to-t to-transparent',
+            imageUrl ? 'h-2/3 from-samara-black/[0.85]' : 'h-1/2 from-samara-black/40',
+          )}
+        />
 
         <span className="absolute inset-x-0 bottom-0 flex flex-col items-start p-6 md:p-7">
           <span className="font-serif text-[clamp(1.5rem,2.2vw,2rem)] font-normal uppercase leading-tight tracking-[0.06em] text-samara-ivory">
