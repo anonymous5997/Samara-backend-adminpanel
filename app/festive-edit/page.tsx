@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { getFestiveEditProducts, type ProductWithImages } from '@/lib/content';
-import { Star, Sparkles } from 'lucide-react';
-import { formatPriceSync, type SupportedCurrency } from '@/lib/currency-utils';
+import { type SupportedCurrency } from '@/lib/currency-utils';
+import { ListingHero, PieceCount } from '@/components/listing/ListingHero';
+import { ListingEmpty, ListingSkeleton } from '@/components/listing/ListingEmpty';
+import { LISTING_GRID, ListingProductCard } from '@/components/listing/ListingProductCard';
+import { FestiveOrnament, LozengeRule } from '@/components/listing/Ornaments';
 // ✅ STEP 1: Import currency rates fetcher
 import { getCurrencyRates } from '@/lib/currency-utils';
 
@@ -133,122 +135,60 @@ export default function FestiveEditPage() {
     loadPrices();
   }, [products, region, rates]); // ✅ Added rates dependency
 
-  /* -----------------------------------------------------
-     RENDER
-  ----------------------------------------------------- */
   return (
-    <div className="bg-black text-white min-h-screen">
-      <section className="relative py-24 bg-gradient-to-b from-black via-luxury-charcoal to-black">
-        <div className="container mx-auto px-4 md:px-8">
-          
-          {/* HEADER */}
-          <div className="text-center mb-16">
-            <h1 className="font-serif text-6xl md:text-7xl font-bold mb-6 text-gold tracking-tighter">
-              Festive Edit
-            </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Celebrate in style with our curated collection of festive sarees,
-              designed to make every occasion unforgettable.
-            </p>
-          </div>
+    <div className="min-h-screen bg-samara-black text-samara-ivory">
+      {/* HEADER */}
+      <ListingHero
+        eyebrow="Curated for Celebration"
+        kicker={<LozengeRule />}
+        title={
+          <>
+            Festive <span className="sm-accent">Edit</span>
+          </>
+        }
+        intro={
+          <>
+            Celebrate in style with our curated collection of festive sarees,
+            designed to make every occasion unforgettable.
+          </>
+        }
+        crumbs={[{ label: 'Home', href: '/' }, { label: 'Festive Edit' }]}
+        meta={!loading && products.length > 0 ? <PieceCount count={products.length} /> : null}
+        ornament={<FestiveOrnament />}
+      />
 
+      <section className="py-[clamp(3.5rem,7vw,6.5rem)]">
+        <div className="sm-container">
           {/* LOADING & EMPTY STATES */}
           {loading ? (
-            <div className="text-center py-20">
-              <p className="text-gray-500">Loading festive collection...</p>
+            <div role="status">
+              <span className="sr-only">Loading festive collection...</span>
+              <ListingSkeleton count={4} className={LISTING_GRID} />
             </div>
           ) : products.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-gray-500 mb-8">
-                Our festive collection is being curated. Check back soon!
-              </p>
-              <Link
-                href="/sarees"
-                className="inline-block px-8 py-3 bg-gold-gradient text-black font-semibold rounded-lg hover:shadow-xl hover:shadow-gold/40 transition-all"
-              >
-                Browse All Sarees
-              </Link>
-            </div>
+            <ListingEmpty
+              eyebrow="Festive Edit"
+              title="Our festive collection is being curated. Check back soon!"
+              actions={[{ label: 'Browse All Sarees', href: '/sarees' }]}
+            />
           ) : (
-            
             /* PRODUCT GRID */
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map((product) => {
+            <div className={LISTING_GRID}>
+              {products.map((product, index) => {
                 const priceData = priceMap[product.id];
+                const badges = [
+                  ...(product.is_bestseller ? [product.bestseller_badge_label || 'Bestseller'] : []),
+                  ...(product.is_new_arrival ? ['New'] : []),
+                ];
 
                 return (
-                  <Link key={product.id} href={`/products/${product.slug}`}>
-                    <div className="group relative bg-black rounded-lg overflow-hidden border-2 border-gold/20 hover:border-gold hover:shadow-2xl hover:shadow-gold/30 transition-all duration-500">
-
-                      {/* IMAGE CONTAINER */}
-                      <div className="aspect-[3/4] relative overflow-hidden bg-luxury-charcoal">
-                        {product.primary_image_url ? (
-                          <img
-                            src={product.primary_image_url}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-600">
-                            Product Image
-                          </div>
-                        )}
-
-                        {/* BADGES */}
-                        {product.is_bestseller && (
-                          <div className="absolute top-3 left-3 bg-gold text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
-                            <Star className="h-3 w-3 fill-current" />
-                            {product.bestseller_badge_label || 'Bestseller'}
-                          </div>
-                        )}
-
-                        {product.is_new_arrival && (
-                          <div className="absolute top-3 right-3 bg-gradient-to-r from-gold to-gold-light text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
-                            <Sparkles className="h-3 w-3" />
-                            New
-                          </div>
-                        )}
-                      </div>
-
-                      {/* DETAILS & PRICING */}
-                      <div className="p-4">
-                        <h3 className="font-serif text-lg font-semibold mb-1 line-clamp-1 text-gold">
-                          {product.name}
-                        </h3>
-
-                        {product.brand && (
-                          <p className="text-sm text-gray-500 mb-2">
-                            {product.brand}
-                          </p>
-                        )}
-
-                        {!priceData ? (
-                          <div className="h-5 w-24 bg-gray-800 animate-pulse rounded" />
-                        ) : (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {/* Display Price */}
-                            <p className="text-xl font-bold text-gold">
-                              {formatPriceSync(priceData.price, priceData.currency)}
-                            </p>
-
-                            {/* MRP (Only if higher) */}
-                            {priceData.mrp && priceData.mrp > priceData.price && (
-                              <p className="text-sm text-gray-500 line-through">
-                                {formatPriceSync(priceData.mrp, priceData.currency)}
-                              </p>
-                            )}
-
-                            {/* Discount Percentage */}
-                            {priceData.discountPct > 0 && (
-                              <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded ml-auto">
-                                {priceData.discountPct}% OFF
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
+                  <ListingProductCard
+                    key={product.id}
+                    product={product}
+                    index={index}
+                    badges={badges}
+                    price={priceData}
+                  />
                 );
               })}
             </div>
