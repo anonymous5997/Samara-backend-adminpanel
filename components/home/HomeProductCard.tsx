@@ -216,7 +216,7 @@ export function HomeProductCard({ product, index, price, tone = 'light' }: HomeP
           className={cn(
             'mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 disabled:cursor-wait',
             dark
-              ? 'border-samara-ivory/45 text-samara-ivory hover:border-samara-gold hover:bg-samara-gold hover:text-samara-cream-ink focus-visible:outline-samara-gold'
+              ? 'border-samara-ivory/[0.45] text-samara-ivory hover:border-samara-gold hover:bg-samara-gold hover:text-samara-cream-ink focus-visible:outline-samara-gold'
               : 'border-samara-gold-deep/60 text-samara-gold-deep hover:border-samara-cream-ink hover:bg-samara-cream-ink hover:text-samara-cream focus-visible:outline-samara-cream-ink',
           )}
         >

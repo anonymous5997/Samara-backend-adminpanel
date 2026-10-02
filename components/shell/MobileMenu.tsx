@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 export const primaryNav = [
   { href: '/sarees', label: 'Sarees' },
   { href: '/collections', label: 'Collections' },
-  { href: '/#new-arrivals', label: 'New Arrivals' },
+  { href: '/shop', label: 'New Arrivals' },
   { href: '/#best-sellers', label: 'Best Sellers' },
   { href: '/about', label: 'Our Story' },
 ];

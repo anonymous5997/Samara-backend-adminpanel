@@ -163,7 +163,7 @@ function CategoryPanel({ category: c, crop, wide }: { category: HomeCategory; cr
         </>
       ) : (
         <span aria-hidden className="absolute inset-0 bg-[linear-gradient(160deg,#22362A_0%,#1B2A1F_70%)]">
-          <span className="absolute inset-5 border border-samara-gold/15" />
+          <span className="absolute inset-5 border border-samara-gold/[0.15]" />
           <span className="absolute right-8 top-6 font-serif text-[clamp(8rem,14vw,13rem)] font-light italic leading-none text-samara-gold/[0.12]">
             {c.name.trim().charAt(0).toUpperCase()}
           </span>

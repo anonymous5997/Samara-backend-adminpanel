@@ -228,7 +228,7 @@ function ArchCard({ collection: c, index }: { collection: HomeCollection; index:
           className={cn(
             'absolute inset-x-0 bottom-0 h-1/2',
             c.imageUrl
-              ? 'bg-gradient-to-t from-samara-black/85 via-samara-black/40 to-transparent'
+              ? 'bg-gradient-to-t from-samara-black/[0.85] via-samara-black/40 to-transparent'
               : 'bg-gradient-to-t from-samara-black/40 to-transparent',
           )}
         />

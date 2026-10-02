@@ -63,7 +63,7 @@ export function Footer() {
               className="inline-block focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold"
             >
               <Image
-                src="/samara-logo.png"
+                src="/brand/samara-logo-transparent.png"
                 alt="Samara - Best Handcrafted Sambalpuri Sarees"
                 width={794}
                 height={290}
