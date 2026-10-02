@@ -8,6 +8,7 @@ import { Mail, Phone, MapPin } from 'lucide-react';
 import { PageHero } from '@/components/content/PageHero';
 import { Reveal } from '@/components/motion/Reveal';
 import { fieldClass, goldButtonClass, labelClass } from '@/components/content/formStyles';
+import { SITE_CONTACT } from '@/config/site';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -17,9 +18,24 @@ export default function ContactPage() {
     message: '',
   });
 
+  const [sent, setSent] = useState(false);
+
+  // No mail backend exists, so hand the message to the visitor's email app,
+  // pre-addressed to Samara with their details filled in.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+    const subject = `Website enquiry from ${formData.name || 'a customer'}`;
+    const body = [
+      formData.message,
+      '',
+      `Name: ${formData.name}`,
+      `Email: ${formData.email}`,
+      formData.phone ? `Phone: ${formData.phone}` : '',
+    ]
+      .filter((line, i) => i < 2 || line)
+      .join('\n');
+    window.location.href = `mailto:${SITE_CONTACT.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSent(true);
   };
 
   return (
@@ -48,29 +64,35 @@ export default function ContactPage() {
                 <div>
                   <dt className="sm-eyebrow">Email</dt>
                   <dd className="mt-2 font-serif text-xl font-light text-samara-ivory">
-                    hello@samara.com
+                    <a href={`mailto:${SITE_CONTACT.email}`} className="sm-link">
+                      {SITE_CONTACT.email}
+                    </a>
                   </dd>
                 </div>
               </div>
 
-              <div className="flex items-start gap-5 border-b border-samara-line py-6">
-                <Phone aria-hidden className="mt-0.5 h-4 w-4 flex-shrink-0 text-samara-gold" strokeWidth={1.25} />
-                <div>
-                  <dt className="sm-eyebrow">Phone</dt>
-                  <dd className="mt-2 font-serif text-xl font-light text-samara-ivory">
-                    +91 98765 43210
-                  </dd>
+              {SITE_CONTACT.phone && (
+                <div className="flex items-start gap-5 border-b border-samara-line py-6">
+                  <Phone aria-hidden className="mt-0.5 h-4 w-4 flex-shrink-0 text-samara-gold" strokeWidth={1.25} />
+                  <div>
+                    <dt className="sm-eyebrow">Phone</dt>
+                    <dd className="mt-2 font-serif text-xl font-light text-samara-ivory">
+                      <a href={`tel:${SITE_CONTACT.phone.replace(/\s+/g, '')}`} className="sm-link">
+                        {SITE_CONTACT.phone}
+                      </a>
+                    </dd>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-start gap-5 border-b border-samara-line py-6">
                 <MapPin aria-hidden className="mt-0.5 h-4 w-4 flex-shrink-0 text-samara-gold" strokeWidth={1.25} />
                 <div>
                   <dt className="sm-eyebrow">Location</dt>
                   <dd className="mt-2 font-serif text-xl font-light leading-snug text-samara-ivory">
-                    Samara Boutique
+                    {SITE_CONTACT.location.name}
                     <br />
-                    Mumbai, India
+                    {SITE_CONTACT.location.city}
                   </dd>
                 </div>
               </div>
@@ -144,8 +166,13 @@ export default function ContactPage() {
                   Send Message
                 </Button>
 
-                <p className="text-center font-sans text-xs leading-relaxed text-samara-mute">
-                  We typically respond within 24-48 hours during business days
+                <p
+                  className="text-center font-sans text-xs leading-relaxed text-samara-mute"
+                  aria-live="polite"
+                >
+                  {sent
+                    ? `Your email app should open with your message to ${SITE_CONTACT.email}.`
+                    : 'We typically respond within 24-48 hours during business days'}
                 </p>
               </form>
             </div>

@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import { ListingEmpty } from "@/components/listing/ListingEmpty";
 
 /* -----------------------------------------------------------
@@ -20,7 +20,12 @@ export default async function SareePage({
 }) {
   // Next.js 15+: params is a Promise and must be awaited.
   const { slug } = await params;
-  const supabase = await createClient();
+  // Public product read: anon key (RLS applies), not the service role.
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
 
   // ---------------------------------------------------------
   // 1. GET REGION & RATES (Server-Side)

@@ -1,6 +1,5 @@
 // Server-only: imported by app/page.tsx (a Server Component). Do not import from client components.
 import { createClient as createAnonClient } from '@supabase/supabase-js';
-import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getAllCollections, getMostLovedProducts, getNewArrivals } from '@/lib/content';
 import type { HomeCategory, HomeCollection, HomeData, HomeHeroSlide } from './types';
 
@@ -31,9 +30,18 @@ function toHeroSlide(row: Record<string, any>): HomeHeroSlide {
   };
 }
 
+// Public storefront reads use the anon key (RLS applies), never the service role.
+function publicClient() {
+  return createAnonClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}
+
 async function getHeroSlides(): Promise<HomeHeroSlide[]> {
   // Same query the homepage already used (app/page.tsx).
-  const supabase = await createServerClient();
+  const supabase = publicClient();
   const { data, error } = await supabase
     .from('hero_slides')
     .select('*')
@@ -44,11 +52,7 @@ async function getHeroSlides(): Promise<HomeHeroSlide[]> {
 }
 
 async function getCategoriesWithImages(): Promise<HomeCategory[]> {
-  const supabase = createAnonClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  const supabase = publicClient();
 
   const [{ data: cats, error: cErr }, { data: prods, error: pErr }] = await Promise.all([
     supabase

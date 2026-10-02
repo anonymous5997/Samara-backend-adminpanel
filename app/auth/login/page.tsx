@@ -218,7 +218,7 @@ export default function LoginPage() {
   const setPassword = async () => {
     if (!form.password || form.password.length < 8) {
       toast.error(
-        'Password must be at least 8 characters, include 1 capital & 1 special character'
+        'Password must be at least 8 characters'
       );
       return;
     }
