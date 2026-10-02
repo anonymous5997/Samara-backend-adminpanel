@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import { AccountHero, BTN_GOLD, Eyebrow, FOCUS, TEXT_LINK } from '@/components/account/ui';
 import { WishlistCard } from '@/components/account/WishlistCard';
@@ -15,11 +16,15 @@ export default function WishlistPage() {
   const { user, items, loading, removeFromWishlist, handleAddToCart, formatPrice } =
     useWishlist();
 
+  // Wait for auth to resolve before deciding; otherwise a signed-in user
+  // opening /wishlist directly is bounced to /auth/login on first render.
+  const { loading: authLoading } = useAuth();
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       router.push('/auth/login');
     }
-  }, [user, router]);
+  }, [authLoading, user, router]);
 
   if (loading) {
     return (
