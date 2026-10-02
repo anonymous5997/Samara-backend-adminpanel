@@ -330,6 +330,26 @@
   animation-delay: var(--anim-delay, 0ms);
 }
 
+/* Drawers (components/shell/Drawer.tsx) — Radix sets data-state */
+@keyframes sm-overlay-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sm-overlay-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sm-drawer-in-right  { from { transform: translate3d(100%, 0, 0); } to { transform: none; } }
+@keyframes sm-drawer-out-right { from { transform: none; } to { transform: translate3d(100%, 0, 0); } }
+@keyframes sm-drawer-in-left   { from { transform: translate3d(-100%, 0, 0); } to { transform: none; } }
+@keyframes sm-drawer-out-left  { from { transform: none; } to { transform: translate3d(-100%, 0, 0); } }
+.sm-drawer-overlay[data-state="open"]   { animation: sm-overlay-in 300ms var(--sm-ease) both; }
+.sm-drawer-overlay[data-state="closed"] { animation: sm-overlay-out 250ms var(--sm-ease) both; }
+.sm-drawer-panel[data-side="right"][data-state="open"]   { animation: sm-drawer-in-right 550ms var(--sm-ease) both; }
+.sm-drawer-panel[data-side="right"][data-state="closed"] { animation: sm-drawer-out-right 350ms var(--sm-ease-in-out) both; }
+.sm-drawer-panel[data-side="left"][data-state="open"]    { animation: sm-drawer-in-left 550ms var(--sm-ease) both; }
+.sm-drawer-panel[data-side="left"][data-state="closed"]  { animation: sm-drawer-out-left 350ms var(--sm-ease-in-out) both; }
+
+/* Stagger children in an opening overlay: <li class="sm-stagger" style="--i:2"> */
+.sm-stagger {
+  animation: sm-fade-up 700ms var(--sm-ease) both;
+  animation-delay: calc(200ms + var(--i, 0) * 60ms);
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-reveal],
   [data-reveal]:not([data-revealed]) {
@@ -343,6 +363,9 @@
     transition: none !important;
   }
   .sm-marquee-track,
+  .sm-drawer-overlay,
+  .sm-drawer-panel,
+  .sm-stagger,
   .sm-anim-hero-image,
   .sm-anim-rise,
   .sm-anim-fade-up {
