@@ -16,7 +16,7 @@ const clean = (v: unknown): string | null => {
 function toHeroSlide(row: Record<string, any>): HomeHeroSlide {
   // The table has used several CTA column names over time
   // (primary_cta_label / cta_label, cta_url / cta_href); accept any.
-  const pLabel = clean(row.primary_cta_label) ?? clean(row.cta_label);
+  const pLabel = clean(row.cta_label) ?? clean(row.primary_cta_label);
   const pHref = clean(row.cta_url) ?? clean(row.cta_href) ?? clean(row.primary_cta_url);
   const sLabel = clean(row.secondary_cta_label);
   const sHref = clean(row.secondary_cta_url);

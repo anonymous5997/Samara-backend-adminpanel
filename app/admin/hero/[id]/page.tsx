@@ -43,7 +43,8 @@ export default function AdminEditHeroSlidePage() {
           title,
           subtitle,
           cta_label,
-          cta_href,
+          primary_cta_label,
+          cta_url,
           media_type,
           media_url,
           sort_order,
@@ -62,8 +63,8 @@ export default function AdminEditHeroSlidePage() {
 
       setTitle(data.title ?? '');
       setSubtitle(data.subtitle ?? '');
-      setCtaLabel(data.cta_label ?? '');
-      setCtaHref(data.cta_href ?? '');
+      setCtaLabel(data.cta_label ?? data.primary_cta_label ?? '');
+      setCtaHref(data.cta_url ?? '');
       setMediaType((data.media_type as MediaType) ?? 'image');
       setExistingMediaUrl(data.media_url ?? null);
       setSortOrder(String(data.sort_order ?? 1));
@@ -119,8 +120,11 @@ export default function AdminEditHeroSlidePage() {
         .update({
           title,
           subtitle: subtitle || null,
+          // hero_slides stores the link in cta_url (there is no cta_href
+          // column); the homepage reads cta_label, then primary_cta_label.
           cta_label: ctaLabel || null,
-          cta_href: ctaHref || null,
+          primary_cta_label: ctaLabel || null,
+          cta_url: ctaHref || null,
           media_type: mediaType,
           media_url: mediaUrl,
           sort_order: Number(sortOrder) || 1,
