@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Brand intro (first visit to "/" per browser session).
+ * Brand intro (every full page load of "/"; not on in-app navigation).
  *
  * Fast by design (~1s) and CSS-driven: an inline script in app/layout.tsx
  * sets <html data-intro="play"> before paint when the intro should run, and
  * the CSS in globals.css (".sm-intro") animates the curtains and hides the
  * overlay at the end — so it disappears even if JS is slow. The hero renders
- * underneath the whole time (no LCP delay). Click/tap skips. Reduced motion,
- * repeat visits and no-JS never see it.
+ * underneath the whole time (no LCP delay). Click/tap skips. Reduced motion
+ * and no-JS never see it.
  */
 export function IntroCurtain() {
   const [skipped, setSkipped] = useState(false);

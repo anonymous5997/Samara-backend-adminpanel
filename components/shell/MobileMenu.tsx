@@ -27,24 +27,8 @@ export function isActiveRoute(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-/**
- * Restyles the shared CurrencySelector (components/currency-selector.tsx)
- * from the outside: square, borderless, tracked uppercase, no flags.
- */
-export const currencySkin = [
-  // trigger
-  '[&>div>button]:h-11 [&>div>button]:gap-1.5 [&>div>button]:rounded-none [&>div>button]:border-0 [&>div>button]:bg-transparent [&>div>button]:px-2',
-  '[&>div>button]:font-sans [&>div>button]:text-[11px] [&>div>button]:font-medium [&>div>button]:uppercase [&>div>button]:tracking-[0.2em] [&>div>button]:text-samara-ivory',
-  '[&>div>button:hover]:bg-transparent [&>div>button:hover]:opacity-70',
-  '[&>div>button:focus-visible]:outline [&>div>button:focus-visible]:outline-1 [&>div>button:focus-visible]:outline-samara-gold',
-  '[&>div>button>span:first-child]:hidden [&>div>button_span_span]:font-medium [&>div>button_span_span:last-child]:text-samara-ivory/60 [&>div>button_span_span:last-child]:normal-case [&>div>button_span_span:last-child]:tracking-normal',
-  '[&>div>button>svg]:ml-0 [&>div>button>svg]:h-3 [&>div>button>svg]:w-3',
-  // panel
-  '[&>div>div]:rounded-none [&>div>div]:border-samara-line [&>div>div]:bg-samara-ink [&>div>div]:shadow-none',
-  '[&_li_button]:bg-transparent [&_li_button]:px-4 [&_li_button]:py-2.5 [&_li_button]:font-sans [&_li_button]:text-xs [&_li_button]:tracking-wide [&_li_button]:text-samara-ivory/75',
-  '[&_li_button:hover]:bg-transparent [&_li_button:hover]:text-samara-ivory',
-  '[&_li_button>span:first-child]:hidden [&_li_button_span]:text-samara-mute',
-].join(' ');
+/** Kept for compatibility; CurrencySelector now carries the Samara styling itself. */
+export const currencySkin = '';
 
 
 const menuNav = [
@@ -60,7 +44,7 @@ function MenuCurrency() {
   const { currency, changeCurrency } = useCurrencySwitch();
   return (
     <div className={cn(currencySkin, '-ml-2')}>
-      <CurrencySelector currency={currency} onChange={changeCurrency} />
+      <CurrencySelector currency={currency} onChange={changeCurrency} align="left" placement="up" />
     </div>
   );
 }
