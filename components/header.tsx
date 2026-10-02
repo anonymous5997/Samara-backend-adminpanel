@@ -118,8 +118,7 @@ export function Header() {
             ? 'border-samara-line bg-samara-ink/95 backdrop-blur-md'
             : 'border-transparent bg-transparent backdrop-blur-0',
           !isOverlay && 'bg-samara-ink',
-          playEntrance &&
-            'motion-safe:animate-[sm-overlay-in_900ms_cubic-bezier(0.22,1,0.36,1)_900ms_both]',
+          playEntrance && 'sm-header-enter',
         )}
       >
         {/* Legibility scrim over imagery; fades out once the bar turns solid. */}

@@ -49,9 +49,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${cormorant.variable} ${manrope.variable} ${playfair.variable}`}
     >
       <head>
+        {/* Brand intro: decide before first paint (first "/" visit per session,
+            motion allowed). CSS in globals.css does the rest. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(location.pathname==='/'&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&!sessionStorage.getItem('sm-intro')){document.documentElement.setAttribute('data-intro','play');sessionStorage.setItem('sm-intro','1')}}catch(e){}",
+          }}
+        />
         {/* Without JS, scroll-reveal content must never stay hidden. */}
         <noscript>
           <style>{`[data-reveal],[data-reveal]>*{opacity:1!important;transform:none!important;clip-path:none!important}`}</style>

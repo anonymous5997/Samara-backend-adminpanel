@@ -2,6 +2,7 @@ import AutoCurrencyWrapper from '@/components/AutoCurrencyWrapper';
 import { Marquee } from '@/components/motion/Marquee';
 import { getHomeData } from '@/components/home/data';
 import { HomeHero } from '@/components/home/HomeHero';
+import { IntroCurtain } from '@/components/home/IntroCurtain';
 import { TrustStrip } from '@/components/home/TrustStrip';
 import { CollectionsArches } from '@/components/home/CollectionsArches';
 import { ShopByCategory } from '@/components/home/ShopByCategory';
@@ -29,6 +30,7 @@ export default async function Home() {
   return (
     <div className="bg-samara-black">
       <AutoCurrencyWrapper />
+      <IntroCurtain />
 
       <HomeHero slides={data.heroSlides} />
       <TrustStrip />

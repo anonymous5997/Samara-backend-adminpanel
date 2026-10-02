@@ -28,9 +28,9 @@ const INTERVAL_MS = 7000;
 const SWIPE_PX = 48;
 
 /** First-load timeline (ms); later slide changes use the quicker set. */
-const FIRST = { eyebrow: 250, lead: 350, accent: 550, subtitle: 750, ctas: 900 };
-const NEXT = { eyebrow: 0, lead: 80, accent: 200, subtitle: 320, ctas: 420 };
-const STATIC_DELAY = 1100;
+const FIRST = { eyebrow: 150, lead: 220, accent: 360, subtitle: 500, ctas: 600 };
+const NEXT = { eyebrow: 0, lead: 60, accent: 150, subtitle: 240, ctas: 320 };
+const STATIC_DELAY = 750;
 
 const delay = (ms: number) => ({ ['--anim-delay' as string]: `${ms}ms` }) as CSSProperties;
 const pad = (n: number) => String(n).padStart(2, '0');
