@@ -1,12 +1,60 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Search, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 import { ProductCard } from '@/components/product-card';
+import { CATALOG_CARD_SIZES } from '@/components/catalog/CatalogGrid';
 import { useProductSearch } from '@/hooks/useProductSearch';
+import type { SearchProduct } from '@/hooks/useProductSearch';
+import { useCart } from '@/lib/cart-context';
+import { resolveFinalPrice } from '@/lib/resolve-product-price';
+import type { ResolvedPrice } from '@/lib/resolve-product-price';
+import { getUserRegion } from '@/lib/region/client';
+import { getCurrencyRates } from '@/lib/currency/get-currency-rates';
+import { cn } from '@/lib/utils';
+
+/**
+ * Prices resolved exactly as components/ProductSection.tsx and the search
+ * overlay do: rates once, then resolveFinalPrice(product, region, currency, rates),
+ * catching errors per product.
+ */
+function useSearchPrices(products: SearchProduct[]) {
+  const { currency } = useCart();
+  const [rates, setRates] = useState<Record<string, number> | null>(null);
+  const [priceMap, setPriceMap] = useState<Record<string, ResolvedPrice>>({});
+
+  useEffect(() => {
+    getCurrencyRates()
+      .then(setRates)
+      .catch((err) => console.error('Failed to load currency rates:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!products.length || !rates) return;
+    let cancelled = false;
+    const region = getUserRegion();
+
+    (async () => {
+      const map: Record<string, ResolvedPrice> = {};
+      for (const product of products) {
+        try {
+          map[product.id] = await resolveFinalPrice(product, region, currency, rates);
+        } catch (err) {
+          console.error('Failed to resolve price:', err);
+        }
+      }
+      if (!cancelled) setPriceMap(map);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [products, currency, rates]);
+
+  return priceMap;
+}
 
 function SearchView({ urlQuery }: { urlQuery: string | null }) {
   const {
@@ -30,90 +78,146 @@ function SearchView({ urlQuery }: { urlQuery: string | null }) {
     selectSuggestion(suggestion);
   };
 
+  const prices = useSearchPrices(products);
+  const suggestionsVisible = showSuggestions && suggestions.length > 0;
+
   return (
-    <div className="min-h-screen bg-[#000000] py-12">
-      <div className="container mx-auto px-4 md:px-8">
-        <div className="max-w-4xl mx-auto mb-12">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold text-[#D4AF37] mb-8 text-center">
-            Search Products
-          </h1>
+    <div className="min-h-screen bg-samara-black pb-24 text-samara-ivory md:pb-32">
+      <div className="sm-container pt-10 md:pt-16 lg:pt-20">
+        <h1 className="sm-eyebrow flex items-center gap-4 !tracking-eyebrow">
+          Search Products
+          <span aria-hidden className="h-px w-10 bg-samara-mute/50" />
+        </h1>
 
-          <div className="relative">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#D4AF37]" />
-              <Input
-                type="text"
-                placeholder="Search for sarees, collections, brands..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                className="pl-12 pr-12 py-6 text-lg bg-[#111111] border-[#D4AF37]/30 text-[#F5F5F5] placeholder:text-[#888] focus:border-[#D4AF37] focus:ring-[#D4AF37]/50"
-              />
-              {searchQuery && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#D4AF37] hover:text-[#F4D03F]"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#111111] border border-[#D4AF37]/30 rounded-lg shadow-xl z-50">
-                {suggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="w-full text-left px-4 py-3 text-[#F5F5F5] hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] transition-colors border-b border-[#D4AF37]/10 last:border-b-0"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
+        <div role="search" className="mt-6 md:mt-12">
+          <label htmlFor="sm-search-page-input" className="sr-only">
+            Search for sarees, collections, brands
+          </label>
+          <div className="relative flex items-end gap-4">
+            <input
+              id="sm-search-page-input"
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="Search for sarees, collections, brands..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              className="min-w-0 flex-1 appearance-none rounded-none border-0 bg-transparent pb-3 font-serif font-light leading-[1.05] text-samara-ivory caret-samara-gold outline-none placeholder:text-samara-mute/40 focus:outline-none focus:ring-0 md:pb-5 [&::-webkit-search-cancel-button]:hidden"
+              style={{ fontSize: 'clamp(1.875rem, 6vw, 5rem)', letterSpacing: '-0.01em' }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+                className="mb-3 flex h-11 shrink-0 items-center gap-2 px-1 font-sans text-[11px] uppercase tracking-eyebrow text-samara-mute transition-colors duration-300 hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold md:mb-5"
+              >
+                <span className="hidden md:inline">Clear</span>
+                <X aria-hidden className="h-5 w-5 md:hidden" strokeWidth={1.25} />
+              </button>
             )}
+          </div>
+          {/* Hairline underline + quiet progress line */}
+          <div className="relative h-px w-full bg-samara-line">
+            <div
+              aria-hidden
+              className={cn(
+                'absolute inset-y-0 left-0 w-full origin-left bg-samara-ivory/60 ease-editorial motion-reduce:transition-none',
+                searchQuery && loading
+                  ? 'scale-x-100 opacity-100 transition-transform duration-1600'
+                  : 'scale-x-0 opacity-0 transition-[opacity,transform] duration-300'
+              )}
+            />
           </div>
 
           {searchQuery && (
-            <p className="mt-4 text-[#888] text-center">
+            <p className="mt-5 font-sans text-[11px] uppercase tracking-[0.2em] text-samara-mute" aria-live="polite">
               {loading ? 'Searching...' : `${products.length} results found`}
             </p>
           )}
         </div>
 
-        {products.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-              />
-            ))}
-          </div>
-        )}
+        <div className="pt-10 md:pt-16">
+          {(suggestionsVisible || products.length > 0) && (
+            <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:gap-10 lg:gap-16">
+              {suggestionsVisible && (
+                <section className="md:col-span-4 lg:col-span-3" aria-labelledby="sm-search-page-suggestions">
+                  <p id="sm-search-page-suggestions" className="sm-eyebrow mb-4">
+                    Suggestions
+                  </p>
+                  <ul className="border-t border-samara-line">
+                    {suggestions.map((suggestion, index) => (
+                      <li key={index} className="border-b border-samara-line">
+                        <button
+                          type="button"
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="flex min-h-[48px] w-full items-center py-3 text-left font-serif text-lg font-light leading-snug text-samara-mute transition-colors duration-300 hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold"
+                        >
+                          {suggestion}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
 
-        {!loading && searchQuery && products.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-2xl text-[#888] mb-4">No products found</p>
-            <p className="text-[#666]">Try different search terms or browse our collections</p>
-            <Button
-              asChild
-              className="mt-6 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold"
-            >
-              <a href="/collections">Browse Collections</a>
-            </Button>
-          </div>
-        )}
+              {products.length > 0 && (
+                <section
+                  className={suggestionsVisible ? 'md:col-span-8 lg:col-span-9' : 'md:col-span-12'}
+                  aria-label="Results"
+                >
+                  <ul
+                    className={cn(
+                      'grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-6 md:gap-y-16',
+                      suggestionsVisible
+                        ? 'lg:grid-cols-3 lg:gap-x-8 min-[1440px]:grid-cols-3'
+                        : 'lg:grid-cols-3 lg:gap-x-8 min-[1440px]:grid-cols-4 min-[1440px]:gap-x-10',
+                      loading && 'opacity-60 transition-opacity duration-300'
+                    )}
+                  >
+                    {products.map((product) => (
+                      <li key={product.id}>
+                        <ProductCard
+                          product={product}
+                          image={product.primary_image_url ? { image_url: product.primary_image_url } : undefined}
+                          price={prices[product.id]}
+                          sizes={CATALOG_CARD_SIZES}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
+          )}
 
-        {!searchQuery && (
-          <div className="text-center py-16">
-            <Search className="h-16 w-16 text-[#D4AF37] mx-auto mb-4" />
-            <p className="text-xl text-[#888]">Start typing to search for products</p>
-          </div>
-        )}
+          {!loading && searchQuery && products.length === 0 && (
+            <div className="max-w-xl">
+              <p className="font-serif text-[clamp(1.5rem,2.4vw,2.25rem)] font-light leading-tight text-samara-ivory">
+                No products <span className="sm-accent">found</span>
+              </p>
+              <p className="sm-body mt-3">Try different search terms or browse our collections</p>
+              <Link
+                href="/collections"
+                className="sm-btn sm-btn-ghost mt-10"
+              >
+                Browse Collections
+              </Link>
+            </div>
+          )}
+
+          {!searchQuery && (
+            <p className="font-serif text-[clamp(1.375rem,2.2vw,2rem)] font-light italic leading-snug text-samara-mute">
+              Start typing to search for products
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
