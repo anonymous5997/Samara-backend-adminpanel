@@ -65,9 +65,9 @@ const selectStyles = {
 export default function CheckoutClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   
-  const { items: cartItems, clearCart } = useCart();
+  const { items: cartItems, clearCart, loading: cartLoading } = useCart();
 
   const mode = searchParams.get('mode');
   const isBuyNow = mode === 'buynow';
@@ -133,9 +133,12 @@ export default function CheckoutClient() {
 
   /* ---------------- AUTH CHECK ---------------- */
   useEffect(() => {
+    // Wait until auth and the cart have loaded; otherwise opening /checkout
+    // directly redirects before the session/cart exist.
+    if (authLoading || cartLoading) return;
     if (!user) router.replace('/auth/login');
     if (!isBuyNow && cartItems.length === 0) router.replace('/cart');
-  }, [user, cartItems.length, isBuyNow, router]);
+  }, [authLoading, cartLoading, user, cartItems.length, isBuyNow, router]);
 
   /* ---------------- PROFILE PRE-FILL ---------------- */
   useEffect(() => {
@@ -249,8 +252,11 @@ export default function CheckoutClient() {
         return;
       }
 
-      if (coupon.min_order_value_inr && subtotalINR < coupon.min_order_value_inr) {
-        toast.error(`Minimum order ₹${coupon.min_order_value_inr} required`);
+      // coupons.min_cart_value_inr is the schema column (same check as /cart);
+      // min_order_value_inr kept as a fallback for older rows.
+      const minOrderINR = coupon.min_cart_value_inr ?? coupon.min_order_value_inr;
+      if (minOrderINR && subtotalINR < minOrderINR) {
+        toast.error(`Minimum order ₹${minOrderINR} required`);
         return;
       }
 
@@ -273,6 +279,21 @@ export default function CheckoutClient() {
       setCouponLoading(false);
     }
   };
+
+  /* ---------------- COUPON CARRIED FROM /cart (?coupon=CODE) ---------------- */
+  const couponParam = searchParams.get('coupon');
+  const [couponParamTried, setCouponParamTried] = useState(false);
+  useEffect(() => {
+    if (couponParam && !couponCode && !couponApplied) setCouponCode(couponParam);
+  }, [couponParam, couponCode, couponApplied]);
+  useEffect(() => {
+    if (couponParamTried || couponApplied || !couponParam || subtotalINR <= 0) return;
+    if (couponCode.trim().toUpperCase() !== couponParam.trim().toUpperCase()) return;
+    setCouponParamTried(true);
+    applyCoupon();
+    // applyCoupon reads current state; run once when the code and subtotal are ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponParam, couponCode, subtotalINR, couponApplied, couponParamTried]);
 
   /* ---------------- SUBMIT ORDER ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {

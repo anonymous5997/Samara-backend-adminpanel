@@ -127,7 +127,6 @@ export default function OrderDetailsPage() {
         .eq('order_id', orderId)
 
       // STEP 4 DEBUG: Raw Data
-      console.log('ORDER ITEMS RAW ===>', itemsData)
       if (itemsError) console.error('ITEMS ERROR:', itemsError)
 
       const parsedItems: OrderItem[] = itemsData?.map((i: any) => ({
@@ -138,7 +137,6 @@ export default function OrderDetailsPage() {
       })) || []
 
       // STEP 5 DEBUG: Parsed Data
-      console.log('PARSED ITEMS ===>', parsedItems)
 
       setItems(parsedItems)
 
@@ -315,19 +313,6 @@ export default function OrderDetailsPage() {
   
   const canCancel = !isCancelled && !isShipped && !isDelivered
   const canReturn = returnEligible && !isCancelled
-
-  // STEP 6 DEBUG: Order Status
-  console.log('ORDER STATUS ===>', order.status)
-
-  // STEP 7 DEBUG: Reviewed IDs
-  console.log('REVIEWED PRODUCT IDS ===>', reviewedProductIds)
-
-  // STEP 8 DEBUG: Gate Condition
-  console.log('SHOULD ASK FOR REVIEW ===>', {
-    isDelivered,
-    itemsLength: items.length,
-    reviewedProductIds,
-  })
 
   // ✅ REVIEW LOGIC
   const shouldAskForReview = isDelivered && items.some(i => !reviewedProductIds.includes(i.product_id))

@@ -75,10 +75,7 @@ export default function PaymentPage() {
         // ---------------------------------------------------------
         handler: async (response: any) => {
           // ✅ Step 1: Confirm Handler Fires
-          console.log("🔥 PAYMENT SUCCESS HANDLER EXECUTED");
-          alert("Payment Success Handler Triggered");
 
-          console.log("Payment response:", response);
 
           // 1️⃣ Update order status
           const { error: orderError } = await supabase
@@ -96,11 +93,9 @@ export default function PaymentPage() {
             console.error("❌ Order update failed:", orderError.message);
             // We continue even if update fails to try and log analytics, or you can return
           } else {
-            console.log("✅ Order marked as paid.");
           }
 
           // ✅ Step 2: Analytics Insert with Detailed Logging
-          console.log("🚀 Attempting analytics insert...");
           
           const insertResult = await supabase
             .from('analytics_events')
@@ -111,16 +106,13 @@ export default function PaymentPage() {
             })
             .select();
 
-          console.log("📦 Insert result:", insertResult);
 
           if (insertResult.error) {
             console.error("❌ Analytics insert FAILED:", insertResult.error.message);
           } else {
-            console.log("✅ Analytics insert SUCCESS");
           }
 
           // ✅ Step 3: Forced Delay to prevent premature unmount
-          console.log("⏳ Waiting 2 seconds before redirect...");
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           router.replace(`/orders/${order.id}`);
