@@ -59,8 +59,10 @@ export default function AdminHeroPage() {
         {
           title,
           subtitle: subtitle || null,
+          // hero_slides stores the link in cta_url (there is no cta_href column).
           cta_label: ctaLabel || null,
-          cta_href: ctaHref || null,
+          primary_cta_label: ctaLabel || null,
+          cta_url: ctaHref || null,
           media_type: mediaType,
           media_url: publicUrl,
           sort_order: Number(sortOrder) || 1,

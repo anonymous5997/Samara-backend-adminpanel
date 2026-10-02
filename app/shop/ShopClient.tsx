@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import * as SheetPrimitive from '@radix-ui/react-dialog';
+import { Check, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { ProductCard } from '@/components/product-card';
 import { supabase } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 
 // ✅ IMPORTS
 import type { ProductWithImages } from '@/lib/content'; 
 import type { Category } from '@/lib/types'; 
 
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -18,7 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Sheet, SheetClose, SheetOverlay, SheetPortal, SheetTitle } from '@/components/ui/sheet';
+import { CatalogHeader, AccentTitle } from '@/components/catalog/CatalogHeader';
+import { CatalogGrid, CatalogGridSkeleton, CATALOG_CARD_SIZES } from '@/components/catalog/CatalogGrid';
 
 // IMPORT PRICING ENGINE
 import { resolveFinalPrice, ResolvedPrice } from '@/lib/resolve-product-price';
@@ -58,6 +63,9 @@ export default function ShopPage() {
 
   // ✅ STEP 1: MOBILE UI STATE
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  // Desktop price popover (presentation only)
+  const [priceOpen, setPriceOpen] = useState(false);
 
   // Initial Load (Categories + Rates)
   useEffect(() => {
@@ -221,227 +229,325 @@ export default function ShopPage() {
     }
   };
 
-  /* -------------------------------------------------------------------------- */
-  /* ✅ STEP 2: EXTRACTED FILTER CONTENT (Reusable)                             */
-  /* -------------------------------------------------------------------------- */
-  const FilterContent = (
-    <div className="space-y-8">
-      {/* Category */}
-      <div className="space-y-3 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
-        <Label className="text-lg font-serif font-medium text-[#D4AF37]">
-          Category
-        </Label>
 
-        <Select
-          value={selectedCategory}
-          onValueChange={(val) => {
-            setSelectedCategory(val);
-            router.push(val === 'all' ? '/shop' : `/shop?category=${val}`);
-          }}
-        >
-          <SelectTrigger className="w-full bg-[#111] text-white border-gray-700 h-10 mt-2">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent className="bg-[#111] text-white border-gray-700">
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.slug}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+  /* -------------------------------------------------------------------------- */
+  /* FILTER HANDLERS (shared by the desktop toolbar and the mobile sheet)        */
+  /* -------------------------------------------------------------------------- */
+  const onCategoryChange = (val: string) => {
+    setSelectedCategory(val);
+    router.push(val === 'all' ? '/shop' : `/shop?category=${val}`);
+  };
+
+  const onApplyPrice = () => {
+    fetchProducts();
+    setMobileFiltersOpen(false); // Close mobile menu on apply
+  };
+
+  const onResetFilters = () => {
+    setPriceRange([0, 50000]);
+    setSelectedCategory('all');
+    router.push('/shop');
+    fetchProducts();
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /* PRESENTATION                                                               */
+  /* -------------------------------------------------------------------------- */
+  const activeCategory = categories.find((c) => c.slug === selectedCategory);
+  const countLabel = `${products.length} ${products.length === 1 ? 'product' : 'products'}`;
+  const priceLabel = `₹${priceRange[0].toLocaleString()} – ₹${priceRange[1].toLocaleString()}`;
+  const categoryOptions = [{ value: 'all', label: 'All' }].concat(
+    categories.map((category) => ({ value: category.slug, label: category.name }))
+  );
+
+  const categoryChips = (className?: string) => (
+    <ul className={cn('flex gap-2', className)} aria-label="Category">
+      {categoryOptions.map((opt) => {
+        const selected = selectedCategory === opt.value;
+        return (
+          <li key={opt.value} className="shrink-0">
+            <button
+              type="button"
+              onClick={() => onCategoryChange(opt.value)}
+              aria-pressed={selected}
+              className={cn(
+                'relative flex h-11 items-center border px-4 font-sans text-[11px] uppercase tracking-[0.2em] transition-colors duration-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold lg:h-10',
+                'after:absolute after:inset-x-4 after:bottom-2 after:h-px after:origin-left after:bg-samara-gold after:transition-transform after:duration-500 after:ease-editorial',
+                selected
+                  ? 'border-samara-ivory/[0.35] text-samara-ivory after:scale-x-100'
+                  : 'border-samara-line text-samara-mute after:scale-x-0 hover:border-samara-ivory/[0.35] hover:text-samara-ivory'
+              )}
+            >
+              {opt.label}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const PriceControl = (
+    <div>
+      <div className="flex justify-between font-sans text-xs tabular-nums text-samara-mute">
+        <span>₹{priceRange[0].toLocaleString()}</span>
+        <span>₹{priceRange[1].toLocaleString()}</span>
       </div>
 
-      {/* Price Filter */}
-      <div className="space-y-4 border border-gray-800 p-4 rounded-lg bg-[#0a0a0a]">
-        <Label className="text-lg font-serif font-medium text-[#D4AF37]">
-          Price Filter
-        </Label>
-
-        <div className="flex justify-between text-xs text-gray-400 font-mono">
-          <span>₹{priceRange[0].toLocaleString()}</span>
-          <span>₹{priceRange[1].toLocaleString()}</span>
-        </div>
-
-        <Slider
-          min={0}
-          max={50000}
-          step={1000}
-          value={priceRange}
-          onValueChange={(value) =>
-            setPriceRange(value as [number, number])
-          }
-          className="py-2"
-        />
-
-        <Button
-          onClick={() => {
-            fetchProducts();
-            setMobileFiltersOpen(false); // Close mobile menu on apply
-          }}
-          className="w-full bg-[#D4AF37] hover:bg-[#b5952f] text-black font-bold h-10 rounded-md mt-2"
-        >
-          APPLY FILTER
-        </Button>
-      </div>
+      <Slider
+        min={0}
+        max={50000}
+        step={1000}
+        value={priceRange}
+        onValueChange={(value) =>
+          setPriceRange(value as [number, number])
+        }
+        className={cn(
+          'py-5',
+          '[&>span:first-child]:h-px [&>span:first-child]:rounded-none [&>span:first-child]:bg-samara-line',
+          '[&>span:first-child>span]:bg-samara-gold',
+          '[&_[role=slider]]:relative [&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:border [&_[role=slider]]:border-samara-gold [&_[role=slider]]:bg-samara-black [&_[role=slider]]:ring-offset-0 [&_[role=slider]]:after:absolute [&_[role=slider]]:after:-inset-3.5 [&_[role=slider]]:after:content-[""] [&_[role=slider]:focus-visible]:ring-1 [&_[role=slider]:focus-visible]:ring-samara-gold'
+        )}
+        aria-label="Price range"
+      />
     </div>
   );
 
-  /* -------------------------------------------------------------------------- */
-  /* RENDER                                                                     */
-  /* -------------------------------------------------------------------------- */
+  const sortOptions = [
+    { value: 'newest', label: 'Newest First' },
+    { value: 'price-asc', label: 'Price: Low to High' },
+    { value: 'price-desc', label: 'Price: High to Low' },
+  ] as const;
+
+  const eyebrowCls = 'font-sans text-[11px] uppercase tracking-[0.2em]';
 
   return (
-    <div className="bg-black min-h-screen text-white pb-20 pt-8">
-      <div className="container mx-auto px-4">
-        {/* Header */}
-        <h1 className="text-4xl font-bold mb-10 text-[#D4AF37] font-serif tracking-wide">
-          Shop All Products
-        </h1>
+    <div className="min-h-screen bg-samara-black pb-24 text-samara-ivory md:pb-32">
+      <CatalogHeader
+        eyebrow="Shop"
+        title={activeCategory ? <AccentTitle text={activeCategory.name} /> : <>All <span className="sm-accent">products</span></>}
+        intro={activeCategory?.description || 'Every piece in the house, gathered in one place.'}
+      />
 
-        <div className="flex flex-col lg:flex-row gap-12">
-          
-          {/* ✅ STEP 3: DESKTOP SIDEBAR (Hidden on Mobile) */}
-          <aside className="hidden lg:block lg:w-64 h-fit">
-            {FilterContent}
-          </aside>
+      {/* ------------------------------------------------------------------ */}
+      {/* TOOLBAR — mobile: count + Filter & Sort; desktop: chips · price · sort */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="sticky top-[60px] z-30 border-b border-samara-line bg-samara-black/95 backdrop-blur-md lg:top-[72px]">
+        <div className="sm-container flex h-14 items-center justify-between gap-6 lg:h-16">
+          {/* Mobile */}
+          <p className={cn(eyebrowCls, 'text-samara-mute lg:hidden')} aria-live="polite">
+            {loading ? 'Loading…' : countLabel}
+          </p>
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className={cn(
+              eyebrowCls,
+              '-mr-2 flex h-11 items-center gap-3 px-2 text-samara-ivory transition-colors duration-300 hover:text-samara-gold focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold lg:hidden'
+            )}
+          >
+            <SlidersHorizontal aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+            Filter &amp; Sort
+          </button>
 
-          {/* PRODUCT GRID SECTION */}
-          <div className="flex-1">
-            
-            {/* ✅ STEP 4: MOBILE FILTER BAR (Visible only on lg:hidden) */}
-            <div className="lg:hidden flex gap-3 mb-4">
-              <button
-                onClick={() => setMobileFiltersOpen(true)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg
-                           bg-[#0b0b0b] border border-[#D4AF37]/30 text-[#D4AF37]
-                           font-semibold text-sm"
+          {/* Desktop */}
+          {categoryChips('hidden min-w-0 overflow-x-auto [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden')}
+
+          <div className="hidden shrink-0 items-center gap-8 lg:flex">
+            <Popover open={priceOpen} onOpenChange={setPriceOpen}>
+              <PopoverTrigger
+                className={cn(
+                  eyebrowCls,
+                  'flex h-10 items-center gap-2 text-samara-mute transition-colors duration-300 hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold data-[state=open]:text-samara-ivory'
+                )}
               >
-                Filters
-              </button>
+                Price
+                <span className="tabular-nums normal-case tracking-normal text-samara-ivory">{priceLabel}</span>
+                <ChevronDown aria-hidden className="h-3.5 w-3.5" strokeWidth={1.25} />
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={12}
+                className="w-80 rounded-none border-samara-line bg-samara-ink p-6 text-samara-ivory shadow-none"
+              >
+                <p className="sm-eyebrow mb-2">Price Filter</p>
+                {PriceControl}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onApplyPrice();
+                    setPriceOpen(false);
+                  }}
+                  className="sm-btn mt-2 w-full bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
+                >
+                  Apply Filter
+                </button>
+              </PopoverContent>
+            </Popover>
 
+            <span aria-hidden className="h-5 w-px bg-samara-line" />
+
+            <div className="flex items-center gap-3">
+              <span className={cn(eyebrowCls, 'text-samara-mute')}>Sort</span>
               <Select
                 value={sortBy}
-                onValueChange={(val: any) => setSortBy(val)}
+                onValueChange={(val: 'newest' | 'price-asc' | 'price-desc') =>
+                  setSortBy(val)
+                }
               >
-                <SelectTrigger className="flex-1 bg-[#0b0b0b] border border-[#D4AF37]/30 text-[#D4AF37] h-12">
-                  <SelectValue placeholder="Sort" />
+                <SelectTrigger
+                  aria-label="Sort by"
+                  className={cn(
+                    eyebrowCls,
+                    'h-10 w-auto gap-2 rounded-none border-0 bg-transparent px-0 text-samara-ivory focus:ring-0 focus:ring-offset-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold [&>svg]:opacity-70'
+                  )}
+                >
+                  <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#111] text-white border-gray-700">
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="price-asc">Price: Low → High</SelectItem>
-                  <SelectItem value="price-desc">Price: High → Low</SelectItem>
+                <SelectContent
+                  align="end"
+                  className="rounded-none border-samara-line bg-samara-ink text-samara-ivory shadow-none"
+                >
+                  {sortOptions.map((opt) => (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className="rounded-none py-2.5 font-sans text-xs tracking-wide focus:bg-samara-forest-2 focus:text-samara-ivory"
+                    >
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Desktop Sort Header (Hidden on mobile to avoid duplication) */}
-            <div className="hidden lg:flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-              <p className="text-sm text-gray-400 font-medium">
-                Showing <span className="text-[#D4AF37]">{products.length}</span> products
-              </p>
-              
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Sort by:</span>
-                <Select
-                  value={sortBy}
-                  onValueChange={(val: 'newest' | 'price-asc' | 'price-desc') =>
-                    setSortBy(val)
-                  }
-                >
-                  <SelectTrigger className="w-40 bg-transparent text-white border-none h-10 focus:ring-0 text-right">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#111] text-white border-gray-700">
-                    <SelectItem value="newest">Newest First</SelectItem>
-                    <SelectItem value="price-asc">Price: Low to High</SelectItem>
-                    <SelectItem value="price-desc">Price: High to Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="space-y-3 animate-pulse">
-                    <div className="aspect-[2/3] md:aspect-[3/4] bg-[#111] rounded-lg border border-gray-900" />
-                    <div className="h-4 bg-[#111] rounded w-3/4" />
-                    <div className="h-4 bg-[#111] rounded w-1/4" />
-                  </div>
-                ))}
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-24 rounded-lg border border-dashed border-gray-800 bg-[#0a0a0a]">
-                <h3 className="text-xl font-medium text-[#D4AF37] mb-2">No products found</h3>
-                <p className="text-gray-500">Try adjusting your filters.</p>
-                <Button 
-                  variant="link" 
-                  onClick={() => {
-                    setPriceRange([0, 50000]);
-                    setSelectedCategory('all');
-                    router.push('/shop');
-                    fetchProducts();
-                  }}
-                  className="text-white underline mt-2"
-                >
-                  Reset Filters
-                </Button>
-              </div>
-            ) : (
-              /* ✅ FIX: GRID COLUMNS TO MATCH SAREES PAGE (2 Cols Mobile) */
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {products.map(({ product, image }) => {
-                  const resolvedPrice = priceMap[product.id];
-
-                  return (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      image={image}
-                      price={resolvedPrice}
-                    />
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* ✅ STEP 5: MOBILE BOTTOM SHEET */}
-      {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={() => setMobileFiltersOpen(false)}
-          />
+      {/* ------------------------------------------------------------------ */}
+      {/* RESULTS                                                             */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="sm-container pt-8 md:pt-12">
+        <p className={cn(eyebrowCls, 'mb-8 hidden text-samara-mute lg:mb-12 lg:block')} aria-live="polite">
+          {loading ? 'Loading…' : (
+            <>
+              Showing <span className="text-samara-ivory">{products.length}</span> {products.length === 1 ? 'product' : 'products'}
+            </>
+          )}
+        </p>
 
-          {/* Bottom Sheet */}
-          <div className="absolute bottom-0 left-0 right-0 max-h-[85vh]
-                          bg-[#0a0a0a] rounded-t-2xl border-t border-[#D4AF37]/30
-                          flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
-
-            {/* Header */}
-            <div className="p-4 border-b border-gray-800 flex justify-between items-center sticky top-0 bg-[#0a0a0a] z-10 rounded-t-2xl">
-              <h3 className="text-lg font-serif font-bold text-[#D4AF37]">Filters</h3>
+        {loading ? (
+          <CatalogGridSkeleton count={8} />
+        ) : products.length === 0 ? (
+          <div className="border-b border-samara-line pb-20 pt-12 md:pb-28 md:pt-16">
+            <div className="max-w-xl">
+              <h2 className="sm-display-s !font-light">
+                No products <span className="sm-accent">found</span>
+              </h2>
+              <p className="sm-body mt-4">Try adjusting your filters.</p>
               <button
-                onClick={() => setMobileFiltersOpen(false)}
-                className="text-gray-400 p-2 hover:text-white"
+                type="button"
+                onClick={onResetFilters}
+                className={cn(
+                  eyebrowCls,
+                  'sm-link mt-8 inline-flex min-h-[44px] items-center text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold'
+                )}
               >
-                ✕
+                Reset Filters
               </button>
             </div>
-
-            {/* Content */}
-            <div className="p-5 overflow-y-auto flex-1 pb-10">
-              {FilterContent}
-            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <CatalogGrid>
+            {products.map(({ product, image }, i) => {
+              const resolvedPrice = priceMap[product.id];
+
+              return (
+                <li key={product.id}>
+                  <ProductCard
+                    product={product}
+                    image={image}
+                    price={resolvedPrice}
+                    sizes={CATALOG_CARD_SIZES}
+                    priority={i < 2}
+                  />
+                </li>
+              );
+            })}
+          </CatalogGrid>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* MOBILE BOTTOM SHEET                                                 */}
+      {/* ------------------------------------------------------------------ */}
+      <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+        <SheetPortal>
+          <SheetOverlay className="z-[1100] bg-samara-black/80 backdrop-blur-sm" />
+          <SheetPrimitive.Content
+            aria-describedby={undefined}
+            className="fixed inset-x-0 bottom-0 z-[1100] flex max-h-[85dvh] flex-col border-t border-samara-line bg-samara-ink text-samara-ivory outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom data-[state=closed]:duration-300 data-[state=open]:duration-500 motion-reduce:!animate-none lg:hidden"
+          >
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-samara-line px-[var(--sm-gutter)]">
+              <SheetTitle className="font-serif text-2xl !font-light text-samara-ivory">
+                Filter <span className="sm-accent">&amp;</span> Sort
+              </SheetTitle>
+              <SheetClose
+                className="-mr-3 flex h-11 w-11 items-center justify-center text-samara-mute transition-colors duration-300 hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold"
+                aria-label="Close filters"
+              >
+                <X aria-hidden className="h-5 w-5" strokeWidth={1.25} />
+              </SheetClose>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[var(--sm-gutter)] py-8">
+              <section aria-labelledby="sm-shop-cat">
+                <p id="sm-shop-cat" className="sm-eyebrow mb-4">Category</p>
+                {categoryChips('flex-wrap')}
+              </section>
+
+              <section aria-labelledby="sm-shop-sort" className="mt-10">
+                <p id="sm-shop-sort" className="sm-eyebrow mb-2">Sort by</p>
+                <ul className="border-t border-samara-line">
+                  {sortOptions.map((opt) => {
+                    const selected = sortBy === opt.value;
+                    return (
+                      <li key={opt.value} className="border-b border-samara-line">
+                        <button
+                          type="button"
+                          onClick={() => setSortBy(opt.value)}
+                          aria-pressed={selected}
+                          className={cn(
+                            'flex min-h-[52px] w-full items-center justify-between text-left font-serif text-lg font-light transition-colors duration-300 focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold',
+                            selected ? 'text-samara-ivory' : 'text-samara-mute hover:text-samara-ivory'
+                          )}
+                        >
+                          {opt.label}
+                          {selected && <Check aria-hidden className="h-4 w-4 text-samara-gold" strokeWidth={1.5} />}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+
+              <section aria-labelledby="sm-shop-price" className="mt-10">
+                <p id="sm-shop-price" className="sm-eyebrow mb-3">Price Filter</p>
+                {PriceControl}
+              </section>
+            </div>
+
+            <div className="shrink-0 border-t border-samara-line px-[var(--sm-gutter)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+              <button
+                type="button"
+                onClick={onApplyPrice}
+                className="sm-btn w-full bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
+              >
+                Apply Filter
+              </button>
+            </div>
+          </SheetPrimitive.Content>
+        </SheetPortal>
+      </Sheet>
     </div>
   );
 }

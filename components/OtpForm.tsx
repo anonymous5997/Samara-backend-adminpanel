@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fieldClass, goldButtonClass } from '@/components/content/formStyles';
 
 export default function OtpForm() {
   const [phone, setPhone] = useState('');
@@ -36,15 +37,16 @@ export default function OtpForm() {
   }
 
   return (
-    <div>
+    <div className="w-full space-y-4 text-samara-ivory">
       {stage === 'send' && (
         <>
           <input
             placeholder="Phone number"
             value={phone}
             onChange={e => setPhone(e.target.value)}
+            className={fieldClass}
           />
-          <button onClick={sendOtp}>Send Voice OTP</button>
+          <button onClick={sendOtp} className={goldButtonClass}>Send Voice OTP</button>
         </>
       )}
 
@@ -54,8 +56,9 @@ export default function OtpForm() {
             placeholder="Enter OTP"
             value={otp}
             onChange={e => setOtp(e.target.value)}
+            className={`${fieldClass} h-16 text-center indent-[0.5em] font-sans text-2xl font-light tabular-nums tracking-[0.5em] placeholder:font-sans placeholder:text-sm placeholder:uppercase placeholder:tracking-eyebrow placeholder:indent-0`}
           />
-          <button onClick={verifyOtp}>Verify OTP</button>
+          <button onClick={verifyOtp} className={goldButtonClass}>Verify OTP</button>
         </>
       )}
     </div>

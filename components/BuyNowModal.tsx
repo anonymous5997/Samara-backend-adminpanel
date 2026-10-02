@@ -1,7 +1,7 @@
 'use client';
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
@@ -71,42 +71,55 @@ export function BuyNowModal({
     router.push('/checkout?mode=buynow');
   };
 
+
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md bg-black border-2 border-[#D4AF37] text-white">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-serif text-2xl text-[#D4AF37]">
-            Confirm Purchase
-          </h2>
-          <Button variant="ghost" size="icon" onClick={onClose} className="hover:text-[#D4AF37]">
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="space-y-4 mb-6">
-          <p className="text-sm text-gray-300">
-            You are about to purchase <strong>{productName}</strong>.
-          </p>
-          
-          <div className="bg-[#1a1a1a] p-3 rounded border border-gray-800 flex justify-between items-center">
-            <span className="text-gray-400 text-sm">Total:</span>
-            <span className="text-[#D4AF37] font-bold text-lg">
-              {formatPriceSync(productPrice, currency)}
-            </span>
+      <DialogPortal>
+        <DialogOverlay className="sm-drawer-overlay z-[1100] bg-black/60 backdrop-blur-[2px]" />
+        <DialogPrimitive.Content className="storefront fixed left-1/2 top-1/2 z-[1101] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 border border-samara-line bg-samara-ink p-6 text-samara-ivory outline-none sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="sm-eyebrow">Buy Now</p>
+              <DialogTitle className="mt-3 font-serif text-[2rem] font-light leading-none tracking-normal text-samara-ivory">
+                Confirm <span className="sm-accent">Purchase</span>
+              </DialogTitle>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center text-samara-mute transition-colors hover:text-samara-ivory focus-visible:outline focus-visible:outline-1 focus-visible:outline-samara-gold"
+            >
+              <X aria-hidden className="h-4 w-4" strokeWidth={1.25} />
+            </button>
           </div>
 
-          <p className="text-xs text-gray-500">
-            You will be redirected to checkout to complete your purchase.
-          </p>
-        </div>
+          <div className="mb-8 mt-6 space-y-5">
+            <DialogDescription className="font-sans text-[0.875rem] leading-relaxed text-samara-mute">
+              You are about to purchase <strong className="font-medium text-samara-ivory">{productName}</strong>.
+            </DialogDescription>
 
-        <Button 
-          className="w-full bg-[#D4AF37] text-black hover:bg-[#F4D03F] font-bold" 
-          onClick={handleBuyNow}
-        >
-          Continue to Checkout
-        </Button>
-      </DialogContent>
+            <div className="flex items-baseline justify-between border-y border-samara-line py-4">
+              <span className="font-sans text-[0.6875rem] uppercase tracking-[0.2em] text-samara-mute">Total:</span>
+              <span className="font-sans text-[1.25rem] tabular-nums text-samara-ivory">
+                {formatPriceSync(productPrice, currency)}
+              </span>
+            </div>
+
+            <p className="font-sans text-[0.75rem] text-samara-mute">
+              You will be redirected to checkout to complete your purchase.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="sm-btn w-full bg-samara-gold text-samara-cream-ink hover:bg-samara-ivory"
+            onClick={handleBuyNow}
+          >
+            Continue to Checkout
+          </button>
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 }

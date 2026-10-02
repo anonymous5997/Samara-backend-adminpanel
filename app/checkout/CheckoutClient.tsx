@@ -4,14 +4,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Select from '@/components/ClientSelect';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart-context';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
 import { formatPriceSync } from '@/lib/currency-utils';
 import { toast } from 'sonner';
-import { Toaster } from '@/components/ui/sonner';
+import { Lock } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  AccountHero,
+  BTN_GOLD,
+  FIELD,
+  FIELD_ERROR,
+  FIELD_LABEL,
+  FIELD_LIGHT,
+  StepHeading,
+  samaraSelectStyles,
+} from '@/components/account/ui';
 // ✅ Step 1: Import Analytics Tracker
 import { trackAnalyticsEvent } from '@/lib/analytics.client';
 
@@ -55,9 +65,9 @@ const selectStyles = {
 export default function CheckoutClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   
-  const { items: cartItems, clearCart } = useCart();
+  const { items: cartItems, clearCart, loading: cartLoading } = useCart();
 
   const mode = searchParams.get('mode');
   const isBuyNow = mode === 'buynow';
@@ -123,9 +133,12 @@ export default function CheckoutClient() {
 
   /* ---------------- AUTH CHECK ---------------- */
   useEffect(() => {
+    // Wait until auth and the cart have loaded; otherwise opening /checkout
+    // directly redirects before the session/cart exist.
+    if (authLoading || cartLoading) return;
     if (!user) router.replace('/auth/login');
     if (!isBuyNow && cartItems.length === 0) router.replace('/cart');
-  }, [user, cartItems.length, isBuyNow, router]);
+  }, [authLoading, cartLoading, user, cartItems.length, isBuyNow, router]);
 
   /* ---------------- PROFILE PRE-FILL ---------------- */
   useEffect(() => {
@@ -239,8 +252,11 @@ export default function CheckoutClient() {
         return;
       }
 
-      if (coupon.min_order_value_inr && subtotalINR < coupon.min_order_value_inr) {
-        toast.error(`Minimum order ₹${coupon.min_order_value_inr} required`);
+      // coupons.min_cart_value_inr is the schema column (same check as /cart);
+      // min_order_value_inr kept as a fallback for older rows.
+      const minOrderINR = coupon.min_cart_value_inr ?? coupon.min_order_value_inr;
+      if (minOrderINR && subtotalINR < minOrderINR) {
+        toast.error(`Minimum order ₹${minOrderINR} required`);
         return;
       }
 
@@ -263,6 +279,21 @@ export default function CheckoutClient() {
       setCouponLoading(false);
     }
   };
+
+  /* ---------------- COUPON CARRIED FROM /cart (?coupon=CODE) ---------------- */
+  const couponParam = searchParams.get('coupon');
+  const [couponParamTried, setCouponParamTried] = useState(false);
+  useEffect(() => {
+    if (couponParam && !couponCode && !couponApplied) setCouponCode(couponParam);
+  }, [couponParam, couponCode, couponApplied]);
+  useEffect(() => {
+    if (couponParamTried || couponApplied || !couponParam || subtotalINR <= 0) return;
+    if (couponCode.trim().toUpperCase() !== couponParam.trim().toUpperCase()) return;
+    setCouponParamTried(true);
+    applyCoupon();
+    // applyCoupon reads current state; run once when the code and subtotal are ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponParam, couponCode, subtotalINR, couponApplied, couponParamTried]);
 
   /* ---------------- SUBMIT ORDER ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {
@@ -390,70 +421,94 @@ export default function CheckoutClient() {
   };
 
   return (
-    <>
-      <Toaster />
-      <div className="min-h-screen bg-black text-white px-4 py-10">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-extrabold tracking-widest font-serif text-[#D4AF37]">
-            CHECKOUT
-          </h1>
-        </div>
+    <div className="bg-samara-ink text-samara-ivory">
+      <AccountHero
+        eyebrow="Secure Checkout"
+        title={<>Your <span className="sm-accent">checkout</span></>}
+        aside={
+          <ol aria-label="Checkout steps" className="flex items-center gap-4 font-sans text-[0.625rem] font-medium uppercase tracking-[0.22em] text-samara-mute">
+            <li className="flex items-center gap-2"><span className="tabular-nums text-samara-gold">01</span> Contact</li>
+            <li aria-hidden className="h-px w-6 bg-samara-line" />
+            <li className="flex items-center gap-2"><span className="tabular-nums text-samara-gold">02</span> Delivery</li>
+            <li aria-hidden className="h-px w-6 bg-samara-line" />
+            <li className="flex items-center gap-2"><span className="tabular-nums text-samara-gold">03</span> Payment</li>
+          </ol>
+        }
+      />
 
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+      <div className="sm-container grid grid-cols-1 gap-12 pb-20 pt-10 md:pb-28 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16 lg:pt-14 xl:grid-cols-[minmax(0,1fr)_440px] xl:gap-24">
+
           {/* Shipping Form */}
           <form
             onSubmit={handleSubmit}
-            className="lg:col-span-2 space-y-4 border border-[#D4AF37]/30 rounded-xl p-6 bg-[#0b0b0b]"
+            className="min-w-0 space-y-14 md:space-y-16"
           >
-            <h2 className="text-xl font-bold text-[#D4AF37] mb-4 font-serif">
-              Shipping Details
-            </h2>
+            {/* 01 CONTACT */}
+            <section aria-labelledby="checkout-contact" className="space-y-8">
+              <StepHeading n="01" title={<span id="checkout-contact">Contact</span>} note="Shipping Details" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-7 md:grid-cols-2">
               {/* Name */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Name</label>
+              <div className="md:col-span-2">
+                <label htmlFor="checkout-name" className={FIELD_LABEL}>Name</label>
                 <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
+                  id="checkout-name"
+                  autoComplete="name"
+                  className={cn(FIELD, 'peer')}
                   placeholder="Full Name"
                   required
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                 />
+                <p className={FIELD_ERROR}>Please enter your full name.</p>
               </div>
 
               {/* Email */}
               <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Email</label>
+                <label htmlFor="checkout-email" className={FIELD_LABEL}>Email</label>
                 <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
+                  id="checkout-email"
+                  autoComplete="email"
+                  className={cn(FIELD, 'peer')}
                   placeholder="Email Address"
                   type="email"
                   required
                   value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
+                <p className={FIELD_ERROR}>Please enter a valid email address.</p>
               </div>
 
               {/* Phone */}
               <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Phone</label>
+                <label htmlFor="checkout-phone" className={FIELD_LABEL}>Phone</label>
                 <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
+                  id="checkout-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  className={cn(FIELD, 'peer')}
                   placeholder="Phone Number"
                   required
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
                 />
+                <p className={FIELD_ERROR}>Please enter a phone number.</p>
               </div>
+              </div>
+            </section>
 
+            {/* 02 DELIVERY */}
+            <section aria-labelledby="checkout-delivery" className="space-y-8">
+              <StepHeading n="02" title={<span id="checkout-delivery">Delivery</span>} note="Where should we send your order?" />
+
+            <div className="grid grid-cols-1 gap-x-6 gap-y-7 md:grid-cols-2">
               {/* ✅ STEP 6: Country Dropdown */}
-              <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">
+              <div className="md:col-span-2">
+                <label id="checkout-country-label" className={FIELD_LABEL}>
                   Country
                 </label>
                 <Select
+                  aria-labelledby="checkout-country-label"
                   options={countryOptions}
                   value={countryOptions.find(c => c.value === formData.country)}
                   onChange={(option: any) =>
@@ -467,27 +522,33 @@ export default function CheckoutClient() {
                     })
                   }
                   isSearchable
-                  styles={selectStyles}
+                  styles={samaraSelectStyles}
                 />
               </div>
 
               {/* Address (Full width) */}
               <div className="md:col-span-2">
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Address</label>
+                <label htmlFor="checkout-address" className={FIELD_LABEL}>Address</label>
                 <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
+                  id="checkout-address"
+                  autoComplete="street-address"
+                  className={cn(FIELD, 'peer')}
                   placeholder="Street Address, Apt, Suite, etc."
                   required
                   value={formData.address}
                   onChange={e => setFormData({ ...formData, address: e.target.value })}
                 />
+                <p className={FIELD_ERROR}>Please enter your street address.</p>
               </div>
 
               {/* ✅ STEP 8: Pincode */}
               <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">Pincode / Zip</label>
+                <label htmlFor="checkout-pincode" className={FIELD_LABEL}>Pincode / Zip</label>
                 <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37]"
+                  id="checkout-pincode"
+                  autoComplete="postal-code"
+                  inputMode="numeric"
+                  className={cn(FIELD, 'peer tabular-nums')}
                   placeholder="PINCODE"
                   value={formData.pincode}
                   onChange={e => {
@@ -500,14 +561,16 @@ export default function CheckoutClient() {
                   }}
                   required={formData.country === 'IN'}
                 />
+                <p className={FIELD_ERROR}>Please enter your PIN code.</p>
               </div>
 
               {/* ✅ STEP 7: State Dropdown */}
               <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">
+                <label id="checkout-state-label" className={FIELD_LABEL}>
                   State / Province
                 </label>
                 <Select
+                  aria-labelledby="checkout-state-label"
                   options={stateOptions}
                   // We store the Label (Name) in formData.state, so we find by label for display
                   value={stateOptions.find(s => s.label === formData.state)}
@@ -517,29 +580,32 @@ export default function CheckoutClient() {
                   isSearchable
                   isDisabled={stateOptions.length === 0}
                   placeholder={stateOptions.length === 0 ? "Select Country First" : "Select State"}
-                  styles={selectStyles}
+                  styles={samaraSelectStyles}
                 />
               </div>
 
               {/* ✅ STEP 9: City Input */}
               <div>
-                <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">City</label>
+                <label htmlFor="checkout-city" className={FIELD_LABEL}>City</label>
                 <Input
-                  className="bg-black text-white border-gray-700 focus:border-[#D4AF37] disabled:opacity-50"
+                  id="checkout-city"
+                  className={cn(FIELD, 'peer')}
                   placeholder="City"
                   required
                   value={formData.city}
                   onChange={e => setFormData({ ...formData, city: e.target.value })}
                   disabled={formData.country === 'IN'}
                 />
+                <p className={FIELD_ERROR}>Please enter your city.</p>
               </div>
 
               {/* ✅ STEP 9: Optional District for IN */}
               {formData.country === 'IN' && (
-                <div className="md:col-span-2">
-                  <label className="text-xs text-gray-500 uppercase ml-1 mb-1 block">District</label>
+                <div>
+                  <label htmlFor="checkout-district" className={FIELD_LABEL}>District</label>
                   <Input
-                    className="bg-black text-white border-gray-700 focus:border-[#D4AF37] disabled:opacity-50"
+                    id="checkout-district"
+                    className={FIELD}
                     placeholder="District"
                     value={formData.district}
                     disabled
@@ -547,102 +613,128 @@ export default function CheckoutClient() {
                 </div>
               )}
             </div>
+            </section>
 
-            <Button
+            {/* 03 PAYMENT */}
+            <section aria-labelledby="checkout-payment" className="space-y-8">
+              <StepHeading n="03" title={<span id="checkout-payment">Payment</span>} />
+
+              <div className="flex items-start gap-4 border border-samara-line bg-samara-char px-5 py-5">
+                <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-samara-gold" strokeWidth={1.25} />
+                <p className="font-sans text-sm leading-relaxed text-samara-mute">
+                  Secure payments powered by Razorpay
+                </p>
+              </div>
+
+            <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black font-bold py-6 text-lg mt-6 hover:shadow-lg hover:shadow-[#D4AF37]/20 transition-all"
+              className={cn(BTN_GOLD, 'min-h-[3.75rem] w-full text-[0.8125rem] tabular-nums')}
             >
               {loading ? 'PROCESSING...' : `PAY ${formatPriceSync(total, displayCurrency)}`}
-            </Button>
+            </button>
             
             {displayCurrency !== 'INR' && (
-              <p className="text-xs text-center text-gray-500 mt-2">
+              <p className="-mt-4 text-center font-sans text-xs text-samara-mute">
                 *Your card will be charged in INR equivalent (≈ {formatPriceSync(totalINR, 'INR')})
               </p>
             )}
+            </section>
           </form>
 
           {/* Order Summary */}
-          <div className="border border-[#D4AF37]/30 rounded-xl p-6 h-fit bg-[#0b0b0b] sticky top-24">
-            <h2 className="text-xl font-bold mb-6 font-serif text-[#D4AF37]">Order Summary</h2>
+          <aside
+            aria-labelledby="checkout-summary-title"
+            className="order-first h-fit bg-samara-cream px-6 py-8 text-samara-cream-ink sm:px-9 sm:py-10 lg:sticky lg:top-[calc(var(--sm-header-h)+2rem)] lg:order-none"
+          >
+            <h2 id="checkout-summary-title" className="font-serif text-[1.875rem] font-light leading-tight text-samara-cream-ink">
+              Order <span className="italic text-samara-gold-deep">Summary</span>
+            </h2>
 
-            <div className="space-y-4 mb-6 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+            <ul className="mt-6 max-h-80 overflow-y-auto border-t border-samara-cream-ink/15 pr-1">
               {items.map(item => (
-                <div key={item.id} className="flex gap-3 border-b border-gray-800 pb-4 last:border-0">
-                  <div className="relative w-16 h-20 flex-shrink-0 bg-gray-900 rounded overflow-hidden">
+                <li key={item.id} className="flex gap-4 border-b border-samara-cream-ink/10 py-5 last:border-0">
+                  <div className="relative aspect-[3/4] w-16 shrink-0 overflow-hidden bg-samara-cream-2">
                     {item.image_url ? (
                       <Image
                         src={item.image_url}
                         alt={item.product.name}
                         fill
+                        sizes="64px"
                         className="object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">Img</div>
+                      <div className="flex h-full w-full items-center justify-center font-sans text-[0.5625rem] uppercase tracking-[0.2em] text-samara-cream-mute">Img</div>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium line-clamp-2">{item.product.name}</p>
-                    <div className="flex justify-between items-center mt-2">
-                      <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
-                      <p className="text-[#D4AF37] font-semibold">
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <p className="line-clamp-2 font-serif text-[1.0625rem] leading-snug">{item.product.name}</p>
+                    <div className="mt-auto flex items-baseline justify-between gap-3 pt-2">
+                      <p className="font-sans text-[0.625rem] font-medium uppercase tracking-[0.2em] text-samara-cream-mute">Qty: {item.quantity}</p>
+                      <p className="font-sans text-sm tabular-nums">
                         {formatPriceSync(item.product.final_price, displayCurrency)}
                       </p>
                     </div>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
 
-            <div className="flex gap-2 mb-6">
+            <div className="mt-6">
+              <label htmlFor="checkout-coupon" className="mb-2.5 block font-sans text-[0.625rem] font-medium uppercase tracking-[0.24em] text-samara-cream-mute">
+                Coupon code
+              </label>
+              <div className="flex">
               <Input
+                id="checkout-coupon"
                 placeholder="Coupon code"
                 value={couponCode}
                 onChange={e => setCouponCode(e.target.value)}
-                className="bg-white/10 text-white placeholder:text-gray-500 border-gray-700"
+                className={cn(FIELD_LIGHT, 'border-r-0')}
               />
-              <Button
+              <button
+                type="button"
                 onClick={applyCoupon}
                 disabled={couponLoading || !couponCode}
-                className="bg-[#D4AF37] text-black hover:bg-[#F4D03F]"
+                className="flex h-12 min-w-[96px] shrink-0 items-center justify-center border border-samara-cream-ink bg-samara-cream-ink px-5 font-sans text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-samara-cream transition-colors hover:border-samara-gold-deep hover:bg-samara-gold-deep disabled:opacity-40 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-cream-ink"
               >
                 Apply
-              </Button>
+              </button>
+              </div>
             </div>
 
-            <div className="border-t border-gray-700 pt-4 space-y-3 text-sm">
-              <div className="flex justify-between text-gray-400">
-                <span>Subtotal</span>
-                <span>{formatPriceSync(subtotal, displayCurrency)}</span>
+            <dl className="mt-8 space-y-4 border-t border-samara-cream-ink/15 pt-6 font-sans text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-samara-cream-mute">Subtotal</dt>
+                <dd className="tabular-nums">{formatPriceSync(subtotal, displayCurrency)}</dd>
               </div>
               
-              <div className="flex justify-between text-gray-400">
-                <span>Shipping</span>
-                <span className="text-green-400">Free</span>
+              <div className="flex justify-between gap-4">
+                <dt className="text-samara-cream-mute">Shipping</dt>
+                <dd>Free</dd>
               </div>
 
               {couponApplied && (
-                <div className="flex justify-between text-green-400">
-                  <span>Discount</span>
-                  <span>-{formatPriceSync(discountDisplay, displayCurrency)}</span>
+                <div className="flex justify-between gap-4 text-samara-gold-deep">
+                  <dt>Discount</dt>
+                  <dd className="tabular-nums">-{formatPriceSync(discountDisplay, displayCurrency)}</dd>
                 </div>
               )}
 
-              <div className="flex justify-between font-bold text-lg pt-2 border-t border-gray-700">
-                <span>Total</span>
-                <span className="text-[#D4AF37]">
+              <div className="flex items-end justify-between gap-4 border-t border-samara-cream-ink/15 pt-6">
+                <dt className="sm-eyebrow text-samara-cream-ink">Total</dt>
+                <dd className="font-serif text-[2rem] leading-none tabular-nums">
                   {formatPriceSync(total, displayCurrency)}
-                </span>
+                </dd>
               </div>
-            </div>
+            </dl>
             
-            <p className="text-xs text-center text-gray-500 mt-4">
+            <p className="mt-6 flex items-center justify-center gap-2 font-sans text-[0.6875rem] text-samara-cream-mute">
+              <Lock aria-hidden className="h-3 w-3" strokeWidth={1.5} />
               Secure payments powered by Razorpay
             </p>
-          </div>
-        </div>
+          </aside>
       </div>
-    </>
+    </div>
   );
 }

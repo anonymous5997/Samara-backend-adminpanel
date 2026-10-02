@@ -75,10 +75,7 @@ export default function PaymentPage() {
         // ---------------------------------------------------------
         handler: async (response: any) => {
           // ✅ Step 1: Confirm Handler Fires
-          console.log("🔥 PAYMENT SUCCESS HANDLER EXECUTED");
-          alert("Payment Success Handler Triggered");
 
-          console.log("Payment response:", response);
 
           // 1️⃣ Update order status
           const { error: orderError } = await supabase
@@ -96,11 +93,9 @@ export default function PaymentPage() {
             console.error("❌ Order update failed:", orderError.message);
             // We continue even if update fails to try and log analytics, or you can return
           } else {
-            console.log("✅ Order marked as paid.");
           }
 
           // ✅ Step 2: Analytics Insert with Detailed Logging
-          console.log("🚀 Attempting analytics insert...");
           
           const insertResult = await supabase
             .from('analytics_events')
@@ -111,16 +106,13 @@ export default function PaymentPage() {
             })
             .select();
 
-          console.log("📦 Insert result:", insertResult);
 
           if (insertResult.error) {
             console.error("❌ Analytics insert FAILED:", insertResult.error.message);
           } else {
-            console.log("✅ Analytics insert SUCCESS");
           }
 
           // ✅ Step 3: Forced Delay to prevent premature unmount
-          console.log("⏳ Waiting 2 seconds before redirect...");
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           router.replace(`/orders/${order.id}`);
@@ -150,10 +142,22 @@ export default function PaymentPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black text-white">
-      <div className="flex items-center gap-2">
-        <Loader2 className="animate-spin text-[#D4AF37]" />
-        <span>Redirecting to payment...</span>
+    <div className="flex min-h-[78vh] items-center justify-center bg-samara-ink px-[var(--sm-gutter)] py-20 text-samara-ivory">
+      <div className="flex w-full max-w-xl flex-col items-center text-center" role="status" aria-live="polite">
+        <span className="relative flex h-20 w-20 items-center justify-center rounded-full border border-samara-gold/40">
+          <Loader2 className="h-6 w-6 animate-spin text-samara-gold motion-reduce:animate-none" strokeWidth={1.25} />
+        </span>
+        <p className="sm-eyebrow sm-anim-fade-up mt-10 text-samara-gold">Secure Payment</p>
+        <h1 className="sm-display-m sm-anim-fade-up mt-5 font-light [--anim-delay:80ms]">
+          <span>Redirecting to </span><span className="sm-accent">payment...</span>
+        </h1>
+        <span aria-hidden className="mt-8 h-px w-16 bg-samara-gold/50" />
+        <p className="sm-body sm-anim-fade-up mt-8 max-w-[38ch] [--anim-delay:160ms]">
+          Secure payments powered by Razorpay
+        </p>
+        <p className="mt-4 max-w-full break-all font-sans text-[0.625rem] font-medium uppercase tracking-[0.22em] text-samara-mute">
+          Order {orderId}
+        </p>
       </div>
     </div>
   );

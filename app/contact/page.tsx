@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail, Phone, MapPin } from 'lucide-react';
+import { PageHero } from '@/components/content/PageHero';
+import { Reveal } from '@/components/motion/Reveal';
+import { fieldClass, goldButtonClass, labelClass } from '@/components/content/formStyles';
+import { SITE_CONTACT } from '@/config/site';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -14,82 +18,96 @@ export default function ContactPage() {
     message: '',
   });
 
+  const [sent, setSent] = useState(false);
+
+  // No mail backend exists, so hand the message to the visitor's email app,
+  // pre-addressed to Samara with their details filled in.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
+    const subject = `Website enquiry from ${formData.name || 'a customer'}`;
+    const body = [
+      formData.message,
+      '',
+      `Name: ${formData.name}`,
+      `Email: ${formData.email}`,
+      formData.phone ? `Phone: ${formData.phone}` : '',
+    ]
+      .filter((line, i) => i < 2 || line)
+      .join('\n');
+    window.location.href = `mailto:${SITE_CONTACT.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setSent(true);
   };
 
   return (
-    <div className="bg-black text-white min-h-screen">
-      <section className="py-24 bg-gradient-to-b from-black to-luxury-charcoal">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-16">
-              <h1 className="font-serif text-6xl md:text-7xl font-bold mb-6 text-gold tracking-tighter">
-                Contact
-              </h1>
-              <p className="text-xl text-gray-400 leading-relaxed">
-                We'd love to hear from you
-              </p>
-            </div>
+    <div className="bg-samara-black text-samara-ivory">
+      <PageHero
+        eyebrow="Customer care"
+        accent="Contact"
+        intro="We'd love to hear from you"
+      />
 
-            <div className="grid md:grid-cols-2 gap-12 mb-16">
-              <div className="space-y-8">
+      <section className="bg-samara-forest">
+        <div className="sm-container grid gap-14 py-16 sm:py-20 lg:grid-cols-12 lg:gap-16 lg:py-28">
+          <Reveal className="lg:col-span-5">
+            <h2 className="sm-display-m font-light">
+              Get in <span className="sm-accent">Touch</span>
+            </h2>
+            <p className="sm-body mt-6 max-w-md">
+              Have a question about our sarees, need styling advice, or want to learn more
+              about our collections? Our team is here to help. We typically respond within
+              24-48 hours.
+            </p>
+
+            <dl className="mt-12 border-t border-samara-line">
+              <div className="flex items-start gap-5 border-b border-samara-line py-6">
+                <Mail aria-hidden className="mt-0.5 h-4 w-4 flex-shrink-0 text-samara-gold" strokeWidth={1.25} />
                 <div>
-                  <h2 className="font-serif text-3xl font-bold text-gold tracking-luxury mb-6">
-                    Get in Touch
-                  </h2>
-                  <p className="text-gray-400 leading-relaxed mb-8">
-                    Have a question about our sarees, need styling advice, or want to learn more
-                    about our collections? Our team is here to help. We typically respond within
-                    24-48 hours.
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
-                      <Mail className="h-5 w-5 text-gold" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gold mb-1">Email</h3>
-                      <p className="text-gray-400">hello@samara.com</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
-                      <Phone className="h-5 w-5 text-gold" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gold mb-1">Phone</h3>
-                      <p className="text-gray-400">+91 98765 43210</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
-                      <MapPin className="h-5 w-5 text-gold" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gold mb-1">Location</h3>
-                      <p className="text-gray-400">
-                        Samara Boutique
-                        <br />
-                        Mumbai, India
-                      </p>
-                    </div>
-                  </div>
+                  <dt className="sm-eyebrow">Email</dt>
+                  <dd className="mt-2 font-serif text-xl font-light text-samara-ivory">
+                    <a href={`mailto:${SITE_CONTACT.email}`} className="sm-link">
+                      {SITE_CONTACT.email}
+                    </a>
+                  </dd>
                 </div>
               </div>
 
-              <div className="bg-luxury-charcoal rounded-lg p-8 border border-gold/20">
-                <h3 className="font-serif text-2xl font-bold text-gold tracking-luxury mb-6">
-                  Send us a Message
-                </h3>
-                <form onSubmit={handleSubmit} className="space-y-6">
+              {SITE_CONTACT.phone && (
+                <div className="flex items-start gap-5 border-b border-samara-line py-6">
+                  <Phone aria-hidden className="mt-0.5 h-4 w-4 flex-shrink-0 text-samara-gold" strokeWidth={1.25} />
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-400 mb-2">
+                    <dt className="sm-eyebrow">Phone</dt>
+                    <dd className="mt-2 font-serif text-xl font-light text-samara-ivory">
+                      <a href={`tel:${SITE_CONTACT.phone.replace(/\s+/g, '')}`} className="sm-link">
+                        {SITE_CONTACT.phone}
+                      </a>
+                    </dd>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-start gap-5 border-b border-samara-line py-6">
+                <MapPin aria-hidden className="mt-0.5 h-4 w-4 flex-shrink-0 text-samara-gold" strokeWidth={1.25} />
+                <div>
+                  <dt className="sm-eyebrow">Location</dt>
+                  <dd className="mt-2 font-serif text-xl font-light leading-snug text-samara-ivory">
+                    {SITE_CONTACT.location.name}
+                    <br />
+                    {SITE_CONTACT.location.city}
+                  </dd>
+                </div>
+              </div>
+            </dl>
+          </Reveal>
+
+          <Reveal delay={150} className="lg:col-span-6 lg:col-start-7">
+            <div className="border border-samara-line bg-samara-black/40 px-5 py-10 sm:px-10 sm:py-12">
+              <h3 className="sm-display-s font-light">
+                Send us a <span className="sm-accent">Message</span>
+              </h3>
+              <form onSubmit={handleSubmit} className="mt-10 space-y-7">
+                <div className="grid gap-7 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="name" className={labelClass}>
                       Name
                     </label>
                     <Input
@@ -97,13 +115,13 @@ export default function ContactPage() {
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="bg-black border-gold/20 text-white focus:border-gold"
+                      className={fieldClass}
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
+                    <label htmlFor="email" className={labelClass}>
                       Email
                     </label>
                     <Input
@@ -111,52 +129,54 @@ export default function ContactPage() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="bg-black border-gold/20 text-white focus:border-gold"
+                      className={fieldClass}
                       required
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-400 mb-2">
-                      Phone
-                    </label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="bg-black border-gold/20 text-white focus:border-gold"
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="phone" className={labelClass}>
+                    Phone
+                  </label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className={fieldClass}
+                  />
+                </div>
 
-                  <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-gray-400 mb-2">
-                      Message
-                    </label>
-                    <Textarea
-                      id="message"
-                      rows={5}
-                      value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      className="bg-black border-gold/20 text-white focus:border-gold resize-none"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label htmlFor="message" className={labelClass}>
+                    Message
+                  </label>
+                  <Textarea
+                    id="message"
+                    rows={5}
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    className={`${fieldClass} h-auto min-h-[9rem] resize-none py-3.5`}
+                    required
+                  />
+                </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-gold-gradient hover:shadow-xl hover:shadow-gold/40 text-black font-semibold py-6"
-                  >
-                    Send Message
-                  </Button>
+                <Button type="submit" className={goldButtonClass}>
+                  Send Message
+                </Button>
 
-                  <p className="text-sm text-gray-500 text-center">
-                    We typically respond within 24-48 hours during business days
-                  </p>
-                </form>
-              </div>
+                <p
+                  className="text-center font-sans text-xs leading-relaxed text-samara-mute"
+                  aria-live="polite"
+                >
+                  {sent
+                    ? `Your email app should open with your message to ${SITE_CONTACT.email}.`
+                    : 'We typically respond within 24-48 hours during business days'}
+                </p>
+              </form>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
     </div>

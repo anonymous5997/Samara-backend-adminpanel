@@ -9,6 +9,12 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
+import {
+  fieldClass,
+  goldButtonClass,
+  outlineButtonClass,
+  textLinkClass,
+} from '@/components/content/formStyles';
 
 type AuthMode =
   | 'login'
@@ -212,7 +218,7 @@ export default function LoginPage() {
   const setPassword = async () => {
     if (!form.password || form.password.length < 8) {
       toast.error(
-        'Password must be at least 8 characters, include 1 capital & 1 special character'
+        'Password must be at least 8 characters'
       );
       return;
     }
@@ -269,39 +275,64 @@ export default function LoginPage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
+    <div className="grid bg-samara-black lg:min-h-[calc(100svh-var(--sm-header-h))] lg:grid-cols-2">
+      {/* BRAND PANEL (desktop) */}
+      <aside
+        aria-hidden
+        className="relative hidden overflow-hidden border-r border-samara-line bg-samara-forest lg:flex lg:items-center lg:justify-center"
+      >
+        <div className="absolute inset-10 border border-samara-gold/30 xl:inset-14" />
+        <div className="absolute inset-12 border border-samara-gold/10 xl:inset-16" />
+        <div className="relative flex flex-col items-center px-16 text-center">
+          <Image
+            src="/brand/samara-logo-transparent.png"
+            alt=""
+            width={717}
+            height={214}
+            priority
+            className="h-auto w-[min(22rem,70%)]"
+          />
+          <span className="mt-12 flex items-center gap-4">
+            <span className="block h-px w-10 bg-samara-gold/40" />
+            <span className="block h-1.5 w-1.5 rotate-45 border border-samara-gold/70" />
+            <span className="block h-px w-10 bg-samara-gold/40" />
+          </span>
+          <p className="mt-10 font-serif text-4xl font-light leading-tight text-samara-ivory xl:text-5xl">
+            Woven for <span className="sm-accent">every woman</span>
+          </p>
+        </div>
+      </aside>
+
+      {/* FORM */}
+      <div className="flex items-start justify-center px-[var(--sm-gutter)] py-14 sm:py-20 lg:items-center lg:px-[clamp(3rem,6vw,7rem)]">
       <form
         onSubmit={onSubmit}
-        className="w-[380px] rounded-2xl border border-[#D4AF37]/40 p-8 bg-black text-white"
+        className="w-full max-w-[26rem] text-samara-ivory"
       >
         {/* LOGO */}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-[#D4AF37] text-black flex items-center justify-center font-bold text-xl">
-            S
-          </div>
-          <span className="text-[#D4AF37] text-xl font-semibold tracking-widest">
-            SAMARA
-          </span>
-        </div>
+        <p className="sm-eyebrow mb-6 flex items-center gap-4 text-samara-gold">
+          Samara
+          <span aria-hidden className="block h-px w-12 bg-samara-gold/50" />
+        </p>
 
-        <h2 className="text-2xl font-semibold text-[#D4AF37] text-center">
-          {mode === 'set-password' ? 'Set Password' : 'Welcome Back'}
+        <h2 className="sm-display-m font-light">
+          {mode === 'set-password' ? <>Set <span className="sm-accent">Password</span></> : <>Welcome <span className="sm-accent">Back</span></>}
         </h2>
-        <p className="text-center text-gray-400 text-sm mb-6">
+        <p className="sm-body mb-10 mt-3">
           {mode === 'set-password' ? 'Secure your account' : 'Sign in to continue'}
         </p>
 
         {/* TABS */}
         {mode !== 'verify-otp' && mode !== 'set-password' && (
-          <div className="flex mb-5 bg-[#111] rounded-lg p-1">
+          <div className="mb-8 flex border-b border-samara-line">
             {['password', 'email', 'phone'].map(t => (
               <button
                 key={t}
                 type="button"
-                className={`flex-1 py-2 rounded-md text-sm ${
+                className={`-mb-px flex-1 border-b py-3.5 font-sans text-[0.6875rem] font-semibold uppercase tracking-eyebrow transition-colors duration-300 focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-2 focus-visible:outline-samara-gold ${
                   tab === t
-                    ? 'bg-white text-black'
-                    : 'text-gray-400'
+                    ? 'border-samara-gold text-samara-ivory'
+                    : 'border-transparent text-samara-mute hover:text-samara-ivory'
                 }`}
                 onClick={() => {
                   setTab(t as any);
@@ -322,7 +353,8 @@ export default function LoginPage() {
             placeholder="Name"
             value={form.name}
             onChange={e => update('name', e.target.value)}
-            className="mb-3 bg-white text-black"
+            aria-label="Name"
+            className={`${fieldClass} mb-4`}
           />
         )}
 
@@ -334,7 +366,8 @@ export default function LoginPage() {
                 placeholder="Email"
                 value={form.email}
                 onChange={e => update('email', e.target.value)}
-                className="mb-3 bg-white text-black"
+                aria-label="Email"
+                className={`${fieldClass} mb-4`}
               />
             )}
             {tab === 'phone' && (
@@ -342,7 +375,8 @@ export default function LoginPage() {
                 placeholder="Phone"
                 value={form.phone}
                 onChange={e => update('phone', e.target.value)}
-                className="mb-3 bg-white text-black"
+                aria-label="Phone"
+                className={`${fieldClass} mb-4`}
               />
             )}
           </>
@@ -350,20 +384,22 @@ export default function LoginPage() {
 
         {/* PASSWORD */}
         {(mode === 'login' && tab === 'password') || mode === 'set-password' ? (
-          <div className="relative mb-3">
+          <div className="relative mb-4">
             <Input
               type={showPassword ? 'text' : 'password'}
               placeholder={mode === 'set-password' ? "New Password" : "Password"}
               value={form.password}
               onChange={e => update('password', e.target.value)}
-              className="bg-white text-black pr-10"
+              aria-label={mode === 'set-password' ? "New Password" : "Password"}
+              className={`${fieldClass} pr-12`}
             />
             <button
               type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center text-samara-mute transition-colors hover:text-samara-gold focus-visible:text-samara-gold focus-visible:outline-none"
               onClick={() => setShowPassword(p => !p)}
             >
-              <Eye size={18} />
+              <Eye size={18} strokeWidth={1.25} />
             </button>
           </div>
         ) : null}
@@ -374,7 +410,8 @@ export default function LoginPage() {
             placeholder="Enter OTP"
             value={form.otp}
             onChange={e => update('otp', e.target.value)}
-            className="mb-3 bg-white text-black"
+            aria-label="Enter OTP"
+            className={`${fieldClass} mb-4 h-16 text-center indent-[0.5em] font-sans text-2xl font-light tabular-nums tracking-[0.5em] placeholder:indent-0 placeholder:font-sans placeholder:text-sm placeholder:tracking-eyebrow placeholder:uppercase`}
           />
         )}
 
@@ -382,7 +419,7 @@ export default function LoginPage() {
         <Button
           type="submit"
           disabled={loading}
-          className="w-full mt-2 bg-[#1a1a1a] text-white"
+          className={`${goldButtonClass} mt-4`}
         >
           {loading
             ? 'Please wait...'
@@ -399,17 +436,17 @@ export default function LoginPage() {
 
         {/* SOCIAL LOGIN */}
         {mode === 'login' && (
-          <div className="mt-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-1 h-px bg-gray-700" />
-              <span className="text-xs text-gray-400">OR CONTINUE WITH</span>
-              <div className="flex-1 h-px bg-gray-700" />
+          <div className="mt-10">
+            <div className="mb-6 flex items-center gap-4">
+              <div className="h-px flex-1 bg-samara-line" />
+              <span className="font-sans text-[0.625rem] font-medium uppercase tracking-eyebrow text-samara-mute">OR CONTINUE WITH</span>
+              <div className="h-px flex-1 bg-samara-line" />
             </div>
-            <div className="space-y-3">
+            <div className="grid gap-3">
               <Button
                 type="button"
                 onClick={() => signInWithProvider('google')}
-                className="w-full bg-white text-black hover:bg-gray-200 font-medium flex items-center justify-center gap-3"
+                className={`${outlineButtonClass} gap-3 px-4 normal-case tracking-[0.04em]`}
               >
                 <Image src="/icons/google.svg" alt="Google" width={18} height={18} />
                 Continue with Google
@@ -417,7 +454,7 @@ export default function LoginPage() {
               <Button
                 type="button"
                 onClick={() => signInWithProvider('facebook')}
-                className="w-full bg-[#1877F2] text-white hover:bg-[#145dbf] font-medium flex items-center justify-center gap-3"
+                className={`${outlineButtonClass} gap-3 px-4 normal-case tracking-[0.04em]`}
               >
                 <Image src="/icons/facebook.svg" alt="Facebook" width={18} height={18} />
                 Continue with Facebook
@@ -428,21 +465,21 @@ export default function LoginPage() {
 
         {/* FOOTER LINKS */}
         {mode === 'login' && (
-          <div className="text-center mt-5 text-sm">
+          <div className="mt-10 border-t border-samara-line pt-8 text-center font-sans text-sm">
             {tab === 'password' && (
               <button
                 type="button"
-                className="text-[#D4AF37]"
+                className={`${textLinkClass} min-h-[44px]`}
                 onClick={() => setMode('forgot')}
               >
                 Forgot password?
               </button>
             )}
-            <div className="mt-3 text-gray-400">
+            <div className="mt-3 text-samara-mute">
               Don&apos;t have an account?{' '}
               <button
                 type="button"
-                className="text-[#D4AF37]"
+                className={`${textLinkClass} ml-1 min-h-[44px]`}
                 onClick={() => setMode('signup')}
               >
                 Sign Up
@@ -456,13 +493,14 @@ export default function LoginPage() {
           <button
             type="button"
             disabled={cooldown > 0 || loading}
-            className="text-xs text-[#D4AF37] mt-4 block mx-auto disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            className={`${textLinkClass} mx-auto mt-6 flex min-h-[44px] items-center transition-opacity disabled:cursor-not-allowed disabled:text-samara-mute disabled:opacity-70`}
             onClick={sendOtp}
           >
             {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend OTP'}
           </button>
         )}
       </form>
+      </div>
     </div>
   );
 }

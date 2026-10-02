@@ -1,17 +1,22 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { Star, Sparkles } from 'lucide-react';
 import { getCollectionBySlug, getCollectionProducts } from '@/lib/content';
 import { resolveFinalPrice } from '@/lib/resolve-product-price';
-import { formatPriceSync, getCurrencyRates } from '@/lib/currency-utils';
+import { getCurrencyRates } from '@/lib/currency-utils';
 import { getCurrentRegion } from '@/lib/region/server';
 import type { SupportedCurrency } from '@/lib/currency-utils';
+import { ListingHero, PieceCount } from '@/components/listing/ListingHero';
+import { ListingEmpty } from '@/components/listing/ListingEmpty';
+import { LISTING_GRID, ListingProductCard } from '@/components/listing/ListingProductCard';
+import { ArchOrnament } from '@/components/listing/Ornaments';
 
 export default async function CollectionDetailPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slug = params.slug;
+  // Next.js 15+: params is a Promise and must be awaited.
+  const { slug } = await params;
 
   // ---------------------------------------------------------
   // 1. FETCH DATA (Parallel)
@@ -26,13 +31,14 @@ export default async function CollectionDetailPage({
   // ---------------------------------------------------------
   if (!collection) {
     return (
-      <div className="bg-black text-white min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="font-serif text-3xl font-bold text-[#D4AF37] mb-4">Collection Not Found</h2>
-          <p className="text-gray-400 mb-6">The collection you're looking for doesn't exist.</p>
-          <Link href="/collections" className="text-[#D4AF37] hover:underline">
-            Browse All Collections
-          </Link>
+      <div className="min-h-[70vh] bg-samara-black text-samara-ivory">
+        <div className="sm-container py-20 md:py-28">
+          <ListingEmpty
+            eyebrow="Collections"
+            title="Collection Not Found"
+            body="The collection you're looking for doesn't exist."
+            actions={[{ label: 'Browse All Collections', href: '/collections', variant: 'ghost' }]}
+          />
         </div>
       </div>
     );
@@ -43,7 +49,7 @@ export default async function CollectionDetailPage({
   // ---------------------------------------------------------
   const region = await getCurrentRegion();
   const rates = await getCurrencyRates();
-  
+
   const priceMap = new Map<
     string,
     { price: number; currency: SupportedCurrency }
@@ -62,98 +68,110 @@ export default async function CollectionDetailPage({
   // ---------------------------------------------------------
   // 4. RENDER
   // ---------------------------------------------------------
+  const crumbs = [
+    { label: 'Home', href: '/' },
+    { label: 'Collections', href: '/collections' },
+    { label: collection.name },
+  ];
+  const meta = products.length > 0 ? <PieceCount count={products.length} /> : null;
+
   return (
-    <div className="bg-black text-white min-h-screen">
+    <div className="min-h-screen bg-samara-black text-samara-ivory">
       {/* HERO SECTION */}
-      {collection.hero_image_url && (
-        <div className="relative h-96 bg-[#050505] overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black z-10" />
-          <img
+      {collection.hero_image_url ? (
+        <section className="relative flex min-h-[460px] items-end overflow-hidden bg-samara-forest md:min-h-[560px] lg:h-[68vh] lg:max-h-[760px]">
+          <Image
             src={collection.hero_image_url}
             alt={collection.name}
-            className="w-full h-full object-cover"
+            fill
+            priority
+            sizes="100vw"
+            unoptimized={!collection.hero_image_url.startsWith('https://wrsrobuicquzpfgnfnmh.supabase.co/')}
+            className="object-cover"
           />
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white text-center px-4">
-            <h1 className="font-serif text-6xl md:text-7xl font-bold mb-4 text-[#D4AF37] tracking-tighter">
+          <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-samara-black/[0.85] via-samara-black/40 to-samara-black/20" />
+          <div className="sm-container relative w-full pb-12 pt-24 md:pb-16">
+            <nav aria-label="Breadcrumb" className="mb-8">
+              <ol className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-[0.6875rem] uppercase tracking-[0.2em] text-samara-ivory/70">
+                {crumbs.map((c, i) => (
+                  <li key={c.label} className="flex items-center gap-3">
+                    {i > 0 && <span aria-hidden className="h-px w-4 bg-samara-ivory/40" />}
+                    {c.href ? (
+                      <Link href={c.href} className="sm-link inline-flex min-h-[44px] items-center hover:text-samara-ivory sm:min-h-0">
+                        {c.label}
+                      </Link>
+                    ) : (
+                      <span aria-current="page" className="text-samara-ivory">
+                        {c.label}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+            <p className="sm-eyebrow mb-5 flex items-center gap-4 text-samara-gold">
+              <span>The Collection</span>
+              <span aria-hidden className="h-px w-10 bg-samara-gold/50" />
+            </p>
+            <h1 className="max-w-4xl font-serif text-[clamp(2.75rem,7vw,6rem)] font-light leading-[0.98] text-samara-ivory">
               {collection.hero_title || collection.name}
             </h1>
             {collection.hero_subtitle && (
-              <p className="text-xl text-gray-300">{collection.hero_subtitle}</p>
+              <p className="mt-5 max-w-xl font-serif text-lg italic text-samara-ivory/80 md:text-xl">
+                {collection.hero_subtitle}
+              </p>
             )}
           </div>
-        </div>
+        </section>
+      ) : (
+        <ListingHero
+          eyebrow="The Collection"
+          title={collection.hero_title || collection.name}
+          intro={collection.hero_subtitle || collection.description}
+          crumbs={crumbs}
+          meta={meta}
+          ornament={<ArchOrnament />}
+        />
       )}
 
       {/* PRODUCTS GRID */}
-      <section className="py-20 bg-gradient-to-b from-[#111111] to-black">
-        <div className="container mx-auto px-4 md:px-8">
-          {!collection.hero_image_url && (
-            <div className="mb-12 text-center">
-              <h1 className="font-serif text-6xl md:text-7xl font-bold mb-6 text-[#D4AF37] tracking-tighter">
-                {collection.name}
-              </h1>
-              {collection.description && (
-                <p className="text-xl text-gray-400 max-w-2xl mx-auto">{collection.description}</p>
-              )}
-            </div>
+      <section className="py-[clamp(3.5rem,7vw,6.5rem)]">
+        <div className="sm-container">
+          {collection.hero_subtitle && collection.description && (
+            <p className="sm-body mb-12 max-w-2xl md:mb-16">{collection.description}</p>
           )}
 
           {products.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-gray-500">No products in this collection yet.</p>
-            </div>
+            <ListingEmpty
+              eyebrow={collection.name}
+              title={
+                <>
+                  This edit is being <span className="sm-accent">curated</span>
+                </>
+              }
+              body="No products in this collection yet."
+              actions={[
+                { label: 'Browse All Sarees', href: '/sarees' },
+                { label: 'Shop All', href: '/shop', variant: 'ghost' },
+              ]}
+            />
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map((product) => {
+            <div className={LISTING_GRID}>
+              {products.map((product, index) => {
                 const resolved = priceMap.get(product.id);
-                
+                const badges = [
+                  ...(product.is_bestseller ? [product.bestseller_badge_label || 'Bestseller'] : []),
+                  ...(product.is_new_arrival ? ['New'] : []),
+                ];
+
                 return (
-                  <Link key={product.id} href={`/products/${product.slug}`}>
-                    <div className="group relative bg-black rounded-lg overflow-hidden border-2 border-[#D4AF37]/20 hover:border-[#D4AF37] hover:shadow-2xl hover:shadow-[#D4AF37]/30 transition-all duration-500">
-                      <div className="aspect-[3/4] relative overflow-hidden bg-[#1a1a1a]">
-                        {product.primary_image_url ? (
-                          <img
-                            src={product.primary_image_url}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-600">
-                            Product Image
-                          </div>
-                        )}
-                        {product.is_bestseller && (
-                          <div className="absolute top-3 left-3 bg-[#D4AF37] text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg z-10">
-                            <Star className="h-3 w-3 fill-current" />
-                            {product.bestseller_badge_label || 'Bestseller'}
-                          </div>
-                        )}
-                        {product.is_new_arrival && (
-                          <div className="absolute top-3 right-3 bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg z-10">
-                            <Sparkles className="h-3 w-3" />
-                            New
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-serif text-lg font-semibold mb-1 line-clamp-1 text-[#D4AF37]">
-                          {product.name}
-                        </h3>
-                        {product.brand && (
-                          <p className="text-sm text-gray-500 mb-2">{product.brand}</p>
-                        )}
-                        
-                        {/* PRICE DISPLAY */}
-                        {resolved ? (
-                          <p className="text-xl font-bold text-[#D4AF37]">
-                            {formatPriceSync(resolved.price, resolved.currency)}
-                          </p>
-                        ) : (
-                          <div className="h-6 w-24 bg-gray-800 rounded animate-pulse" />
-                        )}
-                      </div>
-                    </div>
-                  </Link>
+                  <ListingProductCard
+                    key={product.id}
+                    product={product}
+                    index={index}
+                    badges={badges}
+                    price={resolved}
+                  />
                 );
               })}
             </div>

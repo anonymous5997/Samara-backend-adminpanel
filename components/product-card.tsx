@@ -3,24 +3,81 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Heart } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Product, ProductImage } from '@/lib/types';
 import { formatPriceSync } from '@/lib/currency-utils';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ResolvedPrice } from '@/lib/resolve-product-price';
+import { cn } from '@/lib/utils';
+
+/** Any image row that at least carries a URL (full ProductImage rows still fit). */
+export type ProductCardImage = Pick<ProductImage, 'image_url'> & Partial<ProductImage>;
 
 interface ProductCardProps {
   product: Product;
-  image?: ProductImage;
+  image?: ProductCardImage | null;
   price?: ResolvedPrice;
+  /** Optional second photo, crossfaded in on desktop hover. Defaults to the product's next image when its rows are present. */
+  hoverImage?: ProductCardImage | null;
+  /** next/image `sizes` hint for the grid this card sits in. */
+  sizes?: string;
+  /** Eager-load the image (first row above the fold). */
+  priority?: boolean;
 }
 
-export function ProductCard({ product, image, price }: ProductCardProps) {
+const OPTIMIZED_HOSTS = new Set(['wrsrobuicquzpfgnfnmh.supabase.co', 'images.pexels.com']);
+
+function usable(url: string | null | undefined): url is string {
+  return typeof url === 'string' && url.trim() !== '' && !url.includes('placeholder.com');
+}
+
+function isOptimizable(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && OPTIMIZED_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** The product's own image rows, when the query that produced it joined them. */
+function imageRows(product: Product): Array<{ image_url?: string | null }> {
+  const p = product as Product & {
+    product_images?: Array<{ image_url?: string | null }> | null;
+    images?: Array<{ image_url?: string | null }> | null;
+  };
+  return p.product_images ?? p.images ?? [];
+}
+
+const DEFAULT_SIZES = '(min-width: 1440px) 22vw, (min-width: 1024px) 30vw, 46vw';
+
+export function ProductCard({ product, image, price, hoverImage, sizes = DEFAULT_SIZES, priority = false }: ProductCardProps) {
   const { user } = useAuth();
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Initial wishlisted state for this (user, product). Read only.
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    supabase
+      .from('wishlist_items')
+      .select('product_id')
+      .eq('user_id', user.id)
+      .eq('product_id', product.id)
+      .limit(1)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error loading wishlist state:', error);
+          return;
+        }
+        if (alive) setIsWishlisted((data?.length ?? 0) > 0);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user, product.id]);
 
   const toggleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -30,13 +87,13 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
     try {
       if (isWishlisted) {
         await supabase
-          .from('wishlists')
+          .from('wishlist_items')
           .delete()
           .eq('user_id', user.id)
           .eq('product_id', product.id);
         setIsWishlisted(false);
       } else {
-        await supabase.from('wishlists').insert({
+        await supabase.from('wishlist_items').insert({
           user_id: user.id,
           product_id: product.id,
         });
@@ -49,82 +106,116 @@ export function ProductCard({ product, image, price }: ProductCardProps) {
     }
   };
 
-  return (
-    <Link
-      href={`/products/${product.slug}`}
-      className="group block border border-[#D4AF37]/30 hover:border-[#D4AF37] rounded-xl p-3 transition bg-black"
-    >
-      {/* IMAGE CONTAINER */}
-      <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-[#111]">
-        {image ? (
-          <Image
-            src={image.image_url}
-            alt={product.name}
-            fill
-            className="object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            No Image
-          </div>
-        )}
+  const href = `/products/${product.slug}`;
+  const primaryUrl = image?.image_url;
+  const primary = usable(primaryUrl) ? primaryUrl : null;
+  let secondary: string | null = null;
+  if (primary && hoverImage !== undefined) {
+    const hoverUrl = hoverImage?.image_url;
+    secondary = usable(hoverUrl) && hoverUrl !== primary ? hoverUrl : null;
+  } else if (primary) {
+    secondary =
+      imageRows(product)
+        .map((row) => row.image_url)
+        .find((url): url is string => usable(url) && url !== primary) ?? null;
+  }
+  const showMrp = !!price && typeof price.mrp === 'number' && price.mrp > price.displayPrice;
 
-        {/* Wishlist Button */}
+  return (
+    <article className="group relative">
+      {/* IMAGE */}
+      <div className="relative">
+        <Link
+          href={href}
+          tabIndex={-1}
+          aria-hidden
+          data-img-reveal=""
+          className="sm-zoom relative block aspect-[4/5] w-full bg-samara-char"
+        >
+          {primary ? (
+            <>
+              <Image
+                src={primary}
+                alt={product.name}
+                fill
+                sizes={sizes}
+                priority={priority}
+                unoptimized={!isOptimizable(primary)}
+                className="object-cover"
+              />
+              {secondary && (
+                <Image
+                  src={secondary}
+                  alt=""
+                  fill
+                  sizes={sizes}
+                  unoptimized={!isOptimizable(secondary)}
+                  className="hidden object-cover opacity-0 transition-opacity duration-900 ease-editorial lg:block [@media(hover:hover)_and_(pointer:fine)]:group-hover:opacity-100"
+                />
+              )}
+            </>
+          ) : (
+            <span className="absolute inset-0 flex items-center justify-center font-serif text-6xl font-light text-samara-mute/50">
+              {product.name.trim().charAt(0).toUpperCase()}
+            </span>
+          )}
+        </Link>
+
+        {/* Wishlist */}
         {user && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full h-8 w-8"
+          <button
+            type="button"
             onClick={toggleWishlist}
             disabled={loading}
+            aria-pressed={isWishlisted}
+            aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Save ${product.name} to wishlist`}
+            className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center text-samara-ivory transition-colors duration-300 hover:text-samara-gold focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-4 focus-visible:outline-samara-gold disabled:cursor-wait"
           >
             <Heart
-              className={`h-4 w-4 ${
-                isWishlisted ? 'fill-red-500 text-red-500' : 'text-white'
-              }`}
+              aria-hidden
+              strokeWidth={1.25}
+              className={cn(
+                'h-[18px] w-[18px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] transition-[fill,color] duration-300',
+                isWishlisted ? 'fill-samara-gold text-samara-gold' : 'fill-transparent',
+              )}
             />
-          </Button>
+          </button>
         )}
       </div>
 
-      {/* DETAILS SECTION */}
-      <div className="mt-3 space-y-1">
-        {/* Title */}
-        <h3 className="text-base font-serif font-semibold text-[#D4AF37] line-clamp-2 leading-tight group-hover:text-[#F4CF57] transition-colors">
-          {product.name}
-        </h3>
-
-        {/* Brand */}
-        <p className="text-xs text-gray-400 font-medium">
+      {/* DETAILS */}
+      <div className="mt-4">
+        <p className="font-sans text-[0.625rem] uppercase tracking-[0.22em] text-samara-mute">
           {product.brand || 'Samara Heritage'}
         </p>
 
-        {/* PRICE */}
-        {!price ? (
-          <div className="mt-2 h-5 w-24 bg-gray-800 animate-pulse rounded" />
-        ) : (
-          <div className="mt-2 flex items-center gap-2">
-            {/* Selling Price */}
-            <span className="text-base font-semibold text-[#D4AF37]">
-              {formatPriceSync(price.displayPrice, price.currency)}
-            </span>
+        <h3 className="mt-1.5 font-serif text-[1.125rem] font-normal leading-snug md:text-[1.1875rem]">
+          <Link
+            href={href}
+            className="line-clamp-2 text-samara-ivory transition-colors duration-300 hover:text-samara-gold focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-samara-gold"
+          >
+            {product.name}
+          </Link>
+        </h3>
 
-            {/* MRP */}
-            {price.mrp && price.mrp > price.displayPrice && (
-              <span className="text-xs text-gray-500 line-through decoration-gray-600">
-                {formatPriceSync(price.mrp, price.currency)}
+        <div className="mt-2 min-h-[1.25rem]">
+          {!price ? (
+            <span aria-hidden className="block h-4 w-16 bg-samara-forest-2" />
+          ) : (
+            <p className="flex flex-wrap items-baseline gap-x-2 font-sans text-[0.8125rem] tabular-nums">
+              <span className="text-samara-ivory">
+                {formatPriceSync(price.displayPrice, price.currency)}
               </span>
-            )}
-
-            {/* Discount */}
-            {price.discountPct && price.discountPct > 0 && (
-              <span className="text-[10px] font-bold text-green-400 border border-green-400/30 px-1.5 py-0.5 rounded bg-green-400/10">
-                {price.discountPct}% OFF
-              </span>
-            )}
-          </div>
-        )}
+              {showMrp && (
+                <s className="text-[0.75rem] text-samara-mute">
+                  <span className="sr-only">MRP </span>
+                  {formatPriceSync(price.mrp as number, price.currency)}
+                </s>
+              )}
+            </p>
+          )}
+        </div>
       </div>
-    </Link>
+    </article>
   );
 }
