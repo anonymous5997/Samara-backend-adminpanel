@@ -45,15 +45,12 @@ const eyebrowLink =
 /** Desktop nav: Home first, then the shared storefront links. */
 const desktopNav = [{ href: '/', label: 'Home' }, ...primaryNav];
 
-/** Compact "INR ▾": the shared skin, minus the currency symbol. */
-const compactCurrency =
-  '[&>div>button]:px-1.5 [&>div>button_span_span:last-child]:hidden';
 
 function HeaderCurrency({ className }: { className?: string }) {
   const { currency, changeCurrency } = useCurrencySwitch();
   return (
-    <div className={cn(currencySkin, compactCurrency, className)}>
-      <CurrencySelector currency={currency} onChange={changeCurrency} />
+    <div className={cn(currencySkin, className)}>
+      <CurrencySelector currency={currency} onChange={changeCurrency} variant="compact" />
     </div>
   );
 }

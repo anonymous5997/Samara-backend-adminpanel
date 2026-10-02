@@ -53,12 +53,12 @@ export default function RootLayout({
       className={`${cormorant.variable} ${manrope.variable} ${playfair.variable}`}
     >
       <head>
-        {/* Brand intro: decide before first paint (first "/" visit per session,
-            motion allowed). CSS in globals.css does the rest. */}
+        {/* Brand intro: decide before first paint (every full load of "/",
+            motion allowed; not on in-app navigation). CSS in globals.css does the rest. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(location.pathname==='/'&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&!sessionStorage.getItem('sm-intro')){document.documentElement.setAttribute('data-intro','play');sessionStorage.setItem('sm-intro','1')}}catch(e){}",
+              "try{if(location.pathname==='/'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){document.documentElement.setAttribute('data-intro','play')}}catch(e){}",
           }}
         />
         {/* Without JS, scroll-reveal content must never stay hidden. */}
