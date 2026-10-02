@@ -1,274 +1,293 @@
 'use client';
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingCart, User, Heart, Search, Menu } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Heart, Menu, Search, ShoppingBag, User } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useCart } from '@/lib/cart-context';
-import { Button } from '@/components/ui/button';
-import { useState, useMemo } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import CurrencySelector from '@/components/currency-selector';
-import type { SupportedCurrency } from '@/lib/currency-utils';
-import { setUserRegion } from '@/lib/region/client';
+import { useShell } from '@/components/shell/ShellProvider';
+import {
+  MobileMenu,
+  currencySkin,
+  isActiveRoute,
+  primaryNav,
+} from '@/components/shell/MobileMenu';
+import { useCurrencySwitch } from '@/hooks/useCurrencySwitch';
+import { cn } from '@/lib/utils';
 
-const navLinks = [
-  { href: '/', label: 'Home' },
-  { href: '/sarees', label: 'Sarees' },
-  { href: '/collections', label: 'Collections' },
-  { href: '/festive-edit', label: 'Festive Edit' },
-  { href: '/about', label: 'About' },
-  { href: '/contact', label: 'Contact' },
-];
+/**
+ * Routes where the header floats transparently over a full-bleed hero.
+ * Pathname-based so the server render matches the client (no layout jump).
+ */
+const OVERLAY_ROUTES = ['/'];
+const SCROLL_THRESHOLD = 80;
+
+const iconBtn =
+  'relative flex h-11 w-11 items-center justify-center text-samara-ivory transition-opacity duration-300 ease-editorial hover:opacity-70 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-4px] focus-visible:outline-samara-gold';
+
+const menuItem =
+  'cursor-pointer rounded-none px-5 py-2.5 font-sans text-[11px] font-medium uppercase tracking-eyebrow text-samara-ivory/80 transition-colors focus:bg-transparent focus:text-samara-ivory data-[highlighted]:bg-transparent data-[highlighted]:text-samara-ivory';
+
+const eyebrowLink =
+  'font-sans text-[11px] font-medium uppercase tracking-[0.14em] text-samara-ivory xl:tracking-eyebrow';
+
+function HeaderCurrency({ className }: { className?: string }) {
+  const { currency, changeCurrency } = useCurrencySwitch();
+  return (
+    <div className={cn(currencySkin, className)}>
+      <CurrencySelector currency={currency} onChange={changeCurrency} />
+    </div>
+  );
+}
+
+/** Same footprint as HeaderCurrency while search params resolve. */
+function CurrencyPlaceholder() {
+  return <div className="h-11 w-[84px]" aria-hidden />;
+}
 
 export function Header() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  // ✅ Step 1: Get loading state from auth
+  const pathname = usePathname() ?? '/';
   const { user, profile, signOut, loading } = useAuth();
-  
   const { items } = useCart();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { openSearch, openWishlist, openCart } = useShell();
+  const [menuOpen, setMenuOpen] = useState(false);
   const cartItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Memoize currency to stop re-render loop
-  const urlCurrency = useMemo(() => {
-    return (searchParams.get("currency") || "INR") as SupportedCurrency;
-  }, [searchParams]);
+  const isOverlay = OVERLAY_ROUTES.includes(pathname);
+  // Entrance plays once, only when the first page loaded is an overlay route.
+  const [playEntrance] = useState(isOverlay);
+  const [scrolled, setScrolled] = useState(false);
 
-  const handleCurrencyChange = (nextCurrency: SupportedCurrency) => {
-    // 1. Sync region cookie (for future requests/shipping)
-    switch (nextCurrency) {
-      case 'USD':
-        setUserRegion('US');
-        break;
-      case 'AED':
-        setUserRegion('AE');
-        break;
-      case 'CAD':
-        setUserRegion('CA');
-        break;
-      case 'GBP':
-        setUserRegion('GB');
-        break;
-      default:
-        setUserRegion('IN');
-    }
+  useEffect(() => {
+    if (!isOverlay) return;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setScrolled(window.scrollY > SCROLL_THRESHOLD);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [isOverlay]);
 
-    // 2. Update URL (this is the ONLY trigger for pricing updates now)
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("currency", nextCurrency);
+  const solid = !isOverlay || scrolled;
+  const bagLabel =
+    cartItemsCount > 0
+      ? `Bag, ${cartItemsCount} ${cartItemsCount === 1 ? 'item' : 'items'}`
+      : 'Bag, empty';
 
-    // Replace URL without scrolling
-    router.replace(`${pathname}?${params.toString()}`, {
-      scroll: false,
-    });
-    
-    // ✅ ISSUE 4 FIX: Only refresh server data on shop/product pages
-    // This keeps the Home page fast and instant
-    if (pathname.startsWith("/shop") || pathname.startsWith("/products")) {
-      router.refresh(); 
-    }
-  };
+  return (
+    <>
+      <header
+        className={cn(
+          'top-0 z-[999] w-full border-b text-samara-ivory',
+          'transition-[background-color,border-color,backdrop-filter] duration-700 ease-editorial',
+          isOverlay ? 'fixed inset-x-0' : 'sticky',
+          solid
+            ? 'border-samara-line bg-samara-ink/95 backdrop-blur-md'
+            : 'border-transparent bg-transparent backdrop-blur-0',
+          !isOverlay && 'bg-samara-ink',
+          playEntrance &&
+            'motion-safe:animate-[sm-overlay-in_900ms_cubic-bezier(0.22,1,0.36,1)_900ms_both]',
+        )}
+      >
+        {/* The logo PNG ships on an opaque black ground; this keys black to
+            transparent (alpha from brightness) so it sits cleanly on imagery. */}
+        <svg aria-hidden width="0" height="0" className="absolute">
+          <filter id="samara-logo-key" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  1.3 1.3 0.4 0 0"
+            />
+          </filter>
+        </svg>
 
-  // ✅ ISSUE 2 FIX: Prevent header flicker while auth is loading
-  if (loading) {
-    return (
-      <header className="sticky top-0 z-[999] w-full bg-[#050505] border-b border-[#D4AF37]/20">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="flex h-[72px] items-center justify-between">
-            {/* Logo Placeholder */}
-            <div className="flex items-center gap-4 h-full opacity-50">
-              <div className="relative h-14 w-44 flex items-center">
-                 {/* Keep logo visible but static */}
-                 <Image
-                  src="/samara-logo.png"
-                  alt="Loading..."
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
+        {/* Legibility scrim over imagery; fades out once the bar turns solid. */}
+        {isOverlay && (
+          <div
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute inset-x-0 top-0 -z-10 h-[150%] bg-gradient-to-b from-black/60 via-black/25 to-transparent',
+              'transition-opacity duration-700 ease-editorial',
+              solid ? 'opacity-0' : 'opacity-100',
+            )}
+          />
+        )}
+
+        <div className="sm-container grid h-[60px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center lg:h-[72px]">
+          {/* LEFT */}
+          <div className="flex min-w-0 items-center">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className={cn(iconBtn, '-ml-3 lg:hidden')}
+              aria-label="Open menu"
+              aria-expanded={menuOpen}
+              aria-haspopup="dialog"
+            >
+              <Menu className="h-5 w-5" strokeWidth={1.25} />
+            </button>
+
+            <nav aria-label="Primary" className="hidden lg:block">
+              <ul className="flex items-center gap-5 xl:gap-9">
+                {primaryNav.map((link) => {
+                  const active = isActiveRoute(pathname, link.href);
+                  return (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        aria-current={active ? 'page' : undefined}
+                        className={cn(
+                          eyebrowLink,
+                          'sm-link whitespace-nowrap py-2 transition-opacity duration-300 hover:opacity-100 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold',
+                          active ? 'opacity-100' : 'opacity-80',
+                        )}
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
+
+          {/* CENTRE: logo — always full opacity, including while auth loads */}
+          <Link
+            href="/"
+            aria-label="Samara, home"
+            className="flex items-center justify-center px-2 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold"
+          >
+            <Image
+              src="/samara-logo.png"
+              alt="Samara"
+              width={794}
+              height={290}
+              sizes="(min-width: 1280px) 132px, (min-width: 1024px) 121px, 104px"
+              priority
+              className="h-[38px] w-auto [filter:url(#samara-logo-key)] lg:h-[44px] xl:h-[48px]"
+            />
+          </Link>
+
+          {/* RIGHT */}
+          <div className="flex min-w-0 items-center justify-end">
+            <div className="hidden lg:block">
+              <Suspense fallback={<CurrencyPlaceholder />}>
+                <HeaderCurrency className="mr-2 min-w-[84px]" />
+              </Suspense>
             </div>
-            {/* Empty Right Side to prevent layout shift */}
-            <div className="flex items-center gap-4" />
+
+            <button
+              type="button"
+              onClick={openSearch}
+              className={iconBtn}
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" strokeWidth={1.25} />
+            </button>
+
+            {/* Account — fixed footprint so the auth-loading state never shifts */}
+            <div className="hidden h-11 w-[64px] items-center justify-center lg:flex">
+              {loading ? null : user ? (
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger className={iconBtn} aria-label="Account">
+                    <User className="h-5 w-5" strokeWidth={1.25} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={14}
+                    className="z-[1000] min-w-[220px] rounded-none border-samara-line bg-samara-ink p-0 py-2 text-samara-ivory shadow-none"
+                  >
+                    {user.email && (
+                      <>
+                        <DropdownMenuLabel className="truncate px-5 pb-3 pt-2 font-sans text-xs font-normal text-samara-mute">
+                          {user.email}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="mx-0 my-0 bg-samara-line" />
+                      </>
+                    )}
+                    <div className="py-2">
+                      <DropdownMenuItem asChild className={menuItem}>
+                        <Link href="/profile">Profile</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild className={menuItem}>
+                        <Link href="/orders">Orders</Link>
+                      </DropdownMenuItem>
+                      {profile?.role === 'admin' && (
+                        <DropdownMenuItem asChild className={menuItem}>
+                          <Link href="/admin">Admin Panel</Link>
+                        </DropdownMenuItem>
+                      )}
+                    </div>
+                    <DropdownMenuSeparator className="mx-0 my-0 bg-samara-line" />
+                    <div className="pt-2">
+                      <DropdownMenuItem onClick={signOut} className={cn(menuItem, 'text-samara-mute')}>
+                        Sign out
+                      </DropdownMenuItem>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className={cn(
+                    eyebrowLink,
+                    'sm-link py-2 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-samara-gold',
+                  )}
+                >
+                  Login
+                </Link>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={openWishlist}
+              className={cn(iconBtn, 'hidden lg:flex')}
+              aria-label="Wishlist"
+            >
+              <Heart className="h-5 w-5" strokeWidth={1.25} />
+            </button>
+
+            <button
+              type="button"
+              onClick={openCart}
+              className={cn(iconBtn, '-mr-3')}
+              aria-label={bagLabel}
+            >
+              <ShoppingBag className="h-5 w-5" strokeWidth={1.25} />
+              {cartItemsCount > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute right-[5px] top-[7px] font-sans text-[10px] font-medium leading-none tabular-nums text-samara-gold"
+                >
+                  {cartItemsCount > 99 ? '99+' : cartItemsCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </header>
-    );
-  }
 
-  return (
-    <header className="sticky top-0 z-[999] w-full bg-[#050505] border-b border-[#D4AF37]/20">
-      <div className="container mx-auto px-4 md:px-8">
-        <div className="flex h-[72px] items-center justify-between">
-          {/* LEFT: Logo */}
-          <div className="flex items-center gap-4 h-full">
-            <Link href="/" className="flex items-center group">
-              <div className="relative h-14 w-44 flex items-center">
-                <Image
-                  src="/samara-logo.png"
-                  alt="Samara - Woven for every woman"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-            </Link>
-          </div>
-
-          {/* CENTER: nav (desktop) */}
-          <nav className="hidden lg:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-[#F5F5F5] hover:text-[#F4D03F] transition-colors duration-300 tracking-wide hover:underline underline-offset-4"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* RIGHT: actions */}
-          <div className="flex items-center gap-4">
-            
-            {/* DESKTOP CURRENCY SELECTOR */}
-            <div className="hidden md:block">
-              <CurrencySelector 
-                currency={urlCurrency} 
-                onChange={handleCurrencyChange} 
-              />
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="hidden md:inline-flex text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-            >
-              <Link href="/search">
-                <Search className="h-5 w-5" />
-              </Link>
-            </Button>
-
-            {user && (
-              <Button
-                variant="ghost"
-                size="icon"
-                asChild
-                className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-              >
-                <Link href="/wishlist">
-                  <Heart className="h-5 w-5" />
-                </Link>
-              </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              asChild
-              className="relative text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-            >
-              <Link href="/cart" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartItemsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#D4AF37] text-xs text-black flex items-center justify-center font-semibold">
-                    {cartItemsCount}
-                  </span>
-                )}
-              </Link>
-            </Button>
-
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10"
-                  >
-                    <User className="h-5 w-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-[1000] bg-[#111111] border-[#D4AF37]/20">
-                  <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                    <Link href="/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                    <Link href="/orders">Orders</Link>
-                  </DropdownMenuItem>
-                  {profile?.role === 'admin' && (
-                    <DropdownMenuItem asChild className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                      <Link href="/admin">Admin Panel</Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={signOut} className="text-[#F5F5F5] hover:text-[#D4AF37] focus:text-[#D4AF37]">
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button asChild size="sm" className="bg-gradient-to-r from-[#D4AF37] to-[#F4D03F] hover:shadow-lg hover:shadow-[#D4AF37]/50 text-black font-semibold rounded-full px-6">
-                <Link href="/auth/login">Sign In</Link>
-              </Button>
-            )}
-
-            {/* MOBILE MENU SHEET */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-[#D4AF37] hover:text-[#F4D03F] hover:bg-[#D4AF37]/10">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              
-              {/* ✅ ISSUE FIX: Added overflow-y-auto for scrolling */}
-              <SheetContent 
-                side="left" 
-                className="fixed inset-y-0 left-0 z-[1000] bg-[#000000] border-[#D4AF37]/20 overflow-y-auto"
-              >
-                
-                {/* ✅ ISSUE FIX: Added pb-24 for safe bottom spacing */}
-                <nav className="flex flex-col gap-4 mt-8 pb-24">
-                  {navLinks.map((link) => (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      className="text-lg font-medium text-[#F5F5F5] hover:text-[#D4AF37] transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
-
-                {/* MOBILE CURRENCY SELECTOR */}
-                <div className="mt-8 pt-6 border-t border-[#D4AF37]/20">
-                  <p className="text-sm font-medium text-[#D4AF37] mb-3">Currency</p>
-                  <div className="w-full">
-                    <CurrencySelector
-                      currency={urlCurrency}
-                      onChange={handleCurrencyChange}
-                    />
-                  </div>
-                </div>
-
-              </SheetContent>
-            </Sheet>
-          </div>
-        </div>
-      </div>
-    </header>
+      <MobileMenu open={menuOpen} onOpenChange={setMenuOpen} />
+    </>
   );
 }
 
