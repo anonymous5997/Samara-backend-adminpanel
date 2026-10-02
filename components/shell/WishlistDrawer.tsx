@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Drawer } from '@/components/shell/Drawer';
-import { Toaster } from '@/components/ui/sonner';
 import { useAuth } from '@/lib/auth-context';
 import { useWishlist } from '@/hooks/useWishlist';
 
@@ -26,7 +25,6 @@ export function WishlistDrawer({ open, onOpenChange }: WishlistDrawerProps) {
   const { items, loading, removeFromWishlist, handleAddToCart, formatPrice } =
     useWishlist({ enabled: open });
   const [pending, setPending] = useState<string | null>(null);
-  const [needsToaster, setNeedsToaster] = useState(false);
   const pathname = usePathname();
   const lastPath = useRef(pathname);
 
@@ -36,16 +34,6 @@ export function WishlistDrawer({ open, onOpenChange }: WishlistDrawerProps) {
     lastPath.current = pathname;
     if (open) onOpenChange(false);
   }, [pathname, open, onOpenChange]);
-
-  // Toasts need a <Toaster />. Several pages mount their own; only add one
-  // when none is present, so a toast never renders twice.
-  useEffect(() => {
-    if (!open) return;
-    const others = Array.from(
-      document.querySelectorAll('section[aria-label^="Notifications"]'),
-    ).filter((el) => !el.closest('[data-wishlist-toaster]'));
-    setNeedsToaster(others.length === 0);
-  }, [open, pathname]);
 
   const close = () => onOpenChange(false);
 
@@ -204,11 +192,6 @@ export function WishlistDrawer({ open, onOpenChange }: WishlistDrawerProps) {
       >
         {body}
       </Drawer>
-      {needsToaster && (
-        <div data-wishlist-toaster="">
-          <Toaster />
-        </div>
-      )}
     </>
   );
 }

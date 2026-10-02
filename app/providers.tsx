@@ -7,6 +7,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { Header } from "@/components/header"; 
 import { Footer } from "@/components/footer";
 import { ShellProvider } from "@/components/shell/ShellProvider";
+import { StorefrontToaster } from "@/components/shell/StorefrontToaster";
 
 export default function Providers({
   children,
@@ -44,6 +45,7 @@ export default function Providers({
 
             <Footer />
           </div>
+          {!isAdmin && <StorefrontToaster />}
         </ShellProvider>
       </CartProvider>
     </AuthProvider>
