@@ -1,137 +1,33 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/product-card';
-import { supabase } from '@/lib/supabase/client';
-import { useCart } from '@/lib/cart-context';
-import { Product } from '@/lib/types';
+import { useProductSearch } from '@/hooks/useProductSearch';
 
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
-  return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
-
-interface SearchProduct extends Product {
-  is_bestseller: boolean;
-  bestseller_badge_label: string;
-  is_new_arrival: boolean;
-  primary_image_url?: string;
-  product_images: Array<{
-    id: string;
-    image_url: string;
-    is_primary: boolean;
-  }>;
-}
-
-export default function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [products, setProducts] = useState<SearchProduct[]>([]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+function SearchView({ urlQuery }: { urlQuery: string | null }) {
+  const {
+    searchQuery,
+    setSearchQuery,
+    products,
+    suggestions,
+    loading,
+    selectSuggestion,
+    clearSearch,
+  } = useProductSearch(urlQuery ?? '');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { currency } = useCart();
 
-  const searchProducts = async (query: string) => {
-    if (!query.trim()) {
-      setProducts([]);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          product_images (
-            id,
-            image_url,
-            is_primary
-          )
-        `)
-        .eq('is_active', true)
-        .or(`name.ilike.%${query}%,description.ilike.%${query}%,brand.ilike.%${query}%`)
-        .limit(20);
-
-      if (error) throw error;
-
-      const productsWithImages: SearchProduct[] = (data || []).map(product => ({
-        ...product,
-        primary_image_url: (product.product_images || []).find((img: any) => img.is_primary)?.image_url ||
-                            (product.product_images || [])[0]?.image_url,
-      }));
-
-      setProducts(productsWithImages);
-    } catch (error) {
-      console.error('Error searching products:', error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      searchProducts(query);
-    }, 300),
-    []
-  );
-
-  const fetchSuggestions = async (query: string) => {
-    if (!query.trim() || query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('name')
-        .eq('is_active', true)
-        .ilike('name', `%${query}%`)
-        .limit(5);
-
-      if (error) throw error;
-
-      const uniqueSuggestions = Array.from(new Set((data || []).map(p => p.name)));
-      setSuggestions(uniqueSuggestions);
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      setSuggestions([]);
-    }
-  };
-
-  const debouncedSuggestions = useCallback(
-    debounce((query: string) => {
-      fetchSuggestions(query);
-    }, 200),
-    []
-  );
-
+  // Follow ?q= when it changes while this page is open (e.g. from the search overlay).
   useEffect(() => {
-    debouncedSearch(searchQuery);
-    debouncedSuggestions(searchQuery);
-  }, [searchQuery, debouncedSearch, debouncedSuggestions]);
+    if (urlQuery !== null) setSearchQuery(urlQuery);
+  }, [urlQuery, setSearchQuery]);
 
   const handleSuggestionClick = (suggestion: string) => {
-    setSearchQuery(suggestion);
     setShowSuggestions(false);
-    searchProducts(suggestion);
-  };
-
-  const clearSearch = () => {
-    setSearchQuery('');
-    setProducts([]);
-    setSuggestions([]);
+    selectSuggestion(suggestion);
   };
 
   return (
@@ -220,5 +116,18 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function SearchWithParams() {
+  const params = useSearchParams();
+  return <SearchView urlQuery={params.get('q')} />;
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchView urlQuery={null} />}>
+      <SearchWithParams />
+    </Suspense>
   );
 }
