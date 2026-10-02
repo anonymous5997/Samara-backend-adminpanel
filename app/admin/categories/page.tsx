@@ -24,17 +24,25 @@ import { Category } from '@/lib/types';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
+import { AdminImageField } from '@/components/admin/AdminImageField';
+import { uploadAdminImage } from '@/lib/admin/image-upload';
+
+const emptyForm = {
+  name: '',
+  slug: '',
+  description: '',
+  image_url: null as string | null,
+};
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    description: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
+  // Image chosen in the dialog; uploaded to hero-media/categories/ on save.
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -58,19 +66,37 @@ export default function AdminCategoriesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
     try {
+      let imageUrl = formData.image_url;
+      if (imageFile) {
+        const uploadedUrl = await uploadAdminImage(imageFile, 'categories');
+        if (!uploadedUrl) {
+          toast.error('Failed to upload image');
+          return;
+        }
+        imageUrl = uploadedUrl;
+      }
+
+      const payload = {
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description,
+        image_url: imageUrl,
+      };
+
       if (editingCategory) {
         const { error } = await supabase
           .from('categories')
-          .update(formData)
+          .update(payload)
           .eq('id', editingCategory.id);
 
         if (error) throw error;
         toast.success('Category updated');
       } else {
         const { error } = await supabase.from('categories').insert({
-          ...formData,
+          ...payload,
           is_active: true,
         });
 
@@ -80,10 +106,13 @@ export default function AdminCategoriesPage() {
 
       setDialogOpen(false);
       setEditingCategory(null);
-      setFormData({ name: '', slug: '', description: '' });
+      setFormData(emptyForm);
+      setImageFile(null);
       fetchCategories();
     } catch (error) {
       toast.error('Failed to save category');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -93,7 +122,9 @@ export default function AdminCategoriesPage() {
       name: category.name,
       slug: category.slug,
       description: category.description || '',
+      image_url: category.image_url || null,
     });
+    setImageFile(null);
     setDialogOpen(true);
   };
 
@@ -122,7 +153,8 @@ export default function AdminCategoriesPage() {
               <Button
                 onClick={() => {
                   setEditingCategory(null);
-                  setFormData({ name: '', slug: '', description: '' });
+                  setFormData(emptyForm);
+                  setImageFile(null);
                 }}
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -173,8 +205,21 @@ export default function AdminCategoriesPage() {
                     }
                   />
                 </div>
-                <Button type="submit" className="w-full">
-                  {editingCategory ? 'Update' : 'Create'} Category
+                <AdminImageField
+                  id="categoryImage"
+                  label="Image (optional)"
+                  currentUrl={formData.image_url}
+                  file={imageFile}
+                  onFileChange={setImageFile}
+                  onRemove={() => {
+                    setImageFile(null);
+                    setFormData({ ...formData, image_url: null });
+                  }}
+                />
+                <Button type="submit" className="w-full" disabled={saving}>
+                  {saving
+                    ? 'Saving…'
+                    : `${editingCategory ? 'Update' : 'Create'} Category`}
                 </Button>
               </form>
             </DialogContent>
@@ -188,6 +233,7 @@ export default function AdminCategoriesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Image</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
                   <TableHead>Description</TableHead>
@@ -198,6 +244,18 @@ export default function AdminCategoriesPage() {
               <TableBody>
                 {categories.map((category) => (
                   <TableRow key={category.id}>
+                    <TableCell>
+                      {category.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={category.image_url}
+                          alt=""
+                          className="h-10 w-10 rounded object-cover border"
+                        />
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">
                       {category.name}
                     </TableCell>
